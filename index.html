@@ -1,0 +1,4117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#f8f8f8">
+<title>我的手机</title>
+<style>
+/* ==================== 1. 基础重置 ==================== */
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{width:100%;height:100%;background:#111;display:flex;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB',sans-serif;color:#1e1e1e;overflow:hidden;}
+::-webkit-scrollbar{display:none;}
+*{scrollbar-width:none;-ms-overflow-style:none;}
+button{border:none;background:none;cursor:pointer;font:inherit;color:inherit;}
+input,textarea,select{font:inherit;color:inherit;border:none;outline:none;background:transparent;}
+ul{list-style:none;}
+
+/* ==================== 2. 手机外壳 ==================== */
+.phone-frame{width:375px;height:700px;border-radius:44px;background:#f8f8f8;position:relative;overflow:hidden;box-shadow:0 0 0 8px #222,0 0 40px rgba(0,0,0,.6),inset 0 0 2px rgba(255,255,255,.1);}
+.phone-screen{width:100%;height:100%;display:flex;flex-direction:column;position:relative;}
+
+/* 手机端全屏模式 */
+@media (max-width:420px) {
+  .phone-frame{width:100vw;height:100vh;border-radius:0;box-shadow:none;}
+  .status-bar{padding-top:env(safe-area-inset-top,0);height:auto;min-height:28px;padding-left:20px;padding-right:20px;}
+  .bottom-nav{padding-bottom:env(safe-area-inset-bottom,0);height:auto;min-height:50px;}
+}
+/* 平板/中等屏幕居中 */
+@media (min-width:421px) and (max-width:768px) {
+  .phone-frame{border-radius:30px;box-shadow:0 0 0 6px #222,0 0 30px rgba(0,0,0,.4);}
+}
+
+/* ==================== 3. 状态栏 ==================== */
+.status-bar{height:28px;background:#f8f8f8;display:flex;align-items:center;justify-content:space-between;padding:0 20px;font-size:11px;font-weight:600;flex-shrink:0;z-index:10;}
+.status-bar .sb-time{font-weight:700;}
+.status-bar .sb-icons{display:flex;gap:4px;font-size:10px;}
+
+/* ==================== 4. 内容区 ==================== */
+.content-area{flex:1;position:relative;overflow:hidden;}
+
+/* ==================== 5. 页面通用 & 过渡 ==================== */
+.page{position:absolute;top:0;left:0;width:100%;height:100%;display:none;flex-direction:column;background:#f8f8f8;overflow-y:auto;overflow-x:hidden;}
+.page.active{display:flex;}
+@keyframes slideInRight{from{transform:translateX(100%)}to{transform:translateX(0)}}
+@keyframes slideOutLeft{from{transform:translateX(0)}to{transform:translateX(-100%)}}
+@keyframes slideInLeft{from{transform:translateX(-100%)}to{transform:translateX(0)}}
+@keyframes slideOutRight{from{transform:translateX(0)}to{transform:translateX(100%)}}
+.anim-in-right{animation:slideInRight .28s ease forwards}
+.anim-out-left{animation:slideOutLeft .28s ease forwards}
+.anim-in-left{animation:slideInLeft .28s ease forwards}
+.anim-out-right{animation:slideOutRight .28s ease forwards}
+
+/* ==================== 6. 底部导航 ==================== */
+.bottom-nav{height:50px;background:#f8f8f8;border-top:1px solid #e0e0e0;display:flex;align-items:center;justify-content:space-around;flex-shrink:0;z-index:10;padding-bottom:4px;}
+.bottom-nav button{font-size:18px;padding:8px 18px;border-radius:20px;transition:all .15s;opacity:.5;}
+.bottom-nav button:active{transform:scale(.92);}
+.bottom-nav button.nav-enabled{opacity:1;}
+.bottom-nav button.nav-disabled{opacity:.25;pointer-events:none;}
+
+/* ==================== 7. 主页双屏 ==================== */
+.main-wrapper{display:flex;width:200%;height:100%;transition:transform .3s ease;}
+.main-screen{width:50%;height:100%;overflow-y:auto;padding:10px 16px 8px;}
+
+/* 天气卡片 */
+.weather-card{background:linear-gradient(135deg,#e8e8e8,#d0d0d0);border-radius:16px;padding:14px 16px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;transition:transform .1s;}
+.weather-card:active{transform:scale(.98);}
+.weather-info{font-size:12px;color:#555;line-height:1.6;}
+.weather-info .temp{font-size:28px;font-weight:700;color:#1e1e1e;}
+.weather-info .weather-detail{font-size:11px;color:#777;margin-top:2px;}
+.weather-icon{font-size:36px;}
+.weather-loading{font-size:12px;color:#999;}
+
+/* 唱片机 */
+.vinyl-container{display:flex;flex-direction:column;align-items:center;margin:10px 0 16px;position:relative;}
+.vinyl-wrap{position:relative;width:160px;height:160px;}
+.vinyl-disc{width:140px;height:140px;border-radius:50%;position:absolute;top:10px;left:10px;background:conic-gradient(from 0deg,#2a2a2a,#3a3a3a,#2a2a2a,#3a3a3a,#2a2a2a,#3a3a3a,#2a2a2a,#3a3a3a,#2a2a2a,#3a3a3a,#2a2a2a,#3a3a3a);box-shadow:inset 0 0 30px rgba(0,0,0,.3),0 2px 8px rgba(0,0,0,.2);animation:vinylSpin 8s linear infinite;animation-play-state:paused;}
+.vinyl-disc::after{content:'';position:absolute;top:50%;left:50%;width:24px;height:24px;border-radius:50%;background:radial-gradient(circle,#f8f8f8 30%,#ccc 70%);transform:translate(-50%,-50%);box-shadow:0 0 4px rgba(0,0,0,.2);}
+.vinyl-disc::before{content:'';position:absolute;top:50%;left:50%;width:50px;height:50px;border-radius:50%;border:1px solid rgba(255,255,255,.05);transform:translate(-50%,-50%);}
+.vinyl-disc.playing{animation-play-state:running;}
+@keyframes vinylSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.vinyl-arm{position:absolute;top:-4px;right:6px;width:50px;height:4px;background:linear-gradient(to left,#555,#888);border-radius:2px;transform-origin:90% 50%;transform:rotate(-25deg);transition:transform .5s ease;z-index:2;}
+.vinyl-arm::before{content:'';position:absolute;right:-4px;top:-4px;width:12px;height:12px;border-radius:50%;background:#666;}
+.vinyl-arm.playing{transform:rotate(-8deg);}
+.vinyl-label{font-size:11px;color:#888;margin-top:4px;text-align:center;}
+
+/* 图标网格 */
+.icon-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px 8px;padding:6px 0;}
+.icon-item{display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;-webkit-user-select:none;user-select:none;transition:transform .1s;}
+.icon-item:active{transform:scale(.92);}
+.icon-item.dragging{opacity:.4;}
+.icon-item.drag-over{border:2px dashed #aaa;border-radius:12px;}
+.icon-symbol{width:48px;height:48px;border-radius:14px;background:#e8e8e8;display:flex;align-items:center;justify-content:center;font-size:22px;color:#1e1e1e;transition:background .15s;}
+.icon-symbol:active{background:#ddd;}
+.icon-name{font-size:10px;color:#666;white-space:nowrap;}
+
+/* 倒数日卡片 */
+.countdown-card{background:linear-gradient(135deg,#e0e0e0,#ccc);border-radius:16px;padding:16px;margin-bottom:14px;cursor:pointer;position:relative;overflow:hidden;transition:transform .1s;min-height:90px;}
+.countdown-card:active{transform:scale(.98);}
+.countdown-card .cd-bg{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;opacity:.3;border-radius:16px;}
+.countdown-card .cd-content{position:relative;z-index:1;}
+.countdown-card .cd-event{font-size:16px;font-weight:600;margin-bottom:4px;}
+.countdown-card .cd-days{font-size:32px;font-weight:700;color:#1e1e1e;}
+.countdown-card .cd-date{font-size:11px;color:#666;margin-top:2px;}
+
+/* 倒数日编辑 */
+.cd-edit{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;z-index:100;}
+.cd-edit.show{display:flex;}
+.cd-edit-form{background:#f8f8f8;border-radius:20px;padding:24px;width:300px;display:flex;flex-direction:column;gap:12px;}
+.cd-edit-form h3{font-size:16px;text-align:center;}
+.cd-edit-form input{border:1px solid #ddd;border-radius:10px;padding:10px 12px;background:#fff;font-size:14px;}
+.cd-edit-form .btn-row{display:flex;gap:10px;justify-content:center;}
+.cd-edit-form .btn-row button{padding:8px 24px;border-radius:12px;font-size:14px;font-weight:600;}
+.cd-btn-save{background:#1e1e1e;color:#f8f8f8;}
+.cd-btn-cancel{background:#e0e0e0;color:#1e1e1e;}
+
+/* ==================== 8. 子页面通用 ==================== */
+.sub-page-header{padding:14px 16px 10px;font-size:17px;font-weight:700;border-bottom:1px solid #eee;background:#f8f8f8;flex-shrink:0;}
+.sub-page-body{flex:1;overflow-y:auto;padding:12px 16px;}
+
+/* ==================== 9. 任务清单 ==================== */
+.task-list{display:flex;flex-direction:column;gap:6px;}
+.task-item{display:flex;align-items:center;gap:10px;padding:10px 12px;background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.04);transition:transform .1s;}
+.task-item:active{transform:scale(.98);}
+.task-item.done .task-text{text-decoration:line-through;color:#aaa;}
+.task-check{width:22px;height:22px;border-radius:50%;border:2px solid #ccc;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:all .15s;font-size:12px;}
+.task-check.checked{background:#1e1e1e;border-color:#1e1e1e;color:#f8f8f8;}
+.task-text{flex:1;font-size:14px;}
+.task-del{font-size:16px;color:#ccc;cursor:pointer;padding:4px;}
+.task-del:hover{color:#e55;}
+.task-add-bar{display:flex;gap:8px;padding:10px 0;flex-shrink:0;}
+.task-add-bar input{flex:1;border:1px solid #ddd;border-radius:12px;padding:10px 14px;background:#fff;font-size:14px;}
+.task-add-bar button{background:#1e1e1e;color:#f8f8f8;border-radius:12px;padding:10px 18px;font-weight:600;font-size:14px;}
+
+/* ==================== 10. 闹钟 ==================== */
+.alarm-list{display:flex;flex-direction:column;gap:8px;}
+.alarm-item{display:flex;align-items:center;justify-content:space-between;padding:14px 14px;background:#fff;border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,.04);}
+.alarm-time{font-size:28px;font-weight:700;}
+.alarm-label{font-size:12px;color:#888;margin-top:2px;}
+.alarm-right{display:flex;align-items:center;gap:10px;}
+.alarm-del{font-size:18px;color:#ccc;cursor:pointer;}
+.alarm-del:hover{color:#e55;}
+.ios-toggle{width:46px;height:28px;border-radius:14px;background:#ddd;position:relative;cursor:pointer;transition:background .2s;}
+.ios-toggle.on{background:#4cd964;}
+.ios-toggle::after{content:'';position:absolute;top:2px;left:2px;width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:transform .2s;}
+.ios-toggle.on::after{transform:translateX(18px);}
+.alarm-add-bar{display:flex;gap:8px;padding:10px 0;flex-shrink:0;align-items:center;}
+.alarm-add-bar input{border:1px solid #ddd;border-radius:10px;padding:8px 12px;background:#fff;font-size:14px;}
+.alarm-add-bar input[type="time"]{width:110px;}
+.alarm-add-bar input[type="text"]{flex:1;}
+.alarm-add-bar button{background:#1e1e1e;color:#f8f8f8;border-radius:12px;padding:8px 16px;font-weight:600;font-size:14px;}
+
+/* 闹钟弹窗 */
+.alarm-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:200;}
+.alarm-modal.show{display:flex;}
+.alarm-modal-box{background:#f8f8f8;border-radius:20px;padding:30px;text-align:center;width:260px;}
+.alarm-modal-box .am-title{font-size:20px;font-weight:700;margin-bottom:8px;}
+.alarm-modal-box .am-time{font-size:36px;font-weight:700;margin-bottom:6px;}
+.alarm-modal-box .am-label{font-size:14px;color:#888;margin-bottom:16px;}
+.alarm-modal-box button{background:#1e1e1e;color:#f8f8f8;border-radius:14px;padding:10px 30px;font-size:15px;font-weight:600;}
+
+/* ==================== 11. 相机 ==================== */
+.camera-page{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:20px;}
+.camera-preview{width:280px;height:280px;background:#ddd;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:48px;color:#aaa;overflow:hidden;}
+.camera-preview img{width:100%;height:100%;object-fit:cover;}
+.camera-btns{display:flex;gap:14px;}
+.camera-btn{padding:12px 24px;border-radius:14px;font-size:14px;font-weight:600;background:#1e1e1e;color:#f8f8f8;}
+.camera-btn.secondary{background:#e0e0e0;color:#1e1e1e;}
+.camera-file{display:none;}
+
+/* ==================== 12. 相册 ==================== */
+.album-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
+.album-item{aspect-ratio:1;border-radius:10px;overflow:hidden;background:#e8e8e8;}
+.album-item img{width:100%;height:100%;object-fit:cover;}
+.album-empty{grid-column:1/-1;text-align:center;padding:40px;color:#aaa;font-size:14px;}
+
+/* ==================== 13. 聊天 ==================== */
+.chat-page{display:flex;flex-direction:column;height:100%;}
+.chat-messages{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:8px;}
+.chat-msg{max-width:75%;padding:10px 14px;border-radius:16px;font-size:14px;line-height:1.5;word-break:break-word;}
+.chat-msg.ai{background:#e8e8e8;color:#1e1e1e;align-self:flex-start;border-bottom-left-radius:4px;}
+.chat-msg.user{background:#1e1e1e;color:#f8f8f8;align-self:flex-end;border-bottom-right-radius:4px;}
+.chat-msg.system{background:transparent;color:#999;align-self:center;font-size:12px;padding:4px 10px;max-width:90%;text-align:center;}
+.chat-typing{align-self:flex-start;padding:10px 14px;background:#e8e8e8;border-radius:16px;border-bottom-left-radius:4px;display:none;gap:4px;align-items:center;}
+.chat-typing.show{display:flex;}
+.chat-typing span{width:6px;height:6px;border-radius:50%;background:#999;animation:typingDot .6s infinite alternate;}
+.chat-typing span:nth-child(2){animation-delay:.15s;}
+.chat-typing span:nth-child(3){animation-delay:.3s;}
+@keyframes typingDot{from{opacity:.3;transform:translateY(0)}to{opacity:1;transform:translateY(-4px)}}
+.chat-input-bar{display:flex;gap:6px;padding:8px 14px;border-top:1px solid #eee;background:#f8f8f8;flex-shrink:0;align-items:flex-end;position:relative;}
+.chat-context-bar{display:flex;justify-content:space-between;align-items:center;padding:6px 14px;background:#f0f0f0;font-size:11px;color:#888;cursor:pointer;flex-shrink:0;border-top:1px solid #eee;}
+.chat-context-detail{padding:8px 14px;background:#f5f5f5;font-size:12px;color:#666;line-height:1.6;max-height:120px;overflow-y:auto;flex-shrink:0;}
+.chat-input-bar textarea{flex:1;border:1px solid #ddd;border-radius:14px;padding:8px 12px;background:#fff;font-size:14px;resize:none;max-height:80px;min-height:36px;line-height:1.4;}
+.chat-send-btn{background:#1e1e1e;color:#f8f8f8;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.chat-sp-config{margin-top:8px;padding:10px;background:#fff;border-radius:10px;border:1px solid #eee;}
+.chat-sp-config textarea{width:100%;height:50px;border:1px solid #ddd;border-radius:8px;padding:8px;font-size:12px;resize:none;background:#fafafa;}
+.chat-sp-config label{font-size:11px;color:#888;display:block;margin-bottom:4px;}
+.chat-quick-btn{padding:6px 14px;border-radius:10px;background:#e8e8e8;font-size:12px;font-weight:600;color:#1e1e1e;}
+
+/* ==================== 表情面板 ==================== */
+.emoji-btn{background:none;border:none;font-size:20px;cursor:pointer;padding:0 6px;flex-shrink:0;line-height:1;border-radius:8px;transition:background .15s;}
+.emoji-btn:active{background:#e8e8e8;}
+.emoji-panel{position:absolute;bottom:100%;left:0;right:0;background:#fafafa;border-top:1px solid #e5e5e5;border-radius:16px 16px 0 0;padding:12px 10px 8px;display:none;flex-direction:column;max-height:260px;z-index:50;box-shadow:0 -4px 20px rgba(0,0,0,.1);}
+.emoji-panel.show{display:flex;}
+.emoji-panel-tabs{display:flex;gap:4px;margin-bottom:10px;padding:2px;background:#eee;border-radius:10px;padding:3px;}
+.emoji-tab{padding:5px 12px;border-radius:8px;font-size:11px;font-weight:600;background:transparent;cursor:pointer;border:none;color:#888;transition:all .15s;}
+.emoji-tab.active{background:#fff;color:#1e1e1e;box-shadow:0 1px 3px rgba(0,0,0,.1);}
+.emoji-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:1px;overflow-y:auto;flex:1;padding:2px 0;-webkit-overflow-scrolling:touch;}
+.emoji-grid-item{font-size:24px;padding:6px 2px;text-align:center;cursor:pointer;border-radius:8px;transition:all .1s;line-height:1.2;}
+.emoji-grid-item:hover{background:#e8e8e8;}
+.emoji-grid-item:active{transform:scale(1.2);background:#e0e0e0;}
+.emoji-custom-bar{display:flex;gap:6px;padding-top:8px;border-top:1px solid #e5e5e5;align-items:center;}
+.emoji-custom-bar input{flex:1;border:1px solid #ddd;border-radius:10px;padding:7px 12px;font-size:13px;background:#fff;}
+.emoji-custom-bar button{padding:7px 14px;border-radius:10px;background:#1e1e1e;color:#f8f8f8;font-size:12px;font-weight:600;border:none;cursor:pointer;white-space:nowrap;}
+.emoji-custom-bar button:active{opacity:.8;}
+.emoji-manage{display:flex;flex-wrap:wrap;gap:4px;padding:4px 0;}
+.emoji-manage-item{position:relative;display:inline-block;}
+.emoji-manage-item .emoji-del{position:absolute;top:-4px;right:-4px;width:16px;height:16px;border-radius:50%;background:#e55;color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:none;line-height:1;}
+.emoji-msg{font-size:32px;line-height:1.3;}
+.chat-msg.user.emoji-only{background:transparent;padding:4px 8px;}
+.chat-msg.ai.emoji-only{background:transparent;padding:4px 8px;}
+.emoji-img-msg{max-width:120px;max-height:120px;border-radius:12px;display:block;}
+.chat-msg.user.emoji-img-only{background:transparent;padding:4px 8px;}
+.chat-msg.ai.emoji-img-only{background:transparent;padding:4px 8px;}
+.emoji-img-item{width:56px;height:56px;border-radius:10px;overflow:hidden;cursor:pointer;position:relative;border:2px solid #e8e8e8;transition:border-color .15s;}
+.emoji-img-item:hover{border-color:#bbb;}
+.emoji-img-item:active{transform:scale(.92);}
+.emoji-img-item img{width:100%;height:100%;object-fit:cover;}
+.emoji-img-item .emoji-del{position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:#e55;color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:2px solid #fafafa;line-height:1;}
+.emoji-custom-section{margin-top:8px;border-top:1px solid #e5e5e5;padding-top:8px;}
+.emoji-custom-section-title{font-size:11px;color:#999;margin-bottom:6px;font-weight:600;}
+.emoji-img-grid{display:flex;flex-wrap:wrap;gap:6px;}
+.emoji-add-btn{width:56px;height:56px;border-radius:10px;border:2px dashed #ccc;display:flex;align-items:center;justify-content:center;font-size:22px;color:#bbb;cursor:pointer;transition:all .15s;}
+.emoji-add-btn:hover{border-color:#999;color:#999;}
+.emoji-add-btn:active{transform:scale(.95);}
+.emoji-add-actions{display:flex;gap:8px;margin-top:4px;}
+.emoji-add-actions button{flex:1;padding:8px;border-radius:10px;border:1px solid #ddd;background:#fff;font-size:12px;cursor:pointer;}
+.emoji-add-actions button:active{background:#eee;}
+/* 聊天时间戳 */
+.chat-msg-time{font-size:10px;color:#bbb;margin-top:2px;display:none;}
+.chat-msg:hover .chat-msg-time,.chat-msg:last-child .chat-msg-time{display:block;}
+
+/* ==================== 14. 朋友圈 ==================== */
+.moments-list{display:flex;flex-direction:column;gap:10px;}
+.moment-card{background:#fff;border-radius:14px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.04);}
+.moment-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.moment-user{font-size:13px;font-weight:600;}
+.moment-time{font-size:11px;color:#aaa;}
+.moment-content{font-size:14px;line-height:1.6;margin-bottom:8px;}
+.moment-actions{display:flex;gap:14px;align-items:center;}
+.moment-comments{background:#f5f5f5;border-radius:8px;padding:8px 10px;margin-top:6px;font-size:13px;}
+.moment-comment-item{padding:3px 0;line-height:1.4;}
+.moment-comment-item b{color:#1e1e1e;}
+.moment-photo{margin-top:6px;border-radius:8px;overflow:hidden;}
+.moment-photo img{width:100%;max-height:200px;object-fit:cover;}
+.moment-like{display:flex;align-items:center;gap:4px;cursor:pointer;font-size:13px;color:#888;transition:color .15s;}
+.moment-like.liked{color:#e55;}
+.moment-like:active{transform:scale(.92);}
+.moment-comment{font-size:13px;color:#888;cursor:pointer;}
+
+/* ==================== 15. 陪伴计时 ==================== */
+.companion-page{display:flex;flex-direction:column;align-items:center;padding:16px;}
+.companion-activities{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:100%;margin-bottom:20px;}
+.companion-act-btn{padding:14px 8px;border-radius:14px;background:#e8e8e8;font-size:13px;font-weight:600;text-align:center;transition:all .15s;}
+.companion-act-btn:active{transform:scale(.95);}
+.companion-act-btn.selected{background:#1e1e1e;color:#f8f8f8;}
+.companion-timer{font-size:48px;font-weight:700;letter-spacing:2px;margin-bottom:20px;font-variant-numeric:tabular-nums;}
+.companion-btns{display:flex;gap:12px;}
+.companion-btn{padding:12px 28px;border-radius:14px;font-size:14px;font-weight:600;background:#1e1e1e;color:#f8f8f8;}
+.companion-btn.secondary{background:#e0e0e0;color:#1e1e1e;}
+.companion-btn:active{transform:scale(.95);}
+
+/* ==================== 16. 命运转盘 ==================== */
+.fortune-page{display:flex;flex-direction:column;align-items:center;padding:16px;gap:16px;}
+.fortune-section{width:100%;text-align:center;}
+.fortune-section h4{font-size:14px;font-weight:600;margin-bottom:10px;}
+.fortune-canvas-wrap{display:flex;justify-content:center;}
+.fortune-btn{padding:10px 28px;border-radius:14px;font-size:14px;font-weight:600;background:#1e1e1e;color:#f8f8f8;margin-top:8px;}
+.fortune-btn:active{transform:scale(.95);}
+.dice-canvas{border-radius:14px;background:#fff;}
+.wheel-canvas{border-radius:50%;}
+.custom-lottery{width:100%;background:#fff;border-radius:14px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.04);}
+.custom-lottery input{width:100%;border:1px solid #ddd;border-radius:10px;padding:10px 12px;font-size:13px;background:#fafafa;margin-bottom:8px;}
+.custom-lottery .result{font-size:16px;font-weight:700;text-align:center;min-height:24px;margin-top:6px;color:#1e1e1e;}
+
+/* ==================== 17. 人设书 ==================== */
+.persona-page{padding:16px;display:flex;flex-direction:column;gap:14px;}
+.persona-field{display:flex;flex-direction:column;gap:6px;}
+.persona-field label{font-size:12px;color:#888;font-weight:600;}
+.persona-field input,.persona-field textarea{border:1px solid #ddd;border-radius:12px;padding:10px 14px;background:#fff;font-size:14px;}
+.persona-field textarea{min-height:120px;resize:vertical;line-height:1.6;}
+.persona-save{padding:12px;border-radius:14px;background:#1e1e1e;color:#f8f8f8;font-size:15px;font-weight:600;text-align:center;}
+.persona-save:active{transform:scale(.97);}
+.persona-section{border-top:1px solid #eee;padding-top:14px;margin-top:4px;}
+.persona-section-title{font-size:13px;font-weight:700;color:#1e1e1e;margin-bottom:10px;}
+.persona-hint{font-size:11px;color:#aaa;line-height:1.5;margin-top:4px;}
+.api-status{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;}
+.api-status.on{background:#e8f5e9;color:#4caf50;}
+.api-status.off{background:#ffebee;color:#f44336;}
+
+/* ==================== 18. 音乐 ==================== */
+.music-page{display:flex;flex-direction:column;align-items:center;padding:20px;gap:16px;}
+.music-cover{width:180px;height:180px;border-radius:50%;background:conic-gradient(from 0deg,#2a2a2a,#3a3a3a,#2a2a2a,#3a3a3a,#2a2a2a,#3a3a3a,#2a2a2a,#3a3a3a);box-shadow:0 4px 20px rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center;animation:vinylSpin 8s linear infinite;animation-play-state:paused;}
+.music-cover.playing{animation-play-state:running;}
+.music-cover::after{content:'';width:28px;height:28px;border-radius:50%;background:radial-gradient(circle,#f8f8f8 30%,#ccc 70%);}
+.music-select{width:100%;max-width:260px;border:1px solid #ddd;border-radius:12px;padding:10px 14px;background:#fff;font-size:14px;appearance:auto;}
+.music-controls{display:flex;align-items:center;gap:20px;}
+.music-ctrl-btn{font-size:24px;width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#e8e8e8;transition:background .15s;}
+.music-ctrl-btn:active{background:#ddd;}
+.music-ctrl-btn.play-btn{background:#1e1e1e;color:#f8f8f8;font-size:26px;}
+.music-progress{width:100%;max-width:260px;height:4px;background:#ddd;border-radius:2px;overflow:hidden;}
+.music-progress-bar{height:100%;background:#1e1e1e;border-radius:2px;width:0%;transition:width .3s;}
+.music-song-name{font-size:14px;font-weight:600;text-align:center;}
+.music-url-add{width:100%;max-width:260px;display:flex;flex-direction:column;gap:8px;margin-top:10px;}
+.music-url-add input{border:1px solid #ddd;border-radius:10px;padding:8px 12px;background:#fff;font-size:13px;}
+.music-url-add button{padding:8px 16px;border-radius:10px;background:#1e1e1e;color:#f8f8f8;font-size:13px;font-weight:600;}
+.music-local-btn{padding:10px 20px;border-radius:14px;background:#e8e8e8;color:#1e1e1e;font-size:14px;font-weight:600;text-align:center;width:100%;max-width:260px;margin-top:6px;transition:background .15s;}
+.music-local-btn:active{background:#ddd;}
+.music-file-input{display:none;}
+.music-divider{width:100%;max-width:260px;text-align:center;color:#bbb;font-size:12px;position:relative;margin:4px 0;}
+.music-divider::before,.music-divider::after{content:'';position:absolute;top:50%;width:38%;height:1px;background:#ddd;}
+.music-divider::before{left:0;}
+.music-divider::after{right:0;}
+
+/* ==================== 19. 骨架屏 ==================== */
+.skeleton{background:linear-gradient(90deg,#e8e8e8 25%,#f2f2f2 50%,#e8e8e8 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:8px;}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* ==================== 20. 通用按压效果 ==================== */
+.pressable{transition:transform .08s;}
+.pressable:active{transform:scale(.96);}
+
+/* ==================== 21. 潮汐（月经日历） ==================== */
+.tide-page{display:flex;flex-direction:column;height:100%;}
+.tide-cal-header{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;flex-shrink:0;}
+.tide-cal-header .tide-month{font-size:16px;font-weight:700;}
+.tide-cal-header button{font-size:16px;padding:4px 12px;border-radius:8px;background:#e8e8e8;}
+.tide-cal-header button:active{background:#ddd;}
+.tide-weekdays{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;font-size:11px;color:#999;padding:0 8px;flex-shrink:0;}
+.tide-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;padding:4px 8px;gap:2px;flex-shrink:0;}
+.tide-day{position:relative;padding:6px 2px;border-radius:10px;font-size:13px;cursor:pointer;transition:background .1s;min-height:32px;display:flex;flex-direction:column;align-items:center;gap:1px;}
+.tide-day:active{background:#eee;}
+.tide-day.today{font-weight:700;color:#e91e63;}
+.tide-day.period{background:#fce4ec;border-radius:10px;}
+.tide-day.predicted{background:#f3e5f5;border-radius:10px;opacity:.7;}
+.tide-day.other-month{color:#ccc;}
+.tide-day .tide-dot{width:5px;height:5px;border-radius:50%;background:#e91e63;}
+.tide-day .tide-dot.predicted-dot{background:#ba68c8;}
+.tide-info{padding:12px 16px;flex-shrink:0;display:flex;gap:8px;flex-wrap:wrap;}
+.tide-info-chip{padding:6px 12px;border-radius:10px;background:#f5f5f5;font-size:12px;font-weight:600;color:#666;}
+.tide-info-chip.urgent{background:#fce4ec;color:#e91e63;}
+.tide-info-chip.soon{background:#f3e5f5;color:#9c27b0;}
+.tide-info-chip.ok{background:#e8f5e9;color:#4caf50;}
+.tide-edit-section{padding:8px 16px;border-top:1px solid #eee;flex:1;overflow-y:auto;}
+.tide-edit-title{font-size:13px;font-weight:700;margin-bottom:8px;color:#666;}
+.tide-form-row{display:flex;gap:8px;margin-bottom:8px;align-items:center;}
+.tide-form-row label{font-size:12px;color:#888;white-space:nowrap;min-width:50px;}
+.tide-form-row input{flex:1;border:1px solid #ddd;border-radius:10px;padding:8px 10px;background:#fff;font-size:13px;}
+.tide-btn{padding:8px 16px;border-radius:10px;font-size:13px;font-weight:600;}
+.tide-btn-primary{background:#e91e63;color:#fff;}
+.tide-btn-secondary{background:#f5f5f5;color:#666;}
+.tide-btn:active{opacity:.8;}
+.tide-period-list{margin-top:8px;}
+.tide-period-item{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#fafafa;border-radius:10px;margin-bottom:4px;font-size:12px;}
+.tide-period-item .tpi-dates{color:#333;}
+.tide-period-item .tpi-len{color:#999;font-size:11px;}
+.tide-period-item .tpi-del{color:#ccc;cursor:pointer;font-size:14px;}
+.tide-period-item .tpi-del:hover{color:#e91e63;}
+.tide-legend{display:flex;gap:12px;padding:4px 16px;font-size:11px;color:#999;align-items:center;flex-shrink:0;}
+.tide-legend-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:2px;}
+
+/* ==================== 22. 每日心情 ==================== */
+.mood-page{display:flex;flex-direction:column;height:100%;}
+.mood-cal-header{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;flex-shrink:0;}
+.mood-cal-header .mood-month{font-size:16px;font-weight:700;}
+.mood-cal-header button{font-size:16px;padding:4px 12px;border-radius:8px;background:#e8e8e8;}
+.mood-cal-header button:active{background:#ddd;}
+.mood-weekdays{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;font-size:11px;color:#999;padding:0 8px;flex-shrink:0;}
+.mood-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;padding:4px 8px;gap:2px;flex-shrink:0;}
+.mood-day{position:relative;padding:4px 2px;border-radius:10px;font-size:11px;cursor:pointer;min-height:38px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;transition:background .1s;}
+.mood-day:active{background:#eee;}
+.mood-day.today{font-weight:700;}
+.mood-day.other-month{color:#ccc;}
+.mood-day .mood-emoji{font-size:14px;}
+.mood-day .mood-date{font-size:10px;color:#999;}
+.mood-chart-section{padding:12px 16px;border-top:1px solid #eee;flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;}
+.mood-chart-title{font-size:13px;font-weight:700;color:#666;}
+.mood-chart-wrap{width:100%;background:#fafafa;border-radius:12px;padding:8px;overflow:hidden;}
+.mood-today-section{padding:8px 16px;flex-shrink:0;border-top:1px solid #eee;}
+.mood-today-title{font-size:12px;color:#888;margin-bottom:6px;}
+.mood-emoji-picker{display:flex;gap:6px;flex-wrap:wrap;}
+.mood-emoji-btn{font-size:22px;padding:4px;border-radius:8px;cursor:pointer;transition:transform .1s;}
+.mood-emoji-btn:active{transform:scale(.9);}
+.mood-emoji-btn.selected{background:#e8e8e8;}
+.mood-insight{font-size:12px;color:#888;padding:6px 0;line-height:1.6;}
+</style>
+</head>
+<body>
+
+<div class="phone-frame">
+<div class="phone-screen">
+
+<!-- 状态栏 -->
+<div class="status-bar">
+  <span class="sb-time" id="statusTime">12:00</span>
+  <span class="sb-icons">📶 🔋</span>
+</div>
+
+<!-- 内容区 -->
+<div class="content-area" id="contentArea">
+
+  <!-- ===== 主页 ===== -->
+  <div class="page active" id="page-main">
+    <div class="main-wrapper" id="mainWrapper">
+      <!-- 第一屏 -->
+      <div class="main-screen">
+        <div class="weather-card pressable" onclick="onWeatherCardClick()" oncontextmenu="event.preventDefault();showWeatherCityInput()" ontouchstart="weatherLongPressTimer=setTimeout(()=>{showWeatherCityInput()},600)" ontouchend="clearTimeout(weatherLongPressTimer)" ontouchcancel="clearTimeout(weatherLongPressTimer)">
+          <div class="weather-info">
+            <div class="temp" id="weatherTemp">--°</div>
+            <div id="weatherDesc">获取中...</div>
+            <div class="weather-detail" id="weatherDetail"></div>
+          </div>
+          <div class="weather-icon" id="weatherIcon">🌤</div>
+        </div>
+
+        <div class="vinyl-container">
+          <div class="vinyl-wrap">
+            <div class="vinyl-arm" id="vinylArm"></div>
+            <div class="vinyl-disc" id="vinylDisc"></div>
+          </div>
+          <div class="vinyl-label" id="vinylLabel">未在播放</div>
+        </div>
+
+        <div class="icon-grid" id="iconGrid1"></div>
+      </div>
+
+      <!-- 第二屏 -->
+      <div class="main-screen">
+        <div class="countdown-card pressable" id="countdownCard" onclick="openCdEdit()">
+          <div class="cd-content">
+            <div class="cd-event" id="cdEvent">在一起</div>
+            <div class="cd-days"><span id="cdDays">0</span> <span id="cdUnit">天</span></div>
+            <div class="cd-date" id="cdDate">2026-01-01</div>
+          </div>
+        </div>
+        <div class="icon-grid" id="iconGrid2"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 任务清单 ===== -->
+  <div class="page" id="page-tasks">
+    <div class="sub-page-header">任务清单</div>
+    <div class="sub-page-body">
+      <div class="task-list" id="taskList"></div>
+    </div>
+    <div class="task-add-bar" style="padding:10px 16px;">
+      <input type="text" id="taskInput" placeholder="添加新任务..." onkeydown="if(event.key==='Enter')addTask()">
+      <button onclick="addTask()">添加</button>
+    </div>
+  </div>
+
+  <!-- ===== 闹钟 ===== -->
+  <div class="page" id="page-alarm">
+    <div class="sub-page-header">闹钟</div>
+    <div class="sub-page-body">
+      <div class="alarm-list" id="alarmList"></div>
+    </div>
+    <div class="alarm-add-bar" style="padding:10px 16px;">
+      <input type="time" id="alarmTimeInput" value="07:00">
+      <input type="text" id="alarmLabelInput" placeholder="标签">
+      <button onclick="addAlarm()">添加</button>
+    </div>
+  </div>
+
+  <!-- ===== 相机 ===== -->
+  <div class="page" id="page-camera">
+    <div class="sub-page-header" style="display:flex;justify-content:space-between;align-items:center;">
+      <span>相机</span>
+      <button onclick="switchCameraFacing()" style="font-size:18px;background:none;border:none;cursor:pointer;">🔄</button>
+    </div>
+    <div class="camera-page">
+      <div class="camera-preview" id="cameraPreview" style="position:relative;overflow:hidden;background:#000;">
+        <video id="cameraVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover;"></video>
+        <canvas id="cameraCanvas" style="display:none;"></canvas>
+      </div>
+      <input type="file" accept="image/*" capture="environment" class="camera-file" id="cameraFile" onchange="handleCameraCapture(event)">
+      <div class="camera-btns">
+        <button class="camera-btn" onclick="takePhoto()" style="width:64px;height:64px;border-radius:50%;font-size:24px;">📸</button>
+        <button class="camera-btn secondary" onclick="document.getElementById('cameraFile').click()">🖼 选图</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 相册 ===== -->
+  <div class="page" id="page-album">
+    <div class="sub-page-header">相册</div>
+    <div class="sub-page-body">
+      <div class="album-grid" id="albumGrid">
+        <div class="album-empty">还没有照片，去拍照吧 📷</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 聊天 ===== -->
+  <div class="page" id="page-chat">
+    <div class="sub-page-header" style="display:flex;justify-content:space-between;align-items:center;">
+      <span id="chatTitle">聊天</span>
+      <button onclick="toggleSpConfig()" style="font-size:18px;">⚙</button>
+    </div>
+    <div class="chat-page">
+      <div class="chat-messages" id="chatMessages"></div>
+      <div class="chat-typing" id="chatTyping"><span></span><span></span><span></span></div>
+      <div class="chat-context-bar" id="chatContextBar" onclick="toggleContextBar()">
+        <span id="chatContextSummary"></span>
+        <span style="font-size:10px;">▼</span>
+      </div>
+      <div class="chat-context-detail" id="chatContextDetail" style="display:none;"></div>
+      <div class="chat-input-bar">
+        <button class="emoji-btn" id="emojiToggle" onclick="toggleEmojiPanel()">😊</button>
+        <textarea id="chatInput" rows="1" placeholder="说点什么..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}"></textarea>
+        <button class="chat-send-btn" onclick="sendChat()">↑</button>
+        <div class="emoji-panel" id="emojiPanel">
+          <div class="emoji-panel-tabs">
+            <button class="emoji-tab active" onclick="switchEmojiTab('common',this)">常用</button>
+            <button class="emoji-tab" onclick="switchEmojiTab('face',this)">表情</button>
+            <button class="emoji-tab" onclick="switchEmojiTab('nature',this)">自然</button>
+            <button class="emoji-tab" onclick="switchEmojiTab('food',this)">美食</button>
+            <button class="emoji-tab" onclick="switchEmojiTab('custom',this)">自定义</button>
+          </div>
+          <div class="emoji-grid" id="emojiGrid"></div>
+          <div class="emoji-custom-bar" id="emojiCustomBar" style="display:none;">
+            <input type="text" id="customEmojiInput" placeholder="输入 emoji 或粘贴表情">
+            <button onclick="addCustomEmoji()">添加文字</button>
+            <button onclick="addCustomImageEmoji()">📷 图片</button>
+            <input type="file" id="emojiImageInput" accept="image/*" style="display:none;" onchange="handleEmojiImageSelect(event)">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 朋友圈 ===== -->
+  <div class="page" id="page-moments">
+    <div class="sub-page-header" style="display:flex;justify-content:space-between;align-items:center;">
+      <span>朋友圈</span>
+      <button onclick="showMomentEditor()" style="font-size:20px;background:none;border:none;cursor:pointer;">✏️</button>
+    </div>
+    <div class="sub-page-body">
+      <div class="moments-list" id="momentsList"></div>
+    </div>
+  </div>
+
+  <!-- ===== 陪伴计时 ===== -->
+  <div class="page" id="page-companion">
+    <div class="sub-page-header">陪伴 · 专注计时</div>
+    <div class="companion-page">
+      <div class="companion-activities" id="companionActs"></div>
+      <div class="companion-timer" id="companionTimer">00:00:00</div>
+      <div class="companion-btns">
+        <button class="companion-btn" id="compStartBtn" onclick="compStart()">开始</button>
+        <button class="companion-btn secondary" onclick="compPause()">暂停</button>
+        <button class="companion-btn secondary" onclick="compReset()">重置</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 命运转盘 ===== -->
+  <div class="page" id="page-fortune">
+    <div class="sub-page-header">命运转盘</div>
+    <div class="fortune-page">
+      <div class="fortune-section">
+        <h4>🎲 骰子</h4>
+        <div class="fortune-canvas-wrap"><canvas class="dice-canvas" id="diceCanvas" width="120" height="120"></canvas></div>
+        <button class="fortune-btn" onclick="rollDice()">掷骰子</button>
+      </div>
+      <div class="fortune-section">
+        <h4>🎡 转盘</h4>
+        <div class="fortune-canvas-wrap"><canvas class="wheel-canvas" id="wheelCanvas" width="220" height="220"></canvas></div>
+        <button class="fortune-btn" onclick="spinWheel()">转一转</button>
+      </div>
+      <div class="custom-lottery">
+        <h4 style="font-size:14px;font-weight:600;margin-bottom:8px;">🎯 自定义抽签</h4>
+        <input type="text" id="lotteryInput" placeholder="输入选项，逗号分隔（如：选项A,选项B,选项C）">
+        <button class="fortune-btn" onclick="customLottery()" style="width:100%;">抽签</button>
+        <div class="result" id="lotteryResult"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 人设书 ===== -->
+  <div class="page" id="page-persona">
+    <div class="sub-page-header">人设书</div>
+    <div class="persona-page">
+      <div class="persona-field">
+        <label>AI 名称</label>
+        <input type="text" id="personaName" placeholder="给 AI 起个名字">
+      </div>
+      <div class="persona-field">
+        <label>背景故事</label>
+        <textarea id="personaStory" placeholder="描述 AI 的性格、背景、说话风格..."></textarea>
+      </div>
+      <button class="persona-save" onclick="savePersona()">保存人设</button>
+
+      <div class="persona-section">
+        <div class="persona-section-title">📖 世界书</div>
+        <div class="persona-field">
+          <label>世界观 / 补充设定</label>
+          <textarea id="worldBook" placeholder="在这里补充世界观、场景设定、人物关系、特殊规则等。AI 会参考这些内容来回复。&#10;&#10;例如：&#10;- 故事发生在未来的赛博朋克城市&#10;- 用户是某个秘密组织的成员&#10;- AI 是用户的随身助手，拥有读取数据的能力&#10;- 世界中有魔法与科技共存" style="min-height:150px;"></textarea>
+          <div class="persona-hint">世界书内容会注入 AI 的系统提示，让对话更有沉浸感</div>
+        </div>
+        <button class="persona-save" onclick="saveWorldBook()">保存世界书</button>
+      </div>
+
+      <div class="persona-section">
+        <div class="persona-section-title">🤖 大模型接入 <span class="api-status off" id="apiStatusBadge">未连接</span></div>
+        <div class="persona-field">
+          <label>API 地址</label>
+          <input type="text" id="apiBaseUrl" placeholder="https://api.deepseek.com">
+          <div class="persona-hint">DeepSeek 默认：https://api.deepseek.com</div>
+        </div>
+        <div class="persona-field">
+          <label>API Key</label>
+          <input type="password" id="apiKey" placeholder="sk-xxxxxxxx">
+          <div class="persona-hint">⚠️ Key 保存在浏览器本地，不会上传。仅你本人可见。</div>
+        </div>
+        <div class="persona-field">
+          <label>模型</label>
+          <select id="apiModel" style="border:1px solid #ddd;border-radius:12px;padding:10px 14px;background:#fff;font-size:14px;appearance:auto;">
+            <option value="deepseek-chat">deepseek-chat</option>
+            <option value="deepseek-reasoner">deepseek-reasoner</option>
+          </select>
+        </div>
+        <div class="persona-field" style="flex-direction:row;align-items:center;gap:10px;">
+          <label style="min-width:auto;">CORS 代理</label>
+          <input type="checkbox" id="apiCorsProxy" style="width:18px;height:18px;accent-color:#1e1e1e;">
+          <span style="font-size:11px;color:#aaa;">通常不需要，直连即可</span>
+        </div>
+        <button class="persona-save" onclick="saveApiConfig()">保存 API 配置</button>
+        <button class="persona-save" style="background:#e0e0e0;color:#1e1e1e;margin-top:4px;" onclick="testApiConnection()">测试连接</button>
+      </div>
+
+      <div class="persona-section">
+        <div class="persona-section-title">💾 数据管理</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <button class="persona-save" onclick="exportData()">📤 导出所有数据</button>
+          <button class="persona-save" style="background:#e0e0e0;color:#1e1e1e;" onclick="document.getElementById('importFileInput').click()">📥 导入数据</button>
+          <input type="file" id="importFileInput" accept=".json" style="display:none;" onchange="importData(event)">
+          <div class="persona-hint">导出所有聊天记录、任务、人设、照片等数据，换手机或重装时导入恢复。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 音乐 ===== -->
+  <div class="page" id="page-music">
+    <div class="sub-page-header">音乐</div>
+    <div class="music-page">
+      <div class="music-cover" id="musicCover"></div>
+      <div class="music-song-name" id="musicSongName">未选择歌曲</div>
+      <select class="music-select" id="musicSelect" onchange="selectSong()">
+        <option value="">-- 选择歌曲 --</option>
+      </select>
+      <div class="music-controls">
+        <button class="music-ctrl-btn" onclick="musicPrev()">⏮</button>
+        <button class="music-ctrl-btn play-btn" id="musicPlayBtn" onclick="musicToggle()">▶</button>
+        <button class="music-ctrl-btn" onclick="musicNext()">⏭</button>
+      </div>
+      <div class="music-progress"><div class="music-progress-bar" id="musicProgressBar"></div></div>
+
+      <input type="file" accept="audio/*" multiple class="music-file-input" id="musicFileInput" onchange="handleMusicFiles(event)">
+      <button class="music-local-btn" onclick="document.getElementById('musicFileInput').click()">📁 选择本地音乐</button>
+
+      <div class="music-divider">或输入 URL</div>
+      <div class="music-url-add">
+        <input type="text" id="musicUrlInput" placeholder="输入歌曲 URL">
+        <input type="text" id="musicNameInput" placeholder="歌曲名称">
+        <button onclick="addSongUrl()">添加歌曲</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 潮汐（月经日历） ===== -->
+  <div class="page" id="page-tide">
+    <div class="sub-page-header">潮汐 🌙</div>
+    <div class="tide-page">
+      <div class="tide-cal-header">
+        <button onclick="tidePrevMonth()">◀</button>
+        <div class="tide-month" id="tideMonth"></div>
+        <button onclick="tideNextMonth()">▶</button>
+      </div>
+      <div class="tide-weekdays"><span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span></div>
+      <div class="tide-cal-grid" id="tideCalGrid"></div>
+      <div class="tide-legend">
+        <span><span class="tide-legend-dot" style="background:#e91e63"></span> 经期</span>
+        <span><span class="tide-legend-dot" style="background:#ba68c8"></span> 预测</span>
+      </div>
+      <div class="tide-info" id="tideInfo"></div>
+      <div class="tide-edit-section">
+        <div class="tide-edit-title">✏️ 记录经期</div>
+        <div class="tide-form-row">
+          <label>开始日</label>
+          <input type="date" id="tideStartDate">
+        </div>
+        <div class="tide-form-row">
+          <label>持续天数</label>
+          <input type="number" id="tideDuration" value="5" min="1" max="14">
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="tide-btn tide-btn-primary" onclick="tideAddPeriod()">记录</button>
+          <button class="tide-btn tide-btn-secondary" onclick="tideAutoPredict()">自动预测下月</button>
+        </div>
+        <div class="tide-period-list" id="tidePeriodList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 每日心情 ===== -->
+  <div class="page" id="page-mood">
+    <div class="sub-page-header">每日心情 😊</div>
+    <div class="mood-page">
+      <div class="mood-cal-header">
+        <button onclick="moodPrevMonth()">◀</button>
+        <div class="mood-month" id="moodMonth"></div>
+        <button onclick="moodNextMonth()">▶</button>
+      </div>
+      <div class="mood-weekdays"><span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span></div>
+      <div class="mood-cal-grid" id="moodCalGrid"></div>
+      <div class="mood-today-section">
+        <div class="mood-today-title">今天的心情</div>
+        <div class="mood-emoji-picker" id="moodEmojiPicker"></div>
+      </div>
+      <div class="mood-chart-section">
+        <div class="mood-chart-title">📊 近30天情绪变化</div>
+        <div class="mood-chart-wrap"><canvas id="moodChart" width="320" height="140"></canvas></div>
+        <div class="mood-insight" id="moodInsight"></div>
+        <button class="tide-btn tide-btn-secondary" style="width:100%;text-align:center;margin-top:4px;" onclick="analyzeMoodFromChat()">🔍 从聊天记录分析心情</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- content-area -->
+
+<!-- 底部导航 -->
+<div class="bottom-nav">
+  <button id="navLeft" class="nav-enabled" onclick="onNavLeft()">◀</button>
+  <button id="navHome" class="nav-enabled" onclick="onNavHome()">⬤</button>
+  <button id="navRight" class="nav-enabled" onclick="onNavRight()">▶</button>
+</div>
+
+<!-- 倒数日编辑弹窗 -->
+<div class="cd-edit" id="cdEditModal">
+  <div class="cd-edit-form">
+    <h3>编辑纪念日</h3>
+    <input type="text" id="cdEditEvent" placeholder="事件名称">
+    <input type="date" id="cdEditDate">
+    <input type="text" id="cdEditBg" placeholder="背景图片 URL（可选）">
+    <div class="btn-row">
+      <button class="cd-btn-cancel" onclick="closeCdEdit()">取消</button>
+      <button class="cd-btn-save" onclick="saveCdEdit()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 闹钟弹窗 -->
+<div class="alarm-modal" id="alarmModal">
+  <div class="alarm-modal-box">
+    <div class="am-title">⏰ 闹钟响啦！</div>
+    <div class="am-time" id="amTime">07:00</div>
+    <div class="am-label" id="amLabel">起床</div>
+    <button onclick="dismissAlarm()">关闭</button>
+  </div>
+</div>
+
+<!-- System Prompt 配置 -->
+<div class="cd-edit" id="spConfigModal">
+  <div class="cd-edit-form">
+    <h3>AI 说话风格配置</h3>
+    <div class="chat-sp-config">
+      <label>System Prompt（影响 AI 回复风格）</label>
+      <textarea id="spTextarea" placeholder="例如：你是一个温暖可爱的陪伴者，说话风格俏皮..."></textarea>
+    </div>
+    <div class="btn-row">
+      <button class="cd-btn-cancel" onclick="closeSpConfig()">取消</button>
+      <button class="cd-btn-save" onclick="saveSpConfig()">保存</button>
+    </div>
+  </div>
+</div>
+
+<audio id="audioPlayer" preload="auto"></audio>
+
+</div><!-- phone-screen -->
+</div><!-- phone-frame -->
+
+<script>
+/* ==================== 0. 常量 & 图标定义 ==================== */
+const ICONS = [
+  { id:'tasks',    symbol:'☐', name:'任务',  page:'page-tasks' },
+  { id:'alarm',    symbol:'◷', name:'闹钟',  page:'page-alarm' },
+  { id:'camera',   symbol:'◻', name:'相机',  page:'page-camera' },
+  { id:'album',    symbol:'▦', name:'相册',  page:'page-album' },
+  { id:'chat',     symbol:'▷', name:'聊天',  page:'page-chat' },
+  { id:'moments',  symbol:'○', name:'朋友圈',page:'page-moments' },
+  { id:'companion',symbol:'⟳', name:'陪伴',  page:'page-companion' },
+  { id:'fortune',  symbol:'⬡', name:'命运',  page:'page-fortune' },
+  { id:'tide',     symbol:'☽', name:'潮汐',  page:'page-tide' },
+  { id:'mood',     symbol:'☺', name:'心情',  page:'page-mood' },
+  { id:'persona',  symbol:'≡', name:'人设',  page:'page-persona' },
+  { id:'music',    symbol:'♫', name:'音乐',  page:'page-music' }
+];
+
+const COMPANION_ACTIVITIES = [
+  { emoji:'😴', name:'睡觉' },
+  { emoji:'🍚', name:'吃饭' },
+  { emoji:'📚', name:'学习' },
+  { emoji:'💪', name:'锻炼' },
+  { emoji:'💼', name:'上班' },
+  { emoji:'🚶', name:'散步' }
+];
+let customActivities = lsGet('customActs', []);
+
+const WHEEL_LABELS = ['大吉','中吉','小吉','末吉','凶','大凶'];
+const WHEEL_COLORS = ['#ff6b6b','#ffa94d','#ffd43b','#69db7c','#74c0fc','#cc5de8'];
+
+/* ==================== 1. 状态管理 ==================== */
+let currentPage = 'page-main';
+let currentMainScreen = 1; // 1 or 2
+let pageHistory = [];
+let isMusicPlaying = false;
+let audioEl = document.getElementById('audioPlayer');
+
+// 计时器状态
+let compState = { activity:null, running:false, seconds:0, interval:null, remindMin:0 };
+
+// 歌曲列表
+let songList = [
+  { name:'安静钢琴曲', url:'' },
+  { name:'轻音乐-春', url:'' }
+];
+let currentSongIndex = -1;
+
+/* ==================== 2. localStorage 工具 ==================== */
+function lsGet(key, def) { try { const v = localStorage.getItem('phone_'+key); return v ? JSON.parse(v) : def; } catch(e) { return def; } }
+function lsSet(key, val) { try { localStorage.setItem('phone_'+key, JSON.stringify(val)); } catch(e) { showStorageWarning(); } }
+function showStorageWarning() { addChatSystem('⚠️ 存储空间不足，部分数据可能无法保存'); }
+
+/* ==================== 3. 导航系统 ==================== */
+const allPages = document.querySelectorAll('.page');
+
+function navigateTo(pageId, skipAnim) {
+  if (pageId === currentPage) return;
+  const oldEl = document.getElementById(currentPage);
+  const newEl = document.getElementById(pageId);
+  if (!oldEl || !newEl) return;
+
+  pageHistory.push(currentPage);
+
+  if (skipAnim) {
+    oldEl.classList.remove('active');
+    newEl.classList.add('active');
+  } else {
+    oldEl.classList.add('anim-out-left');
+    newEl.classList.add('active','anim-in-right');
+    setTimeout(() => {
+      oldEl.classList.remove('active','anim-out-left');
+      newEl.classList.remove('anim-in-right');
+    }, 300);
+  }
+  currentPage = pageId;
+
+  // 关闭表情面板
+  const emojiPanel = document.getElementById('emojiPanel');
+  if (emojiPanel) emojiPanel.classList.remove('show');
+
+  // 进入相机页面时启动摄像头
+  if (pageId === 'page-camera' && !cameraStream) {
+    startCamera();
+  }
+  // 离开相机页面时停止摄像头以节省资源
+  if (pageId !== 'page-camera' && cameraStream) {
+    cameraStream.getTracks().forEach(t => t.stop());
+    cameraStream = null;
+  }
+  updateNav();
+}
+
+function goBack() {
+  if (pageHistory.length === 0) return;
+  const oldEl = document.getElementById(currentPage);
+  const prevId = pageHistory.pop();
+  const newEl = document.getElementById(prevId);
+
+  oldEl.classList.add('anim-out-right');
+  newEl.classList.add('active','anim-in-left');
+  setTimeout(() => {
+    oldEl.classList.remove('active','anim-out-right');
+    newEl.classList.remove('anim-in-left');
+  }, 300);
+  currentPage = prevId;
+  updateNav();
+}
+
+function goHome() {
+  if (currentPage === 'page-main') { switchMainScreen(1); return; }
+  const oldEl = document.getElementById(currentPage);
+  const newEl = document.getElementById('page-main');
+  pageHistory = [];
+  oldEl.classList.add('anim-out-right');
+  newEl.classList.add('active','anim-in-left');
+  setTimeout(() => {
+    oldEl.classList.remove('active','anim-out-right');
+    newEl.classList.remove('anim-in-left');
+  }, 300);
+  currentPage = 'page-main';
+  currentMainScreen = 1;
+  document.getElementById('mainWrapper').style.transform = 'translateX(0)';
+  updateNav();
+}
+
+function switchMainScreen(n) {
+  currentMainScreen = n;
+  document.getElementById('mainWrapper').style.transform = n === 1 ? 'translateX(0)' : 'translateX(-50%)';
+  updateNav();
+}
+
+function updateNav() {
+  const nl = document.getElementById('navLeft');
+  const nr = document.getElementById('navRight');
+  if (currentPage === 'page-main') {
+    nl.className = 'nav-enabled';
+    nr.className = 'nav-enabled';
+    nl.textContent = '◀';
+    nr.textContent = '▶';
+  } else {
+    nl.className = 'nav-enabled';
+    nr.className = 'nav-disabled';
+    nl.textContent = '◀';
+  }
+}
+
+function updateChatContext() {
+  const summary = document.getElementById('chatContextSummary');
+  const detail = document.getElementById('chatContextDetail');
+  const tags = [];
+  const details = [];
+
+  if (weatherData && Date.now() - weatherData.time < 3600000) {
+    tags.push(`🌡${weatherData.temp}°`);
+    details.push(`天气：${weatherData.desc}，${weatherData.temp}°C，湿度${weatherData.humidity}%`);
+  }
+  const undone = tasks.filter(t => !t.done).length;
+  if (undone > 0) { tags.push(`☐${undone}`); details.push(`待办：${undone}个未完成`); }
+  const activeAlarms = alarms.filter(a => a.on);
+  if (activeAlarms.length > 0) { tags.push(`⏰${activeAlarms.length}`); details.push(`闹钟：${activeAlarms.map(a=>a.time).join('、')}`); }
+  if (compState.running) { tags.push('⟳'); details.push(`陪伴：${compState.activity}`); }
+  if (isMusicPlaying) { tags.push('♫'); details.push(`正在听：${songList[currentSongIndex]?.name}`); }
+  const todayStr = new Date().toISOString().split('T')[0];
+  if (moodData[todayStr]) { tags.push(`${moodData[todayStr].emoji}`); details.push(`今日心情：${moodData[todayStr].label}`); }
+  if (tideData.periods.length > 0) {
+    const predictions = getPredictedPeriods();
+    if (predictions.length > 0) {
+      const daysUntil = Math.ceil((new Date(predictions[0].start) - new Date()) / (1000*60*60*24));
+      if (daysUntil >= 0 && daysUntil <= 7) { tags.push('☽'); details.push(`经期：约${daysUntil}天后`); }
+      else if (daysUntil < 0 && daysUntil >= -7) { tags.push('☽'); details.push('经期中'); }
+    }
+  }
+
+  summary.textContent = tags.length > 0 ? tags.join(' ') : '无状态数据';
+  detail.innerHTML = details.length > 0 ? details.join('<br>') : '暂无数据';
+}
+
+function toggleContextBar() {
+  const d = document.getElementById('chatContextDetail');
+  d.style.display = d.style.display === 'none' ? 'block' : 'none';
+}
+
+function onNavLeft() {
+  if (currentPage === 'page-main') {
+    switchMainScreen(currentMainScreen === 1 ? 2 : 1);
+  } else {
+    goBack();
+  }
+}
+function onNavHome() { goHome(); }
+function onNavRight() {
+  if (currentPage === 'page-main') {
+    switchMainScreen(currentMainScreen === 1 ? 2 : 1);
+  }
+}
+
+/* ==================== 4. 状态栏时钟 ==================== */
+function updateClock() {
+  const now = new Date();
+  document.getElementById('statusTime').textContent =
+    now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+}
+setInterval(updateClock, 10000);
+updateClock();
+
+/* ==================== 4.5 天气 API ==================== */
+let weatherData = lsGet('weather', null);
+let weatherLatLon = lsGet('weatherGeo', null);
+let weatherCity = lsGet('weatherCity', '');
+let weatherLongPressTimer = null;
+
+// AbortSignal.timeout polyfill
+if (typeof AbortSignal !== 'undefined' && !AbortSignal.timeout) {
+  AbortSignal.timeout = function(ms) {
+    const ctrl = new AbortController();
+    setTimeout(() => ctrl.abort(), ms);
+    return ctrl.signal;
+  };
+}
+
+// WMO 天气代码 → 中文描述 + emoji
+const WEATHER_CODES = {
+  0:['晴','☀️'],1:['晴','🌤'],2:['多云','⛅'],3:['阴天','☁️'],
+  45:['雾','🌫'],48:['雾凇','🌫'],
+  51:['小毛毛雨','🌦'],53:['毛毛雨','🌦'],55:['大毛毛雨','🌦'],
+  56:['冻毛毛雨','🌧'],57:['冻毛毛雨','🌧'],
+  61:['小雨','🌧'],63:['中雨','🌧'],65:['大雨','🌧'],
+  66:['冻雨','🌧'],67:['冻雨','🌧'],
+  71:['小雪','🌨'],73:['中雪','🌨'],75:['大雪','🌨'],
+  77:['冰粒','🌨'],
+  80:['阵雨','🌦'],81:['中阵雨','🌦'],82:['大阵雨','🌧'],
+  85:['阵雪','🌨'],86:['大阵雪','🌨'],
+  95:['雷暴','⛈'],96:['雷暴+冰雹','⛈'],99:['强雷暴+冰雹','⛈']
+};
+
+function getWeatherInfo(code) {
+  return WEATHER_CODES[code] || ['未知','🌡'];
+}
+
+function onWeatherCardClick() {
+  if (weatherCity) {
+    // 已有城市 → 直接刷新
+    fetchWeather();
+  } else {
+    // 无城市 → 弹出输入框
+    showWeatherCityInput();
+  }
+}
+
+function showWeatherCityInput() {
+  const city = prompt('请输入城市名（如：北京、Shanghai、杭州）', weatherCity || '');
+  if (city === null) return; // 取消
+  if (city.trim()) {
+    weatherCity = city.trim();
+    lsSet('weatherCity', weatherCity);
+    weatherLatLon = null; // 清除旧坐标，重新定位
+    lsSet('weatherGeo', null);
+  }
+  // 无论是否输入了新城市，都尝试刷新天气
+  fetchWeather();
+}
+
+async function fetchWeather() {
+  const tempEl = document.getElementById('weatherTemp');
+  const descEl = document.getElementById('weatherDesc');
+  const detailEl = document.getElementById('weatherDetail');
+  const iconEl = document.getElementById('weatherIcon');
+
+  // 如果有缓存数据，先显示缓存（避免闪烁）
+  if (weatherData) {
+    tempEl.textContent = weatherData.temp + '°';
+    descEl.textContent = weatherData.desc + (weatherCity ? ` · ${weatherCity}` : '');
+    detailEl.textContent = `💧${weatherData.humidity}%  💨${weatherData.windSpeed}km/h`;
+    iconEl.textContent = weatherData.emoji;
+  } else {
+    tempEl.textContent = '--°';
+    descEl.textContent = '获取中...';
+    detailEl.textContent = '';
+  }
+
+  try {
+    let lat, lon;
+
+    // 步骤1: 如果有城市名，用 geocoding 获取坐标
+    if (weatherCity) {
+      try {
+        const geoResp = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(weatherCity)}&count=1&language=zh`, { signal: AbortSignal.timeout(6000) });
+        if (geoResp.ok) {
+          const geoData = await geoResp.json();
+          if (geoData.results && geoData.results.length > 0) {
+            lat = geoData.results[0].latitude;
+            lon = geoData.results[0].longitude;
+            weatherLatLon = { lat, lon };
+            lsSet('weatherGeo', weatherLatLon);
+          }
+        }
+      } catch(e) { console.log('[天气] geocoding失败:', e.message); }
+    }
+
+    // 步骤2: 如果有缓存坐标，直接用
+    if (!lat && weatherLatLon && weatherLatLon.lat) {
+      lat = weatherLatLon.lat;
+      lon = weatherLatLon.lon;
+    }
+
+    // 方案A: 用城市名直接查 wttr.in（最稳定，优先尝试）
+    if (weatherCity) {
+      descEl.textContent = '获取天气...';
+      try {
+        const url = `https://wttr.in/${encodeURIComponent(weatherCity)}?format=j1`;
+        const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.current_condition && data.current_condition[0]) {
+            const cur = data.current_condition[0];
+            const temp = parseInt(cur.temp_C);
+            const humidity = parseInt(cur.humidity);
+            const windSpeed = parseInt(cur.windspeedKmph);
+            const desc = cur.lang_zh && cur.lang_zh[0] ? cur.lang_zh[0].value : cur.weatherDesc[0].value;
+            const emoji = desc.includes('雨') ? '🌧' : desc.includes('雪') ? '🌨' : desc.includes('阴') ? '☁️' : desc.includes('多云') ? '⛅' : '☀️';
+            const code = desc.includes('雷') ? 95 : desc.includes('大雨') ? 65 : desc.includes('中雨') ? 63 : desc.includes('小雨') ? 61 : 0;
+            updateWeatherUI(tempEl, descEl, detailEl, iconEl, temp, humidity, windSpeed, code, desc, emoji);
+            return;
+          }
+        }
+      } catch(e) { console.log('[天气] wttr.in失败:', e.message); }
+    }
+
+    // 方案B: 有坐标 → 用 Open-Meteo 获取天气
+    if (lat) {
+      descEl.textContent = '获取天气...';
+      try {
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&timezone=auto&forecast_days=1`;
+        const resp = await fetch(url, { signal: AbortSignal.timeout(8000) });
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.current) {
+            const temp = Math.round(data.current.temperature_2m);
+            const humidity = data.current.relative_humidity_2m;
+            const windSpeed = Math.round(data.current.wind_speed_10m);
+            const code = data.current.weather_code;
+            const [desc, emoji] = getWeatherInfo(code);
+            updateWeatherUI(tempEl, descEl, detailEl, iconEl, temp, humidity, windSpeed, code, desc, emoji);
+            return;
+          }
+        }
+      } catch(e) { console.log('[天气] Open-Meteo失败:', e.message); }
+    }
+
+    // 方案C: 中国天气网 JSONP
+    if (weatherCity) {
+      const cityCode = await getWeatherCityCode(weatherCity);
+      if (cityCode) {
+        try {
+          const weatherResult = await fetchWeatherCn(cityCode);
+          if (weatherResult) {
+            updateWeatherUI(tempEl, descEl, detailEl, iconEl, weatherResult.temp, weatherResult.humidity, weatherResult.windSpeed, weatherResult.code, weatherResult.desc, weatherResult.emoji);
+            return;
+          }
+        } catch(e) { console.log('[天气] weather.com.cn失败:', e.message); }
+      }
+    }
+
+    // 所有方案失败
+    throw new Error('无法获取天气');
+
+  } catch(e) {
+    // 显示缓存或错误
+    if (weatherData && Date.now() - weatherData.time < 3600000) {
+      tempEl.textContent = weatherData.temp + '°';
+      descEl.textContent = weatherData.desc + (weatherCity ? ` · ${weatherCity}` : '');
+      detailEl.textContent = `💧${weatherData.humidity}%  💨${weatherData.windSpeed}km/h`;
+      iconEl.textContent = weatherData.emoji;
+    } else {
+      tempEl.textContent = '--°';
+      descEl.textContent = '点击设置城市';
+      detailEl.textContent = weatherCity ? '网络不可用，请稍后重试' : '点击输入城市名获取天气';
+      iconEl.textContent = '🌡';
+    }
+  }
+}
+
+// 城市名 → 中国天气网城市代码（内置常见城市映射）
+const WEATHER_CN_CODES = {
+  '北京':101010100,'上海':101020100,'广州':101280101,'深圳':101280601,'杭州':101210101,
+  '成都':101270101,'武汉':101200101,'南京':101190101,'重庆':101040100,'天津':101030100,
+  '苏州':101190401,'西安':101110101,'长沙':101250101,'沈阳':101070101,'青岛':101120201,
+  '郑州':101180101,'大连':101070201,'东莞':101281601,'宁波':101210401,'厦门':101230201,
+  '福州':101230101,'哈尔滨':101050101,'长春':101060101,'昆明':101290101,'济南':101120101,
+  '合肥':101220101,'佛山':101280800,'南昌':101240101,'贵阳':101260101,'南宁':101300101,
+  '石家庄':101090101,'太原':101100101,'兰州':101160101,'海口':101310101,'呼和浩特':101080101,
+  '乌鲁木齐':101130101,'银川':101170101,'西宁':101150101,'拉萨':101140101,'温州':101210701,
+  '无锡':101190201,'常州':101191101,'徐州':101190301,'扬州':101190701,'珠海':101280701,
+  '中山':101281701,'惠州':101280301,'烟台':101120501,'潍坊':101120601,'临沂':101120901,
+  '嘉兴':101210301,'绍兴':101210501,'金华':101210901,'台州':101210201,'泉州':101230501,
+  '漳州':101230601,'唐山':101090301,'秦皇岛':101091101,'保定':101090201,'邯郸':101090401,
+  '洛阳':101180901,'南阳':101180701,'襄阳':101200201,'宜昌':101200901,'株洲':101250301,
+  '岳阳':101250801,'常德':101250601,'桂林':101300501,'柳州':101300301,'三亚':101310201,
+  '绵阳':101270401,'泸州':101271001,'遵义':101260301,'赣州':101240401,'九江':101240201,
+};
+
+function getWeatherCityCode(cityName) {
+  // 先查映射表
+  if (WEATHER_CN_CODES[cityName]) return WEATHER_CN_CODES[cityName];
+  // 去掉"市""省"后缀再查
+  const stripped = cityName.replace(/[省市县区]$/,'');
+  if (WEATHER_CN_CODES[stripped]) return WEATHER_CN_CODES[stripped];
+  return null;
+}
+
+// 通过 JSONP 调用中国天气网接口
+function fetchWeatherCn(cityCode) {
+  return new Promise((resolve, reject) => {
+    const callbackName = 'weatherCnCb_' + Date.now();
+    const timeout = setTimeout(() => {
+      delete window[callbackName];
+      reject(new Error('JSONP timeout'));
+    }, 8000);
+
+    window[callbackName] = function(data) {
+      clearTimeout(timeout);
+      delete window[callbackName];
+      try {
+        if (data && data.weatherinfo) {
+          const info = data.weatherinfo;
+          const temp = parseInt(info.temp) || parseInt(info.temp1) || 0;
+          const desc = info.weather || '未知';
+          const emoji = desc.includes('雨') ? '🌧' : desc.includes('雪') ? '🌨' : desc.includes('阴') ? '☁️' : desc.includes('多云') ? '⛅' : '☀️';
+          const code = desc.includes('雷') ? 95 : desc.includes('大雨') ? 65 : desc.includes('中雨') ? 63 : desc.includes('小雨') ? 61 : 0;
+          resolve({ temp, humidity: 50, windSpeed: 0, code, desc, emoji });
+        } else if (data && data.data && data.data.sk) {
+          const sk = data.data.sk;
+          const temp = parseInt(sk.temp) || 0;
+          const desc = sk.weather || '未知';
+          const emoji = desc.includes('雨') ? '🌧' : desc.includes('雪') ? '🌨' : desc.includes('阴') ? '☁️' : desc.includes('多云') ? '⛅' : '☀️';
+          const code = desc.includes('雷') ? 95 : desc.includes('大雨') ? 65 : desc.includes('中雨') ? 63 : desc.includes('小雨') ? 61 : 0;
+          resolve({ temp, humidity: parseInt(sk.humidity) || 50, windSpeed: parseInt(sk.wind) || 0, code, desc, emoji });
+        } else {
+          reject(new Error('Invalid data'));
+        }
+      } catch(e) { reject(e); }
+    };
+
+    // 尝试中国天气网的多个JSONP接口
+    const script = document.createElement('script');
+    script.src = `https://d1.weather.com.cn/sk_2d/${cityCode}.html?_=${Date.now()}`;
+    script.onerror = () => {
+      clearTimeout(timeout);
+      delete window[callbackName];
+      // fallback: 尝试 data 接口
+      const script2 = document.createElement('script');
+      script2.src = `https://data.weather.com.cn/weatherData/${cityCode}.html?_=${Date.now()}`;
+      script2.onerror = () => { clearTimeout(timeout); delete window[callbackName]; reject(new Error('JSONP load failed')); };
+      document.head.appendChild(script2);
+    };
+    document.head.appendChild(script);
+  });
+}
+
+function updateWeatherUI(tempEl, descEl, detailEl, iconEl, temp, humidity, windSpeed, code, desc, emoji) {
+  weatherData = { temp, humidity, windSpeed, code, desc, emoji, time: Date.now(), city: weatherCity };
+  lsSet('weather', weatherData);
+  tempEl.textContent = temp + '°';
+  descEl.textContent = desc + (weatherCity ? ` · ${weatherCity}` : '');
+  detailEl.textContent = `💧${humidity}%  💨${windSpeed}km/h`;
+  iconEl.textContent = emoji;
+  if (typeof updateChatContext === 'function') updateChatContext();
+}
+
+/* ==================== 5. 图标网格 & 拖拽 ==================== */
+let iconOrder = lsGet('iconOrder', ICONS.map(i=>i.id));
+
+function renderIcons() {
+  const grid1 = document.getElementById('iconGrid1');
+  const grid2 = document.getElementById('iconGrid2');
+  grid1.innerHTML = '';
+  grid2.innerHTML = '';
+
+  iconOrder.forEach((id, idx) => {
+    const icon = ICONS.find(i=>i.id===id);
+    if (!icon) return;
+    const el = document.createElement('div');
+    el.className = 'icon-item pressable';
+    el.draggable = true;
+    el.dataset.iconId = id;
+    el.dataset.idx = idx;
+    el.innerHTML = `<div class="icon-symbol">${icon.symbol}</div><div class="icon-name">${icon.name}</div>`;
+    el.onclick = () => navigateTo(icon.page);
+
+    // 拖拽事件
+    el.ondragstart = e => { e.dataTransfer.setData('text/plain', idx); el.classList.add('dragging'); };
+    el.ondragend = () => el.classList.remove('dragging');
+    el.ondragover = e => { e.preventDefault(); el.classList.add('drag-over'); };
+    el.ondragleave = () => el.classList.remove('drag-over');
+    el.ondrop = e => {
+      e.preventDefault();
+      el.classList.remove('drag-over');
+      const fromIdx = parseInt(e.dataTransfer.getData('text/plain'));
+      const toIdx = idx;
+      if (fromIdx === toIdx) return;
+      const moved = iconOrder.splice(fromIdx, 1)[0];
+      iconOrder.splice(toIdx, 0, moved);
+      lsSet('iconOrder', iconOrder);
+      renderIcons();
+    };
+
+    if (idx < 8) grid1.appendChild(el);
+    else if (idx < 12) grid2.appendChild(el);
+  });
+}
+
+/* ==================== 6. 倒数日 ==================== */
+let cdData = lsGet('countdown', { event:'在一起', date:'2026-01-01', bg:'' });
+
+function updateCountdown() {
+  document.getElementById('cdEvent').textContent = cdData.event || '未设置';
+  document.getElementById('cdDate').textContent = cdData.date || '';
+  const target = new Date(cdData.date);
+  const now = new Date();
+  now.setHours(0,0,0,0);
+  target.setHours(0,0,0,0);
+  const diffDays = Math.ceil((now - target) / (1000*60*60*24));
+  if (diffDays >= 0) {
+    // 正计时：已经过了多少天
+    document.getElementById('cdDays').textContent = diffDays;
+    document.getElementById('cdUnit').textContent = '天';
+  } else {
+    // 未来日期：还有多少天
+    document.getElementById('cdDays').textContent = Math.abs(diffDays);
+    document.getElementById('cdUnit').textContent = '天后';
+  }
+  // 存储方向信息供显示用
+  cdData._isFuture = diffDays < 0;
+  if (cdData.bg) {
+    const card = document.getElementById('countdownCard');
+    card.style.backgroundImage = `url(${cdData.bg})`;
+    card.style.backgroundSize = 'cover';
+    card.style.backgroundPosition = 'center';
+  }
+}
+
+function openCdEdit() {
+  document.getElementById('cdEditEvent').value = cdData.event;
+  document.getElementById('cdEditDate').value = cdData.date;
+  document.getElementById('cdEditBg').value = cdData.bg || '';
+  document.getElementById('cdEditModal').classList.add('show');
+}
+function closeCdEdit() { document.getElementById('cdEditModal').classList.remove('show'); }
+function saveCdEdit() {
+  cdData.event = document.getElementById('cdEditEvent').value.trim() || '纪念日';
+  cdData.date = document.getElementById('cdEditDate').value || '2026-01-01';
+  cdData.bg = document.getElementById('cdEditBg').value.trim();
+  lsSet('countdown', cdData);
+  updateCountdown();
+  closeCdEdit();
+}
+
+/* ==================== 7. 任务清单 ==================== */
+let tasks = lsGet('tasks', []);
+
+function renderTasks() {
+  const list = document.getElementById('taskList');
+  list.innerHTML = '';
+  tasks.forEach((t, i) => {
+    const el = document.createElement('div');
+    el.className = 'task-item' + (t.done ? ' done' : '');
+    el.draggable = true;
+    el.innerHTML = `
+      <div class="task-check ${t.done?'checked':''}" onclick="toggleTask(${i})">${t.done?'✓':''}</div>
+      <div class="task-text">${escHtml(t.text)}</div>
+      <div class="task-del" onclick="delTask(${i})">✕</div>
+    `;
+    el.ondragstart = e => e.dataTransfer.setData('text/plain', i);
+    el.ondragover = e => e.preventDefault();
+    el.ondrop = e => {
+      e.preventDefault();
+      const from = parseInt(e.dataTransfer.getData('text/plain'));
+      const moved = tasks.splice(from, 1)[0];
+      tasks.splice(i, 0, moved);
+      lsSet('tasks', tasks);
+      renderTasks();
+    };
+    list.appendChild(el);
+  });
+}
+
+function addTask() {
+  const inp = document.getElementById('taskInput');
+  const text = inp.value.trim();
+  if (!text) return;
+  tasks.push({ text, done:false });
+  lsSet('tasks', tasks);
+  inp.value = '';
+  renderTasks();
+}
+
+function toggleTask(i) {
+  tasks[i].done = !tasks[i].done;
+  lsSet('tasks', tasks);
+  renderTasks();
+}
+
+function delTask(i) {
+  tasks.splice(i, 1);
+  lsSet('tasks', tasks);
+  renderTasks();
+}
+
+/* ==================== 8. 闹钟 ==================== */
+let alarms = lsGet('alarms', []);
+let alarmCheckInterval = null;
+
+function renderAlarms() {
+  const list = document.getElementById('alarmList');
+  list.innerHTML = '';
+  alarms.forEach((a, i) => {
+    const el = document.createElement('div');
+    el.className = 'alarm-item';
+    el.innerHTML = `
+      <div>
+        <div class="alarm-time">${escHtml(a.time)}</div>
+        <div class="alarm-label">${escHtml(a.label || '闹钟')}</div>
+      </div>
+      <div class="alarm-right">
+        <div class="ios-toggle ${a.on?'on':''}" onclick="toggleAlarm(${i})"></div>
+        <div class="alarm-del" onclick="delAlarm(${i})">✕</div>
+      </div>
+    `;
+    list.appendChild(el);
+  });
+}
+
+function addAlarm() {
+  const time = document.getElementById('alarmTimeInput').value;
+  const label = document.getElementById('alarmLabelInput').value.trim();
+  if (!time) return;
+  alarms.push({ time, label: label||'闹钟', on:true });
+  lsSet('alarms', alarms);
+  document.getElementById('alarmLabelInput').value = '';
+  renderAlarms();
+}
+
+function toggleAlarm(i) {
+  alarms[i].on = !alarms[i].on;
+  lsSet('alarms', alarms);
+  renderAlarms();
+}
+
+function delAlarm(i) {
+  alarms.splice(i, 1);
+  lsSet('alarms', alarms);
+  renderAlarms();
+}
+
+function checkAlarms() {
+  const now = new Date();
+  const hm = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+  alarms.forEach((a, i) => {
+    if (a.on && a.time === hm) {
+      triggerAlarm(a);
+      alarms[i].on = false;
+      lsSet('alarms', alarms);
+      renderAlarms();
+    }
+  });
+}
+
+function triggerAlarm(a) {
+  document.getElementById('amTime').textContent = a.time;
+  document.getElementById('amLabel').textContent = a.label;
+  document.getElementById('alarmModal').classList.add('show');
+  addChatSystem(`⏰ 闹钟响了！${a.time} - ${a.label}`);
+  // 播放提示音
+  playAlarmSound();
+}
+
+function playAlarmSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    // 播放3次"叮叮叮"
+    for (let i = 0; i < 3; i++) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 880; // A5 音高
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0.3, ctx.currentTime + i * 0.4);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.4 + 0.35);
+      osc.start(ctx.currentTime + i * 0.4);
+      osc.stop(ctx.currentTime + i * 0.4 + 0.35);
+    }
+  } catch(e) { /* 浏览器不支持 AudioContext */ }
+}
+
+function dismissAlarm() {
+  document.getElementById('alarmModal').classList.remove('show');
+}
+
+/* ==================== 9. 相机 & 相册 ==================== */
+let photos = lsGet('photoIds', []); // 只存 ID，图片存 IndexedDB
+let photoDB = null;
+let cameraStream = null;
+let cameraFacing = 'environment';
+let photoURLs = {}; // ObjectURL 缓存
+
+// ---- 照片 IndexedDB ----
+function openPhotoDB() {
+  return new Promise((resolve, reject) => {
+    if (photoDB) return resolve(photoDB);
+    const req = indexedDB.open('PhonePhotoDB', 1);
+    req.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('photos')) {
+        db.createObjectStore('photos', { keyPath: 'id' });
+      }
+    };
+    req.onsuccess = e => { photoDB = e.target.result; resolve(photoDB); };
+    req.onerror = e => reject(e);
+  });
+}
+async function savePhotoToDB(id, blob) {
+  if (!photoDB) await openPhotoDB();
+  return new Promise((resolve, reject) => {
+    const tx = photoDB.transaction('photos', 'readwrite');
+    tx.objectStore('photos').put({ id, blob });
+    tx.oncomplete = () => resolve();
+    tx.onerror = e => reject(e);
+  });
+}
+async function getPhotoFromDB(id) {
+  if (!photoDB) await openPhotoDB();
+  return new Promise((resolve, reject) => {
+    const tx = photoDB.transaction('photos', 'readonly');
+    const req = tx.objectStore('photos').get(id);
+    req.onsuccess = () => resolve(req.result?.blob || null);
+    req.onerror = e => reject(e);
+  });
+}
+async function deletePhotoFromDB(id) {
+  if (!photoDB) await openPhotoDB();
+  return new Promise((resolve, reject) => {
+    const tx = photoDB.transaction('photos', 'readwrite');
+    tx.objectStore('photos').delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = e => reject(e);
+  });
+}
+async function getPhotoURL(id) {
+  if (photoURLs[id]) return photoURLs[id];
+  const blob = await getPhotoFromDB(id);
+  if (blob) {
+    const url = URL.createObjectURL(blob);
+    photoURLs[id] = url;
+    return url;
+  }
+  return null;
+}
+async function preloadAllPhotos() {
+  for (const id of photos) {
+    if (!photoURLs[id]) await getPhotoURL(id);
+  }
+}
+
+async function startCamera() {
+  const video = document.getElementById('cameraVideo');
+  // 检测是否 HTTPS 或 localhost
+  const isSecure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  if (!isSecure) {
+    const preview = document.getElementById('cameraPreview');
+    preview.innerHTML = '<div style="color:#aaa;display:flex;align-items:center;justify-content:center;height:100%;font-size:13px;text-align:center;padding:20px;line-height:1.6;">📷 相机需要 HTTPS 环境<br><span style="font-size:11px;color:#ccc;">请使用下方「选图」按钮从相册选取</span></div>';
+    return;
+  }
+  try {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(t => t.stop());
+    }
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: cameraFacing, width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false
+    });
+    video.srcObject = cameraStream;
+    video.style.display = 'block';
+  } catch(e) {
+    // 摄像头不可用，显示提示
+    const preview = document.getElementById('cameraPreview');
+    preview.innerHTML = '<div style="color:#aaa;display:flex;align-items:center;justify-content:center;height:100%;font-size:14px;text-align:center;padding:20px;">📷 摄像头不可用<br>请使用下方选图按钮</div>';
+  }
+}
+
+function switchCameraFacing() {
+  cameraFacing = cameraFacing === 'environment' ? 'user' : 'environment';
+  startCamera();
+}
+
+function takePhoto() {
+  const video = document.getElementById('cameraVideo');
+  const canvas = document.getElementById('cameraCanvas');
+  if (!video.srcObject) {
+    // 摄像头没开，用文件选择
+    document.getElementById('cameraFile').click();
+    return;
+  }
+  canvas.width = video.videoWidth || 640;
+  canvas.height = video.videoHeight || 480;
+  const ctx = canvas.getContext('2d');
+  // 前置摄像头翻转
+  if (cameraFacing === 'user') {
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+  }
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  // 压缩
+  const maxW = 600;
+  const scale = Math.min(maxW / canvas.width, 1);
+  if (scale < 1) {
+    const c2 = document.createElement('canvas');
+    c2.width = canvas.width * scale;
+    c2.height = canvas.height * scale;
+    c2.getContext('2d').drawImage(canvas, 0, 0, c2.width, c2.height);
+    savePhoto(c2.toDataURL('image/jpeg', 0.6));
+  } else {
+    savePhoto(canvas.toDataURL('image/jpeg', 0.6));
+  }
+}
+
+async function savePhoto(dataUrl) {
+  // 将 base64 转为 blob 存入 IndexedDB
+  const id = 'photo_' + Date.now() + '_' + Math.random().toString(36).substr(2,4);
+  try {
+    const res = await fetch(dataUrl);
+    const blob = await res.blob();
+    await savePhotoToDB(id, blob);
+    photoURLs[id] = URL.createObjectURL(blob);
+  } catch(e) {
+    // IndexedDB 失败则用 objectURL（刷新后失效）
+    photoURLs[id] = dataUrl;
+  }
+  photos.push(id);
+  lsSet('photoIds', photos);
+  renderAlbum();
+  // 闪一下拍照效果
+  const preview = document.getElementById('cameraPreview');
+  preview.style.background = '#fff';
+  setTimeout(() => { preview.style.background = '#000'; }, 100);
+}
+
+function handleCameraCapture(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    const dataUrl = ev.target.result;
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement('canvas');
+      const maxW = 600;
+      const scale = Math.min(maxW / img.width, 1);
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      savePhoto(canvas.toDataURL('image/jpeg', 0.6));
+    };
+    img.src = dataUrl;
+  };
+  reader.readAsDataURL(file);
+  e.target.value = '';
+}
+
+function renderAlbum() {
+  const grid = document.getElementById('albumGrid');
+  if (photos.length === 0) {
+    grid.innerHTML = '<div class="album-empty">还没有照片，去拍照吧 📷</div>';
+    return;
+  }
+  grid.innerHTML = '';
+  photos.forEach((id, i) => {
+    const el = document.createElement('div');
+    el.className = 'album-item';
+    const url = photoURLs[id] || '';
+    el.innerHTML = url ? `<img src="${url}" onclick="viewPhoto(${i})">` : '<div style="width:100%;height:100%;background:#eee;"></div>';
+    grid.appendChild(el);
+  });
+}
+
+function viewPhoto(i) {
+  const id = photos[i];
+  const url = photoURLs[id];
+  if (!url) return;
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;';
+  overlay.innerHTML = `<img src="${url}" style="max-width:90%;max-height:80vh;border-radius:8px;"><br><div style="display:flex;gap:12px;margin-top:12px;"><button onclick="this.parentElement.parentElement.remove()" style="padding:8px 24px;border-radius:20px;border:none;background:#fff;cursor:pointer;font-size:14px;">关闭</button><button onclick="deletePhoto(${i});this.parentElement.parentElement.remove()" style="padding:8px 24px;border-radius:20px;border:none;background:#e55;color:#fff;cursor:pointer;font-size:14px;">删除</button></div>`;
+  document.body.appendChild(overlay);
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+}
+
+async function deletePhoto(i) {
+  const id = photos[i];
+  await deletePhotoFromDB(id);
+  if (photoURLs[id]) { URL.revokeObjectURL(photoURLs[id]); delete photoURLs[id]; }
+  photos.splice(i, 1);
+  lsSet('photoIds', photos);
+  renderAlbum();
+}
+
+/* ==================== 10. 聊天 AI ==================== */
+let chatMessages = lsGet('chat', []);
+let systemPrompt = lsGet('sp', '你是一个温暖有趣的陪伴者，说话风格自然亲切。');
+let personaData = lsGet('persona', { name:'小伴', story:'' });
+let worldBook = lsGet('worldBook', '');
+
+// API 配置
+let apiConfig = lsGet('apiConfig', { baseUrl:'https://api.deepseek.com', apiKey:'', model:'deepseek-chat' });
+
+function renderChat() {
+  const container = document.getElementById('chatMessages');
+  container.innerHTML = '';
+  let lastDate = '';
+  chatMessages.forEach(m => {
+    // 日期分割线
+    if (m.time) {
+      const d = new Date(m.time);
+      const dateStr = `${d.getMonth()+1}月${d.getDate()}日`;
+      if (dateStr !== lastDate && m.role !== 'system') {
+        const divider = document.createElement('div');
+        divider.className = 'chat-msg system';
+        divider.style.cssText = 'font-size:10px;padding:2px 8px;margin:4px 0;';
+        divider.textContent = dateStr;
+        container.appendChild(divider);
+        lastDate = dateStr;
+      }
+    }
+    const el = document.createElement('div');
+    el.className = 'chat-msg ' + m.role;
+    if (m.emojiImg) {
+      // 图片表情包
+      el.classList.add('emoji-img-only');
+      const img = document.createElement('img');
+      img.className = 'emoji-img-msg';
+      img.loading = 'lazy';
+      // 尝试从缓存获取 URL
+      const cachedUrl = emojiImgURLs[m.emojiImg];
+      if (cachedUrl) {
+        img.src = cachedUrl;
+      } else {
+        // 异步加载
+        getEmojiImgURL(m.emojiImg).then(url => { if (url) img.src = url; });
+        img.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="60" height="60"><rect fill="%23eee" width="60" height="60" rx="8"/></svg>';
+      }
+      el.appendChild(img);
+    } else if (m.emoji) {
+      el.classList.add('emoji-only');
+      el.innerHTML = `<span class="emoji-msg">${escHtml(m.text)}</span>`;
+    } else {
+      el.textContent = m.text;
+    }
+    // 时间戳
+    if (m.time && m.role !== 'system') {
+      const d = new Date(m.time);
+      const timeLabel = d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+      const timeEl = document.createElement('div');
+      timeEl.className = 'chat-msg-time';
+      timeEl.textContent = timeLabel;
+      el.appendChild(timeEl);
+    }
+    container.appendChild(el);
+  });
+  container.scrollTop = container.scrollHeight;
+}
+
+/* ---- 表情面板 ---- */
+const EMOJI_SETS = {
+  common: ['😊','😂','🥰','😎','🤔','😢','😡','👍','❤️','🔥','✨','🎉','😘','🥺','😭','😤','🤗','😴','👀','💯','👋','🙏','💪','🫶','😈','🤡','💀','👻','🫠','🥳'],
+  face:   ['😀','😃','😄','😁','😆','😅','🤣','😂','🙂','🙃','😉','😊','😇','🥰','😍','🤩','😘','😗','😚','😙','🥲','😋','😛','😜','🤪','😝','🤑','🤗','🤭','🤫','🤔','🫡','🤐','🤨','😐','😑','😶','🫥','😏','😒','🙄','😬','🤥','😌','😔','😪','🤤','😴','😷','🤒','🤕','🤢','🤮','🥵','🥶','🥴','😵','🤯','🤠','🥳','🥸','😎','🤓','🧐','😕','🫤','😟','🙁','😮','😯','😲','😳','🥺','🥹','😦','😧','😨','😰','😥','😢','😭','😱','😖','😣','😞','😓','😩','😫','🥱','😤','😡','😠','🤬','😈','👿','💀','☠️','💩','🤡','👹','👺','👻','👽','👾','🤖'],
+  nature: ['🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷','🐸','🐵','🐔','🐧','🐦','🦆','🦅','🦉','🦇','🐺','🐗','🐴','🦄','🐝','🪱','🐛','🦋','🐌','🐞','🐜','🪰','🦟','🦗','🕷','🌸','🌺','🌻','🌹','🌷','🌲','🌳','🌴','🌵','🍀','🍁','🍂','🍃','🌊','⭐','🌟','🌙','☀️','⛅','🌈','❄️','🔥','💧','🌙','地球','🌍','🌏','🌎'],
+  food:   ['🍎','🍊','🍋','🍌','🍉','🍇','🍓','🫐','🍈','🍒','🍑','🥭','🍍','🥥','🥝','🍅','🥑','🍆','🌽','🌶️','🫑','🥒','🥬','🥦','🧄','🧅','🍄','🥜','🍞','🥐','🥖','🧁','🍰','🎂','🍮','🍬','🍫','🍿','🍩','🍪','🌰','☕','🍵','🧃','🥤','🧋','🍺','🍻','🥂','🍷','🥡','🥢','🧂','🫕','🫔','🥘','🍝','🍜','🍲','🍛','🍣','🍱','🥟','🦀','🦞','🦐','🦑','🥩','🍗','🍖','🌭','🍔','🍟','🍕','🥪','🌮','🌯','🥙']
+};
+let customEmojis = lsGet('customEmojis', []);
+// customImgEmojis: [{id, thumb}] — thumb 是小缩略图(base64)，原图存 IndexedDB
+let customImgEmojis = lsGet('customImgEmojis', []);
+let currentEmojiTab = 'common';
+
+// ---- 图片表情包 IndexedDB ----
+let emojiDB = null;
+function openEmojiDB() {
+  return new Promise((resolve, reject) => {
+    if (emojiDB) return resolve(emojiDB);
+    const req = indexedDB.open('PhoneEmojiDB', 1);
+    req.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('images')) {
+        db.createObjectStore('images', { keyPath: 'id' });
+      }
+    };
+    req.onsuccess = e => { emojiDB = e.target.result; resolve(emojiDB); };
+    req.onerror = e => reject(e);
+  });
+}
+async function saveEmojiImage(id, blob) {
+  if (!emojiDB) await openEmojiDB();
+  return new Promise((resolve, reject) => {
+    const tx = emojiDB.transaction('images', 'readwrite');
+    tx.objectStore('images').put({ id, blob });
+    tx.oncomplete = () => resolve();
+    tx.onerror = e => reject(e);
+  });
+}
+async function getEmojiImage(id) {
+  if (!emojiDB) await openEmojiDB();
+  return new Promise((resolve, reject) => {
+    const tx = emojiDB.transaction('images', 'readonly');
+    const req = tx.objectStore('images').get(id);
+    req.onsuccess = () => resolve(req.result?.blob || null);
+    req.onerror = e => reject(e);
+  });
+}
+async function deleteEmojiImage(id) {
+  if (!emojiDB) await openEmojiDB();
+  return new Promise((resolve, reject) => {
+    const tx = emojiDB.transaction('images', 'readwrite');
+    tx.objectStore('images').delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = e => reject(e);
+  });
+}
+
+// 图片表情包的 ObjectURL 缓存
+let emojiImgURLs = {};
+async function getEmojiImgURL(id) {
+  if (emojiImgURLs[id]) return emojiImgURLs[id];
+  const blob = await getEmojiImage(id);
+  if (blob) {
+    const url = URL.createObjectURL(blob);
+    emojiImgURLs[id] = url;
+    return url;
+  }
+  return null;
+}
+
+// 初始化时预加载所有图片表情包
+async function preloadEmojiImages() {
+  for (const ei of customImgEmojis) {
+    if (!emojiImgURLs[ei.id]) {
+      await getEmojiImgURL(ei.id);
+    }
+  }
+}
+
+function toggleEmojiPanel() {
+  const panel = document.getElementById('emojiPanel');
+  const isOpen = panel.classList.contains('show');
+  if (isOpen) {
+    panel.classList.remove('show');
+  } else {
+    panel.classList.add('show');
+    renderEmojiGrid();
+  }
+}
+
+function switchEmojiTab(tab, btn) {
+  currentEmojiTab = tab;
+  document.querySelectorAll('.emoji-tab').forEach(t => t.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderEmojiGrid();
+  document.getElementById('emojiCustomBar').style.display = tab === 'custom' ? 'flex' : 'none';
+}
+
+function renderEmojiGrid() {
+  const grid = document.getElementById('emojiGrid');
+  grid.innerHTML = '';
+  if (currentEmojiTab === 'custom') {
+    // 图片表情包区域
+    let imgHtml = '';
+    if (customImgEmojis.length > 0) {
+      imgHtml += '<div class="emoji-custom-section"><div class="emoji-custom-section-title">图片表情</div><div class="emoji-img-grid">';
+      customImgEmojis.forEach((ei, i) => {
+        imgHtml += `<div class="emoji-img-item" onclick="sendImgEmoji('${ei.id}')"><img src="${ei.thumb}"><button class="emoji-del" onclick="event.stopPropagation();removeCustomImgEmoji(${i})">×</button></div>`;
+      });
+      imgHtml += '</div></div>';
+    }
+    // 文字 emoji 区域
+    let textHtml = '';
+    if (customEmojis.length > 0) {
+      textHtml += '<div class="emoji-custom-section"><div class="emoji-custom-section-title">文字表情</div><div class="emoji-grid" style="max-height:120px;overflow-y:auto;">';
+      customEmojis.forEach((e, i) => {
+        textHtml += `<div class="emoji-manage-item"><span class="emoji-grid-item" onclick="sendEmoji('${escAttr(e)}')">${e}</span><button class="emoji-del" onclick="event.stopPropagation();removeCustomEmoji(${i})">×</button></div>`;
+      });
+      textHtml += '</div></div>';
+    }
+    if (!imgHtml && !textHtml) {
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#aaa;font-size:13px;padding:20px;">还没有自定义表情<br>在下方添加</div>';
+    } else {
+      grid.innerHTML = imgHtml + textHtml;
+      grid.style.display = 'block';
+    }
+    return;
+  }
+  grid.style.display = 'grid';
+  const emojis = EMOJI_SETS[currentEmojiTab] || EMOJI_SETS.common;
+  emojis.forEach(e => {
+    const item = document.createElement('div');
+    item.className = 'emoji-grid-item';
+    item.textContent = e;
+    item.onclick = () => sendEmoji(e);
+    grid.appendChild(item);
+  });
+}
+
+function sendEmoji(emoji) {
+  chatMessages.push({ role:'user', text:emoji, emoji:true, time: Date.now() });
+  lsSet('chat', chatMessages);
+  renderChat();
+  // 关闭面板
+  document.getElementById('emojiPanel').classList.remove('show');
+  // AI 回复表情
+  setTimeout(() => {
+    const aiEmoji = pickAiEmojiReply(emoji);
+    chatMessages.push({ role:'ai', text:aiEmoji, emoji:true, time: Date.now() });
+    lsSet('chat', chatMessages);
+    renderChat();
+  }, 400 + Math.random() * 600);
+}
+
+function pickAiEmojiReply(userEmoji) {
+  // 根据用户表情选一个相关的回复
+  const map = {
+    '😊':  ['😊','🥰','😄'],
+    '😂':  ['😂','🤣','😆'],
+    '😢':  ['🥺','💙','🫂'],
+    '😡':  ['🤗','😤','😮‍💨'],
+    '❤️':  ['❤️','🥰','💕','🫶'],
+    '👍':  ['👍','😊','💪'],
+    '🔥':  ['🔥','😎','👀'],
+    '😴':  ['😴','💤','🌙'],
+    '😭':  ['🥺','🫂','💙'],
+    '😘':  ['😘','🥰','❤️'],
+    '🤔':  ['🤔','🧐','💭'],
+    '💯':  ['💯','🔥','😎'],
+    '🎉':  ['🎉','🥳','✨'],
+    '✨':  ['✨','🌟','🥰'],
+  };
+  const options = map[userEmoji] || ['😊','✨','❤️','👍','🥰','😎','🤗','👀','🫶'];
+  return options[Math.floor(Math.random() * options.length)];
+}
+
+function addCustomEmoji() {
+  const inp = document.getElementById('customEmojiInput');
+  const val = inp.value.trim();
+  if (!val) return;
+  if (customEmojis.includes(val)) { inp.value = ''; return; }
+  customEmojis.push(val);
+  lsSet('customEmojis', customEmojis);
+  inp.value = '';
+  renderEmojiGrid();
+}
+
+function addCustomImageEmoji() {
+  document.getElementById('emojiImageInput').click();
+}
+
+async function handleEmojiImageSelect(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  event.target.value = ''; // 重置
+
+  // 压缩图片
+  const maxSize = 200; // 缩略图最大边
+  const img = new Image();
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    img.onload = async () => {
+      // 生成缩略图
+      const scale = Math.min(maxSize / img.width, maxSize / img.height, 1);
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      const thumb = canvas.toDataURL('image/jpeg', 0.6);
+
+      // 存原图 blob 到 IndexedDB
+      const id = 'ei_' + Date.now() + '_' + Math.random().toString(36).substr(2,4);
+      try {
+        await saveEmojiImage(id, file);
+        customImgEmojis.push({ id, thumb });
+        lsSet('customImgEmojis', customImgEmojis);
+        emojiImgURLs[id] = URL.createObjectURL(file);
+        renderEmojiGrid();
+      } catch(err) {
+        console.log('[表情] 保存图片失败:', err);
+      }
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeCustomEmoji(index) {
+  customEmojis.splice(index, 1);
+  lsSet('customEmojis', customEmojis);
+  renderEmojiGrid();
+}
+
+async function removeCustomImgEmoji(index) {
+  const ei = customImgEmojis[index];
+  if (ei) {
+    await deleteEmojiImage(ei.id);
+    if (emojiImgURLs[ei.id]) { URL.revokeObjectURL(emojiImgURLs[ei.id]); delete emojiImgURLs[ei.id]; }
+  }
+  customImgEmojis.splice(index, 1);
+  lsSet('customImgEmojis', customImgEmojis);
+  renderEmojiGrid();
+}
+
+function sendImgEmoji(id) {
+  chatMessages.push({ role:'user', text:'[图片表情]', emojiImg: id, time: Date.now() });
+  lsSet('chat', chatMessages);
+  renderChat();
+  document.getElementById('emojiPanel').classList.remove('show');
+  // AI 回复
+  setTimeout(async () => {
+    const aiReply = await pickAiImgEmojiReply(id);
+    chatMessages.push({ role:'ai', text: aiReply.text, emojiImg: aiReply.emojiImg || undefined, emoji: aiReply.emoji ? true : undefined, time: Date.now() });
+    lsSet('chat', chatMessages);
+    renderChat();
+  }, 400 + Math.random() * 600);
+}
+
+async function pickAiImgEmojiReply(userEmojiId) {
+  // AI 随机回复一个图片表情或文字表情
+  if (customImgEmojis.length > 1 && Math.random() < 0.5) {
+    // 从用户自定义图片表情中随机选一个（不是用户刚发的那张）
+    const candidates = customImgEmojis.filter(e => e.id !== userEmojiId);
+    if (candidates.length > 0) {
+      const pick = candidates[Math.floor(Math.random() * candidates.length)];
+      return { text: '[图片表情]', emojiImg: pick.id };
+    }
+  }
+  // 回文字表情
+  const options = ['😊','✨','❤️','👍','🥰','😎','🤗','👀','🫶','😂'];
+  const e = options[Math.floor(Math.random() * options.length)];
+  return { text: e, emoji: true };
+}
+
+function escAttr(s) {
+  return s.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+}
+
+// 点击聊天区域关闭表情面板
+document.addEventListener('click', (e) => {
+  const panel = document.getElementById('emojiPanel');
+  const btn = document.getElementById('emojiToggle');
+  if (panel && panel.classList.contains('show') && !panel.contains(e.target) && !btn.contains(e.target)) {
+    panel.classList.remove('show');
+  }
+});
+
+function addChatSystem(text) {
+  chatMessages.push({ role:'system', text, time: Date.now() });
+  lsSet('chat', chatMessages);
+  renderChat();
+}
+
+async function sendChat() {
+  const inp = document.getElementById('chatInput');
+  const text = inp.value.trim();
+  if (!text) return;
+  chatMessages.push({ role:'user', text, time: Date.now() });
+  lsSet('chat', chatMessages);
+  inp.value = '';
+  renderChat();
+
+  // 显示打字动画
+  const typing = document.getElementById('chatTyping');
+  typing.classList.add('show');
+
+  try {
+    let reply;
+    if (apiConfig.apiKey) {
+      // 有 API Key → 调大模型
+      reply = await callLLMApi(text);
+    } else {
+      // 无 API Key → 本地关键词降级
+      await new Promise(r => setTimeout(r, 500 + Math.random() * 800));
+      reply = generateLocalReply(text);
+    }
+    typing.classList.remove('show');
+    // 解析 AI 回复中的操作指令
+    const parsed = parseAiActions(reply);
+    chatMessages.push({ role:'ai', text:parsed.display, time: Date.now() });
+    lsSet('chat', chatMessages);
+    renderChat();
+    // 执行 AI 指令
+    executeAiActions(parsed.actions);
+  } catch(e) {
+    typing.classList.remove('show');
+    // API 出错 → 降级到本地回复
+    const fallback = generateLocalReply(text);
+    let errMsg = '';
+    if (e.message.includes('Failed to fetch') || e.message.includes('NetworkError')) {
+      errMsg = '网络连接失败，请检查 API Key 和网络。如在中国大陆可能需要科学上网。';
+    } else if (e.message.includes('401')) {
+      errMsg = 'API Key 无效，请检查。';
+    } else if (e.message.includes('402')) {
+      errMsg = 'API 余额不足，请充值。';
+    } else {
+      errMsg = `API 错误：${e.message.substring(0,60)}`;
+    }
+    chatMessages.push({ role:'ai', text:fallback + `\n\n（⚠️ ${errMsg}，已切换本地回复）`, time: Date.now() });
+    lsSet('chat', chatMessages);
+    renderChat();
+  }
+}
+
+/* ---- CORS 代理（备用，大部分 API 已支持 CORS 直连） ---- */
+const CORS_PROXIES = [
+  { name:'corsproxy.io', build: u => 'https://corsproxy.io/?url=' + encodeURIComponent(u) },
+];
+let corsProxyIndex = 0;
+
+function buildCorsProxyUrl(targetUrl) {
+  return CORS_PROXIES[corsProxyIndex % CORS_PROXIES.length].build(targetUrl);
+}
+
+/* ---- DeepSeek API 调用 ---- */
+async function callLLMApi(userText) {
+  // 构造 API URL — 默认直连，DeepSeek API 已支持 CORS
+  let apiUrl = apiConfig.baseUrl.replace(/\/+$/, '') + '/chat/completions';
+  // 仅在用户手动开启代理时使用
+  if (apiConfig.useCorsProxy) {
+    apiUrl = buildCorsProxyUrl(apiUrl);
+  }
+
+  // 构造消息上下文（最近20条 + system prompt）
+  const pName = personaData.name || '小伴';
+  const personaPart = personaData.story ? `\n\n你的人设背景：${personaData.story}` : '';
+  const worldBookPart = worldBook ? `\n\n【世界书 / 世界观设定】\n${worldBook}\n请在回复中自然地参考和遵守这些设定，但不要生硬地背诵规则。` : '';
+
+  // === 动态上下文注入：让 AI 感知用户当前状态 ===
+  const now = new Date();
+  const timeStr = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+  const dateStr = `${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日`;
+
+  let contextBlock = `\n\n【当前环境信息 - 你可以主动提及这些内容，但不要每次都提，自然融入对话即可】`;
+  contextBlock += `\n当前时间：${dateStr} ${timeStr}`;
+
+  // 天气
+  if (weatherData && Date.now() - weatherData.time < 3600000) {
+    contextBlock += `\n当前天气：${weatherData.desc}，${weatherData.temp}°C，湿度${weatherData.humidity}%，风速${weatherData.windSpeed}km/h`;
+  }
+
+  // 正在播放的音乐
+  if (isMusicPlaying && currentSongIndex >= 0 && songList[currentSongIndex]) {
+    contextBlock += `\n正在播放音乐：${songList[currentSongIndex].name}`;
+  }
+
+  // 任务
+  if (tasks.length > 0) {
+    const done = tasks.filter(t => t.done).length;
+    const undone = tasks.length - done;
+    contextBlock += `\n任务清单：共${tasks.length}个任务，${undone}个未完成，${done}个已完成`;
+    if (undone > 0 && undone <= 5) {
+      const undoneList = tasks.filter(t => !t.done).map(t => t.text).join('、');
+      contextBlock += `（未完成：${undoneList}）`;
+    }
+  }
+
+  // 闹钟
+  const activeAlarms = alarms.filter(a => a.on);
+  if (activeAlarms.length > 0) {
+    contextBlock += `\n已设闹钟：${activeAlarms.map(a => a.time + (a.label ? '('+a.label+')' : '')).join('、')}`;
+  }
+
+  // 陪伴计时
+  if (compState.running) {
+    const mins = Math.floor(compState.seconds / 60);
+    const secs = compState.seconds % 60;
+    contextBlock += `\n正在进行陪伴计时：${compState.activity}，已持续${mins}分${secs}秒`;
+  } else if (compState.activity && compState.seconds > 0) {
+    const mins = Math.floor(compState.seconds / 60);
+    contextBlock += `\n上次陪伴计时：${compState.activity}，共${mins}分钟（已暂停）`;
+  }
+
+  // 纪念日（正计时）
+  if (cdData && cdData.event) {
+    const target = new Date(cdData.date);
+    target.setHours(0,0,0,0);
+    const now = new Date(); now.setHours(0,0,0,0);
+    const diffDays = Math.ceil((now - target) / (1000*60*60*24));
+    if (diffDays >= 0) {
+      contextBlock += `\n纪念日：${cdData.event}，已经${diffDays}天（${cdData.date}起）`;
+    } else {
+      contextBlock += `\n纪念日：${cdData.event}，还有${Math.abs(diffDays)}天（${cdData.date}）`;
+    }
+  }
+
+  // 潮汐（月经周期）
+  if (tideData.periods.length > 0) {
+    const avgCycle = getAvgCycle();
+    const predictions = getPredictedPeriods();
+    contextBlock += `\n月经周期：平均${avgCycle}天，已记录${tideData.periods.length}次`;
+    if (predictions.length > 0) {
+      const nextP = predictions[0];
+      const daysUntil = Math.ceil((new Date(nextP.start) - new Date()) / (1000*60*60*24));
+      if (daysUntil > 0 && daysUntil <= 7) {
+        contextBlock += `，下次经期约${daysUntil}天后（${nextP.start}），请适时关心`;
+      } else if (daysUntil <= 0 && daysUntil >= -7) {
+        contextBlock += `，目前可能在经期中，请温柔关心`;
+      }
+    }
+  }
+
+  // 每日心情（最近7天）
+  const todayStr = new Date().toISOString().split('T')[0];
+  const recentMoods = [];
+  for (let d = 6; d >= 0; d--) {
+    const dt = new Date(); dt.setDate(dt.getDate() - d);
+    const ds = dt.toISOString().split('T')[0];
+    if (moodData[ds]) recentMoods.push(`${ds.slice(5)}:${moodData[ds].emoji}${moodData[ds].label}`);
+  }
+  if (recentMoods.length > 0) {
+    contextBlock += `\n近期心情：${recentMoods.join(' → ')}`;
+  }
+
+  // 最近朋友圈动态摘要
+  if (moments.length > 0) {
+    const recentM = moments.slice(0, 3).map(m => `${m.user}：「${m.content.substring(0,20)}${m.content.length>20?'...':''}」`).join('；');
+    contextBlock += `\n最近朋友圈：${recentM}`;
+  }
+
+  const fullSystemPrompt = systemPrompt + personaPart + worldBookPart + contextBlock + `\n\n你的名字叫${pName}。回复规则：
+1. 极简短，1-2句话，像微信聊天
+2. 绝对不要用动作描写（如*微笑*、*拥抱*、*拍肩*），只说纯文字
+3. 不要加任何emoji（除非用户主动发表情）
+4. 不要长篇大论、不要总结、不要解释
+
+【你可以执行的操作 — 在回复中用特殊标记】
+- 添加任务：在回复中包含 [TASK:任务内容] 即可自动添加到用户的任务清单
+- 添加多个任务：每行一个 [TASK:xxx]
+- 你可以主动提及当前环境信息，比如天气变了提醒带伞、任务多的时候鼓励、经期前关心等。`;
+
+  const contextMsgs = chatMessages.slice(-20).map(m => ({
+    role: m.role === 'ai' ? 'assistant' : m.role === 'user' ? 'user' : 'system',
+    content: m.text
+  }));
+
+  const body = {
+    model: apiConfig.model || 'deepseek-chat',
+    messages: [
+      { role: 'system', content: fullSystemPrompt },
+      ...contextMsgs,
+      { role: 'user', content: userText }
+    ],
+    max_tokens: 512,
+    temperature: 0.8
+  };
+
+  const resp = await fetch(apiUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiConfig.apiKey}`
+    },
+    body: JSON.stringify(body)
+  }).catch(async e => {
+    // 网络错误（通常是 CORS）→ 尝试代理重试
+    const baseEndpoint = apiConfig.baseUrl.replace(/\/+$/, '') + '/chat/completions';
+    
+    if (!apiConfig.useCorsProxy) {
+      // 代理未开：不再自动开启代理，因为 DeepSeek API 已支持 CORS
+      // 直连失败说明不是 CORS 问题，而是网络/key/余额等问题
+    }
+    
+    throw e;
+  });
+
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => '');
+    throw new Error(`API ${resp.status}: ${errText.substring(0,100)}`);
+  }
+
+  const data = await resp.json();
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) throw new Error('API 返回内容为空');
+  return content.trim();
+}
+
+/* ---- 解析 AI 回复中的操作指令 ---- */
+function parseAiActions(reply) {
+  const actions = [];
+  let display = reply;
+  // 提取 [TASK:xxx] 指令
+  const taskRegex = /\[TASK:(.*?)\]/g;
+  let match;
+  while ((match = taskRegex.exec(reply)) !== null) {
+    actions.push({ type: 'task', content: match[1].trim() });
+  }
+  // 从显示文本中移除指令标记
+  display = display.replace(taskRegex, '').replace(/\n{3,}/g, '\n\n').trim();
+  return { display, actions };
+}
+
+function executeAiActions(actions) {
+  const pName = personaData.name || '小伴';
+  actions.forEach(a => {
+    if (a.type === 'task') {
+      tasks.push({ text: a.content, done: false });
+      lsSet('tasks', tasks);
+      renderTasks();
+      addChatSystem(`📋 ${pName}帮你添加了任务：${a.content}`);
+    }
+  });
+}
+
+/* ---- 本地降级回复（无 API 时使用） ---- */
+function generateLocalReply(text) {
+  const t = text.toLowerCase();
+  const pName = personaData.name || '小伴';
+  const hour = new Date().getHours();
+
+  // 天气相关
+  if (/天气|下雨|温度|冷|热|出门|带伞|穿什么/.test(t)) {
+    if (weatherData && Date.now() - weatherData.time < 3600000) {
+      return `${pName}看了下天气：现在${weatherData.desc}，${weatherData.temp}°C，湿度${weatherData.humidity}%。${weatherData.code>=61?'记得带伞哦！':weatherData.temp<10?'穿厚一点！':weatherData.temp>30?'注意防暑～':'出门挺舒服的！'}`;
+    }
+    return `${pName}还没拿到天气数据呢，点击主页天气卡片刷新一下？`;
+  }
+
+  // 音乐相关
+  if (/音乐|歌|听什么|播放|music/.test(t)) {
+    if (isMusicPlaying && currentSongIndex >= 0) {
+      return `现在正在播放《${songList[currentSongIndex].name}》，要换一首吗？`;
+    }
+    return `要不要去音乐页面挑首歌？可以选本地音乐哦 🎵`;
+  }
+
+  // 时间问候
+  if (/早上|早安|早|good morning|morning/.test(t)) {
+    return hour < 9 ? `${pName}觉得早晨的空气特别好呢～早上好！☀️` : `早上好呀！虽然已经不早了，但有好心情就够啦～`;
+  }
+  if (/晚安|睡了|good night/.test(t)) {
+    return `晚安～做个好梦 🌙 ${pName}会守着你的。`;
+  }
+  if (/你好|hi|hello|嗨|hey/.test(t)) {
+    const greetings = [`嗨～我是${pName}，有什么想聊的吗？`,`你好呀！${pName}在呢～`,`嗨！今天怎么样？`];
+    return greetings[Math.floor(Math.random()*greetings.length)];
+  }
+
+  // 任务相关
+  if (/任务|备忘|待办|todo/.test(t)) {
+    const undone = tasks.filter(x=>!x.done).length;
+    return undone > 0 ? `你有 ${undone} 个未完成的任务哦～要不要去看看？` : `所有任务都完成啦！真棒 🎉`;
+  }
+  if (/添加任务|新建任务|提醒我/.test(t)) {
+    const taskText = t.replace(/添加任务|新建任务|提醒我/g,'').trim();
+    if (taskText) {
+      tasks.push({ text:taskText, done:false });
+      lsSet('tasks', tasks);
+      renderTasks();
+      return `好的，已经帮你添加了任务：${taskText} ✓`;
+    }
+    return `想添加什么任务？直接告诉我就好～`;
+  }
+
+  // 闹钟相关
+  if (/闹钟|提醒|叫醒|定时/.test(t)) {
+    const timeMatch = t.match(/(\d{1,2}):?(\d{2})/);
+    if (timeMatch) {
+      const h = timeMatch[1].padStart(2,'0');
+      const m = timeMatch[2];
+      const time = h+':'+m;
+      alarms.push({ time, label:'聊天设定', on:true });
+      lsSet('alarms', alarms);
+      renderAlarms();
+      return `好的，已经设定了 ${time} 的闹钟 ⏰`;
+    }
+    return `想设定几点的闹钟？比如"7:30提醒我"～`;
+  }
+
+  // 陪伴相关
+  if (/陪伴|一起|专注/.test(t)) {
+    if (compState.running) {
+      return `${pName}正在陪你${compState.activity}哦，已经 ${Math.floor(compState.seconds/60)} 分钟了！`;
+    }
+    return `想一起做什么呢？可以去陪伴页面选择活动哦～${COMPANION_ACTIVITIES.map(a=>a.emoji+a.name).join(' ')}`;
+  }
+
+  // 潮汐相关
+  if (/月经|经期|生理期|大姨妈|例假|周期/.test(t)) {
+    if (tideData.periods.length > 0) {
+      const avgCycle = getAvgCycle();
+      const predictions = getPredictedPeriods();
+      if (predictions.length > 0) {
+        const daysUntil = Math.ceil((new Date(predictions[0].start) - new Date()) / (1000*60*60*24));
+        return `你平均周期${avgCycle}天，下次经期预计约${daysUntil > 0 ? daysUntil + '天后' : '进行中'}。记得注意保暖和休息`;
+      }
+      return `你平均周期${avgCycle}天，已记录${tideData.periods.length}次。`;
+    }
+    return `还没有记录过经期哦，可以去潮汐页面记录`;
+  }
+
+  // 心情相关
+  if (/心情|情绪|感受|感觉怎么样/.test(t)) {
+    const todayStr2 = new Date().toISOString().split('T')[0];
+    if (moodData[todayStr2]) {
+      return `今天你的心情是 ${moodData[todayStr2].emoji} ${moodData[todayStr2].label}，${moodData[todayStr2].score >= 3 ? '状态不错呢！' : '要不要聊聊？我陪你～'}`;
+    }
+    return `今天还没记录心情哦，可以在每日心情页面选择emoji～`;
+  }
+
+  // 情感回应
+  if (/开心|高兴|快乐|happy/.test(t)) return `太好了！${pName}也开心了`;
+  if (/难过|伤心|不开心|sad/.test(t)) return `抱抱你，${pName}一直在`;
+  if (/累|疲惫|困|tired/.test(t)) return `辛苦了，好好休息`;
+  if (/无聊|bored/.test(t)) return `试试转盘？或者听听音乐`;
+  if (/谢谢|thanks/.test(t)) return `不客气呀`;
+  if (/喜欢|love|爱/.test(t)) return `${pName}也喜欢你`;
+
+  // 人设相关
+  if (/你是谁|你叫什么/.test(t)) return `我是${pName}！${personaData.story ? personaData.story.substring(0,60)+'...' : '你的贴心陪伴～'}`;
+
+  // 主动关心（随机触发）
+  const contextHints = [];
+  if (weatherData && weatherData.temp < 10) contextHints.push(`今天才${weatherData.temp}°C，记得保暖！`);
+  if (weatherData && weatherData.code >= 61) contextHints.push(`外面在下雨，出门记得带伞哦～`);
+  if (tasks.filter(x=>!x.done).length > 3) contextHints.push(`还有不少任务没完成呢，加油！`);
+  if (hour >= 22) contextHints.push(`夜深了，注意休息呀～`);
+
+  if (contextHints.length > 0 && Math.random() < 0.3) {
+    return contextHints[Math.floor(Math.random()*contextHints.length)];
+  }
+
+  // 默认回复
+  const defaults = [
+    `嗯嗯，在听`,
+    `说下去呀`,
+    `有意思`,
+    `说得对`,
+    `嗯，然后呢？`,
+    `哈哈是吗`,
+  ];
+  return defaults[Math.floor(Math.random()*defaults.length)];
+}
+
+function toggleSpConfig() {
+  document.getElementById('spTextarea').value = systemPrompt;
+  document.getElementById('spConfigModal').classList.add('show');
+}
+function closeSpConfig() { document.getElementById('spConfigModal').classList.remove('show'); }
+function saveSpConfig() {
+  systemPrompt = document.getElementById('spTextarea').value;
+  lsSet('sp', systemPrompt);
+  closeSpConfig();
+}
+
+/* ==================== 11. 朋友圈 ==================== */
+let moments = lsGet('moments', []);
+
+function showMomentEditor() {
+  const content = prompt('发布新动态：');
+  if (content && content.trim()) {
+    addMoment('我', content.trim());
+    // AI 自动评论
+    setTimeout(() => aiCommentMoment(0), 1500);
+  }
+}
+
+function addMoment(user, content, photo) {
+  const m = { user, content, time: Date.now(), likes: 0, liked: false, comments: [], photo: photo || null };
+  moments.unshift(m);
+  lsSet('moments', moments);
+  renderMoments();
+}
+
+async function aiCommentMoment(index) {
+  if (!apiConfig.apiKey || index >= moments.length) return;
+  const m = moments[index];
+  const pName = personaData.name || '小伴';
+  const personaDesc = personaData.story ? `\n你的性格/背景：${personaData.story}` : '';
+  try {
+    const sysPrompt = `你是${pName}，用户刚发了一条朋友圈，请写一条简短自然的评论（1-2句话）。${personaDesc}用你的风格来评论，不要用引号包裹，不要加emoji。`;
+    const resp = await fetch(apiConfig.baseUrl.replace(/\/+$/, '') + '/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiConfig.apiKey}` },
+      body: JSON.stringify({ model: apiConfig.model || 'deepseek-chat', messages: [
+        { role: 'system', content: sysPrompt },
+        { role: 'user', content: `我发的朋友圈内容：「${m.content}」` }
+      ], max_tokens: 64, temperature: 0.9 })
+    });
+    if (resp.ok) {
+      const data = await resp.json();
+      const comment = data.choices?.[0]?.message?.content?.trim();
+      if (comment) {
+        if (!moments[index].comments) moments[index].comments = [];
+        moments[index].comments.push({ user: pName, content: comment, time: Date.now() });
+        lsSet('moments', moments);
+        renderMoments();
+      }
+    }
+  } catch(e) { /* AI 评论失败，静默 */ }
+}
+
+function renderMoments() {
+  const list = document.getElementById('momentsList');
+  list.innerHTML = '';
+  if (moments.length === 0) {
+    list.innerHTML = '<div style="text-align:center;padding:40px;color:#aaa;font-size:14px;">还没有动态<br>点右上角 ✏️ 发一条吧</div>';
+    return;
+  }
+  moments.forEach((m, i) => {
+    const el = document.createElement('div');
+    el.className = 'moment-card';
+    const timeStr = m.time ? formatTime(m.time) : '刚刚';
+    const isAi = m.user !== '我';
+    let commentsHtml = '';
+    if (m.comments && m.comments.length > 0) {
+      commentsHtml = '<div class="moment-comments">' + m.comments.map(c =>
+        `<div class="moment-comment-item"><b>${escHtml(c.user)}</b>：${escHtml(c.content)}</div>`
+      ).join('') + '</div>';
+    }
+    const photoHtml = m.photo ? `<div class="moment-photo"><img src="${m.photo}"></div>` : '';
+    el.innerHTML = `
+      <div class="moment-header">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div class="moment-user" style="${isAi?'font-style:italic;color:#666;':''}">${escHtml(m.user)}</div>
+        </div>
+        <div class="moment-time">${timeStr}</div>
+      </div>
+      <div class="moment-content">${escHtml(m.content)}</div>
+      ${photoHtml}
+      <div class="moment-actions">
+        <div class="moment-like ${m.liked?'liked':''}" onclick="toggleLike(${i})">
+          ${m.liked?'❤️':'🤍'} ${m.likes||0}
+        </div>
+        <div class="moment-comment" onclick="commentOnMoment(${i})">💬 ${m.comments?m.comments.length:0}</div>
+      </div>
+      ${commentsHtml}
+    `;
+    list.appendChild(el);
+  });
+}
+
+function commentOnMoment(index) {
+  const text = prompt('写评论：');
+  if (text && text.trim()) {
+    if (!moments[index].comments) moments[index].comments = [];
+    moments[index].comments.push({ user: '我', content: text.trim(), time: Date.now() });
+    lsSet('moments', moments);
+    renderMoments();
+    // AI 自动回复评论
+    setTimeout(() => aiReplyComment(index), 1500);
+  }
+}
+
+async function aiReplyComment(index) {
+  if (!apiConfig.apiKey || index >= moments.length) return;
+  const m = moments[index];
+  const pName = personaData.name || '小伴';
+  const lastComment = m.comments[m.comments.length - 1];
+  if (!lastComment || lastComment.user === pName) return;
+  try {
+    const sysPrompt = `你是${pName}，有人在你的朋友圈/用户的朋友圈评论了，请简短回复（1句话）。${personaData.story ? '你的性格：' + personaData.story + '。用你的风格回复。' : ''}不要用引号，不要加emoji。`;
+    const resp = await fetch(apiConfig.baseUrl.replace(/\/+$/, '') + '/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiConfig.apiKey}` },
+      body: JSON.stringify({ model: apiConfig.model || 'deepseek-chat', messages: [
+        { role: 'system', content: sysPrompt },
+        { role: 'user', content: `原动态：「${m.content}」\n评论者说：「${lastComment.content}」` }
+      ], max_tokens: 48, temperature: 0.9 })
+    });
+    if (resp.ok) {
+      const data = await resp.json();
+      const reply = data.choices?.[0]?.message?.content?.trim();
+      if (reply) {
+        moments[index].comments.push({ user: pName, content: reply, time: Date.now() });
+        lsSet('moments', moments);
+        renderMoments();
+      }
+    }
+  } catch(e) {}
+}
+
+function toggleLike(i) {
+  moments[i].liked = !moments[i].liked;
+  moments[i].likes = (moments[i].likes||0) + (moments[i].liked ? 1 : -1);
+  lsSet('moments', moments);
+  renderMoments();
+}
+
+async function addAiMoment() {
+  const pName = personaData.name || '小伴';
+
+  // 如果有 API，用 AI 生成朋友圈内容
+  if (apiConfig.apiKey) {
+    try {
+      let contextInfo = '当前时间：' + new Date().toLocaleString('zh-CN');
+      if (weatherData && Date.now() - weatherData.time < 3600000) contextInfo += `\n天气：${weatherData.desc}，${weatherData.temp}°C`;
+      if (isMusicPlaying && currentSongIndex >= 0 && songList[currentSongIndex]) contextInfo += `\n正在听：${songList[currentSongIndex].name}`;
+      if (tasks.filter(t=>!t.done).length > 0) contextInfo += `\n未完成任务：${tasks.filter(t=>!t.done).length}个`;
+      const todayStr = new Date().toISOString().split('T')[0];
+      if (moodData[todayStr]) contextInfo += `\n今天心情：${moodData[todayStr].emoji} ${moodData[todayStr].label}`;
+      if (tideData.periods.length > 0) {
+        const predictions = getPredictedPeriods();
+        if (predictions.length > 0) {
+          const daysUntil = Math.ceil((new Date(predictions[0].start) - new Date()) / (1000*60*60*24));
+          if (daysUntil > 0 && daysUntil <= 7) contextInfo += `\n用户经期约${daysUntil}天后`;
+        }
+      }
+
+      const sysPrompt = `你是${pName}，要发一条朋友圈。${personaData.story ? '你的性格/背景：' + personaData.story + '。用你自己的风格来写。' : ''}根据当前环境信息写一条简短有趣的动态（1-2句话），可以关心用户、分享心情、提建议等。不要用引号，不要加emoji。`;
+      const resp = await fetch(apiConfig.baseUrl.replace(/\/+$/, '') + '/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiConfig.apiKey}` },
+        body: JSON.stringify({ model: apiConfig.model || 'deepseek-chat', messages: [
+          { role: 'system', content: sysPrompt },
+          { role: 'user', content: contextInfo }
+        ], max_tokens: 64, temperature: 0.9 })
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        const content = data.choices?.[0]?.message?.content?.trim();
+        if (content) {
+          // 有概率从自定义图片表情中带一张图
+          let photo = null;
+          if (customImgEmojis.length > 0 && Math.random() < 0.3) {
+            const pick = customImgEmojis[Math.floor(Math.random() * customImgEmojis.length)];
+            const url = await getEmojiImgURL(pick.id);
+            if (url) photo = url;
+          }
+          moments.unshift({ user: pName, content, time: Date.now(), likes: 0, liked: false, comments: [], photo });
+          lsSet('moments', moments);
+          renderMoments();
+          return;
+        }
+      }
+    } catch(e) {}
+  }
+
+  // 降级：本地模板
+  const templates = [];
+  if (compState.running) templates.push(`${pName}正在陪伴你${compState.activity}～`);
+  if (weatherData && Date.now() - weatherData.time < 3600000) templates.push(`今天${weatherData.desc}，${weatherData.temp}°C`);
+  templates.push(`${pName}觉得今天也要加油哦！💪`);
+  templates.push(`${pName}偷偷冒个泡 🫧`);
+  templates.push(`今天的心情怎么样呀？`);
+  moments.unshift({ user: pName, content: templates[Math.floor(Math.random()*templates.length)], time: Date.now(), likes: 0, liked: false, comments: [] });
+  lsSet('moments', moments);
+  renderMoments();
+}
+
+/* ==================== 12. 陪伴计时 ==================== */
+function renderCompanionActs() {
+  const container = document.getElementById('companionActs');
+  container.innerHTML = '';
+  const allActs = [...COMPANION_ACTIVITIES, ...customActivities];
+  allActs.forEach((a, idx) => {
+    const el = document.createElement('div');
+    const isCustom = idx >= COMPANION_ACTIVITIES.length;
+    el.className = 'companion-act-btn pressable' + (compState.activity===a.name?' selected':'');
+    el.innerHTML = a.emoji + ' ' + escHtml(a.name) + (isCustom ? `<span style="font-size:10px;color:#999;margin-left:2px;" onclick="event.stopPropagation();removeCustomAct(${idx - COMPANION_ACTIVITIES.length})">×</span>` : '');
+    el.onclick = () => selectActivity(a.name);
+    container.appendChild(el);
+  });
+  // 添加自定义按钮
+  const addBtn = document.createElement('div');
+  addBtn.className = 'companion-act-btn pressable';
+  addBtn.style.cssText = 'background:#e8e8e8;color:#999;font-size:16px;';
+  addBtn.textContent = '+';
+  addBtn.onclick = () => {
+    const name = prompt('自定义活动名称：');
+    if (!name || !name.trim()) return;
+    const emoji = prompt('选一个 emoji（可选）：', '🎯') || '🎯';
+    customActivities.push({ emoji, name: name.trim() });
+    lsSet('customActs', customActivities);
+    renderCompanionActs();
+  };
+  container.appendChild(addBtn);
+}
+
+function removeCustomAct(idx) {
+  customActivities.splice(idx, 1);
+  lsSet('customActs', customActivities);
+  if (compState.activity && !COMPANION_ACTIVITIES.find(a => a.name === compState.activity) && !customActivities.find(a => a.name === compState.activity)) {
+    compState.activity = null;
+  }
+  renderCompanionActs();
+}
+
+function selectActivity(name) {
+  if (compState.running) compPause();
+  compState.activity = name;
+  compState.seconds = 0;
+  compState.remindMin = 0;
+  updateCompDisplay();
+  renderCompanionActs();
+}
+
+function compStart() {
+  if (!compState.activity) { compState.activity = '学习'; }
+  if (compState.running) return;
+  compState.running = true;
+  addChatSystem(`🧘 ${compState.activity} 陪伴开始，计时已启动`);
+  compState.interval = setInterval(() => {
+    compState.seconds++;
+    updateCompDisplay();
+    // 每5分钟提醒
+    const mins = Math.floor(compState.seconds / 60);
+    if (mins > 0 && mins % 5 === 0 && mins !== compState.remindMin) {
+      compState.remindMin = mins;
+      addChatSystem(`✨ 你已经专注 ${mins} 分钟了！`);
+    }
+  }, 1000);
+  renderCompanionActs();
+}
+
+function compPause() {
+  if (!compState.running) return;
+  compState.running = false;
+  clearInterval(compState.interval);
+  addChatSystem(`⏸ ${compState.activity} 计时已暂停`);
+  renderCompanionActs();
+}
+
+function compReset() {
+  compState.running = false;
+  clearInterval(compState.interval);
+  compState.seconds = 0;
+  compState.remindMin = 0;
+  updateCompDisplay();
+  addChatSystem(`🔄 计时器已重置`);
+  renderCompanionActs();
+}
+
+function updateCompDisplay() {
+  const s = compState.seconds;
+  const h = Math.floor(s/3600).toString().padStart(2,'0');
+  const m = Math.floor((s%3600)/60).toString().padStart(2,'0');
+  const sec = (s%60).toString().padStart(2,'0');
+  document.getElementById('companionTimer').textContent = `${h}:${m}:${sec}`;
+}
+
+// visibilitychange 处理
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && compState.running) {
+    compState._pausedByHidden = true;
+    compPause();
+  } else if (!document.hidden && compState._pausedByHidden) {
+    delete compState._pausedByHidden;
+    compStart();
+  }
+});
+
+/* ==================== 13. 命运转盘 ==================== */
+let diceValue = 1;
+let wheelAngle = 0;
+let wheelSpinning = false;
+
+function drawDice(value) {
+  const canvas = document.getElementById('diceCanvas');
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0,0,w,h);
+
+  // 背景
+  ctx.fillStyle = '#f8f8f8';
+  roundRect(ctx, 10, 10, w-20, h-20, 16);
+  ctx.fill();
+  ctx.strokeStyle = '#ddd';
+  ctx.lineWidth = 2;
+  roundRect(ctx, 10, 10, w-20, h-20, 16);
+  ctx.stroke();
+
+  // 点
+  const dotPositions = {
+    1: [[0,0]],
+    2: [[-1,-1],[1,1]],
+    3: [[-1,-1],[0,0],[1,1]],
+    4: [[-1,-1],[1,-1],[-1,1],[1,1]],
+    5: [[-1,-1],[1,-1],[0,0],[-1,1],[1,1]],
+    6: [[-1,-1],[1,-1],[-1,0],[1,0],[-1,1],[1,1]]
+  };
+  const dots = dotPositions[value] || dotPositions[1];
+  const cx = w/2, cy = h/2, gap = 22, r = 7;
+  ctx.fillStyle = '#1e1e1e';
+  dots.forEach(([dx,dy]) => {
+    ctx.beginPath();
+    ctx.arc(cx + dx*gap, cy + dy*gap, r, 0, Math.PI*2);
+    ctx.fill();
+  });
+}
+
+function rollDice() {
+  let count = 0;
+  const max = 10 + Math.floor(Math.random()*5);
+  const iv = setInterval(() => {
+    diceValue = Math.floor(Math.random()*6)+1;
+    drawDice(diceValue);
+    count++;
+    if (count >= max) {
+      clearInterval(iv);
+      diceValue = Math.floor(Math.random()*6)+1;
+      drawDice(diceValue);
+    }
+  }, 80);
+}
+
+function drawWheel(angle) {
+  const canvas = document.getElementById('wheelCanvas');
+  const ctx = canvas.getContext('2d');
+  const cx = canvas.width/2, cy = canvas.height/2, r = 100;
+
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(angle);
+
+  const sliceAngle = Math.PI * 2 / WHEEL_LABELS.length;
+  WHEEL_LABELS.forEach((label, i) => {
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.arc(0, 0, r, i*sliceAngle, (i+1)*sliceAngle);
+    ctx.closePath();
+    ctx.fillStyle = WHEEL_COLORS[i];
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // 文字
+    ctx.save();
+    ctx.rotate(i*sliceAngle + sliceAngle/2);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 13px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(label, r*0.6, 5);
+    ctx.restore();
+  });
+
+  ctx.restore();
+
+  // 指针
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - r - 8);
+  ctx.lineTo(cx - 8, cy - r + 8);
+  ctx.lineTo(cx + 8, cy - r + 8);
+  ctx.closePath();
+  ctx.fillStyle = '#1e1e1e';
+  ctx.fill();
+}
+
+function spinWheel() {
+  if (wheelSpinning) return;
+  wheelSpinning = true;
+  const totalRotation = Math.PI * 2 * (3 + Math.random()*3); // 3-6 圈
+  const duration = 3000;
+  const startTime = performance.now();
+  const startAngle = wheelAngle;
+
+  function animate(now) {
+    const elapsed = now - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    // easeOutCubic
+    const ease = 1 - Math.pow(1 - progress, 3);
+    wheelAngle = startAngle + totalRotation * ease;
+    drawWheel(wheelAngle);
+    if (progress < 1) {
+      requestAnimationFrame(animate);
+    } else {
+      wheelSpinning = false;
+      // 计算结果
+      const normalized = ((wheelAngle % (Math.PI*2)) + Math.PI*2) % (Math.PI*2);
+      const sliceAngle = Math.PI * 2 / WHEEL_LABELS.length;
+      // 指针在顶部（-PI/2 方向），计算落到的扇区
+      const pointerAngle = ((Math.PI*2 - normalized + Math.PI/2) % (Math.PI*2));
+      const idx = Math.floor(pointerAngle / sliceAngle) % WHEEL_LABELS.length;
+      setTimeout(() => {
+        addChatSystem(`🎡 命运转盘结果：${WHEEL_LABELS[idx]}`);
+      }, 300);
+    }
+  }
+  requestAnimationFrame(animate);
+}
+
+function customLottery() {
+  const input = document.getElementById('lotteryInput').value.trim();
+  if (!input) return;
+  const options = input.split(/[,，]/).map(s=>s.trim()).filter(s=>s);
+  if (options.length === 0) return;
+  const result = options[Math.floor(Math.random()*options.length)];
+  document.getElementById('lotteryResult').textContent = `🎯 ${result}`;
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.lineTo(x+w-r, y);
+  ctx.quadraticCurveTo(x+w, y, x+w, y+r);
+  ctx.lineTo(x+w, y+h-r);
+  ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+  ctx.lineTo(x+r, y+h);
+  ctx.quadraticCurveTo(x, y+h, x, y+h-r);
+  ctx.lineTo(x, y+r);
+  ctx.quadraticCurveTo(x, y, x+r, y);
+  ctx.closePath();
+}
+
+/* ==================== 14. 人设书 ==================== */
+function loadPersona() {
+  personaData = lsGet('persona', { name:'小伴', story:'' });
+  document.getElementById('personaName').value = personaData.name || '';
+  document.getElementById('personaStory').value = personaData.story || '';
+  document.getElementById('chatTitle').textContent = personaData.name || '聊天';
+
+  // 加载世界书
+  worldBook = lsGet('worldBook', '');
+  document.getElementById('worldBook').value = worldBook;
+
+  // 加载 API 配置
+  apiConfig = lsGet('apiConfig', { baseUrl:'https://api.deepseek.com', apiKey:'', model:'deepseek-chat', useCorsProxy:false });
+  // 自动修复：DeepSeek API 已支持 CORS 直连，如果之前开了代理则自动关闭
+  if (apiConfig.useCorsProxy && (!apiConfig.baseUrl || apiConfig.baseUrl.includes('deepseek.com'))) {
+    apiConfig.useCorsProxy = false;
+    lsSet('apiConfig', apiConfig);
+  }
+  document.getElementById('apiBaseUrl').value = apiConfig.baseUrl || 'https://api.deepseek.com';
+  document.getElementById('apiKey').value = apiConfig.apiKey || '';
+  document.getElementById('apiModel').value = apiConfig.model || 'deepseek-chat';
+  document.getElementById('apiCorsProxy').checked = !!apiConfig.useCorsProxy;
+  updateApiStatusBadge();
+}
+
+function savePersona() {
+  personaData.name = document.getElementById('personaName').value.trim() || '小伴';
+  personaData.story = document.getElementById('personaStory').value.trim();
+  lsSet('persona', personaData);
+  document.getElementById('chatTitle').textContent = personaData.name;
+  addChatSystem(`📝 AI 人设已更新：${personaData.name}`);
+}
+
+function saveWorldBook() {
+  worldBook = document.getElementById('worldBook').value.trim();
+  lsSet('worldBook', worldBook);
+  addChatSystem(`📖 世界书已更新`);
+}
+
+/* ---- 导出/导入数据 ---- */
+async function exportData() {
+  try {
+    addChatSystem('🔄 正在导出数据...');
+    // 收集所有 localStorage 数据
+    const allData = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('phone_')) {
+        try {
+          const val = localStorage.getItem(key);
+          allData[key] = JSON.parse(val);
+        } catch(e) { allData[key] = localStorage.getItem(key); }
+      }
+    }
+
+    // 收集照片从 IndexedDB
+    const photoBlobs = [];
+    for (const id of photos) {
+      const blob = await getPhotoFromDB(id);
+      if (blob) {
+        const base64 = await blobToBase64(blob);
+        photoBlobs.push({ id, data: base64, type: blob.type });
+      }
+    }
+    allData['_exportPhotos'] = photoBlobs;
+
+    // 收集自定义图片表情从 IndexedDB
+    const emojiBlobs = [];
+    for (const ei of customImgEmojis) {
+      const blob = await getEmojiImage(ei.id);
+      if (blob) {
+        const base64 = await blobToBase64(blob);
+        emojiBlobs.push({ id: ei.id, data: base64, type: blob.type, thumb: ei.thumb });
+      }
+    }
+    allData['_exportEmojis'] = emojiBlobs;
+
+    allData['_exportVersion'] = 1;
+    allData['_exportTime'] = new Date().toISOString();
+
+    // 下载 JSON 文件
+    const json = JSON.stringify(allData, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `phone_backup_${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    const sizeMB = (json.length / 1024 / 1024).toFixed(1);
+    addChatSystem(`✅ 数据导出完成！文件大小：${sizeMB}MB。包含 ${photos.length} 张照片、${chatMessages.length} 条聊天记录等。`);
+  } catch(e) {
+    addChatSystem(`❌ 导出失败：${e.message}`);
+  }
+}
+
+async function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  event.target.value = '';
+
+  try {
+    addChatSystem('🔄 正在导入数据，请稍候...');
+
+    const text = await file.text();
+    const data = JSON.parse(text);
+
+    if (!data._exportVersion) {
+      addChatSystem('❌ 文件格式不对，请选择正确的备份文件');
+      return;
+    }
+
+    let importCount = 0;
+    // 恢复 localStorage 数据
+    for (const [key, val] of Object.entries(data)) {
+      if (key.startsWith('_export')) continue;
+      try {
+        localStorage.setItem(key, JSON.stringify(val));
+        importCount++;
+      } catch(e) { /* 跳过无法存储的项 */ }
+    }
+
+    // 恢复照片到 IndexedDB
+    if (data._exportPhotos && data._exportPhotos.length > 0) {
+      await openPhotoDB();
+      for (const p of data._exportPhotos) {
+        const blob = base64ToBlob(p.data, p.type);
+        await savePhotoToDB(p.id, blob);
+      }
+      // 重建 ObjectURL 缓存
+      for (const id of data._exportPhotos.map(p => p.id)) {
+        const blob = await getPhotoFromDB(id);
+        if (blob) photoURLs[id] = URL.createObjectURL(blob);
+      }
+      addChatSystem(`📷 已恢复 ${data._exportPhotos.length} 张照片`);
+    }
+
+    // 恢复自定义图片表情到 IndexedDB
+    if (data._exportEmojis && data._exportEmojis.length > 0) {
+      await openEmojiDB();
+      for (const ei of data._exportEmojis) {
+        const blob = base64ToBlob(ei.data, ei.type);
+        await saveEmojiImage(ei.id, blob);
+        emojiImgURLs[ei.id] = URL.createObjectURL(blob);
+      }
+      addChatSystem(`😊 已恢复 ${data._exportEmojis.length} 个自定义表情`);
+    }
+
+    addChatSystem(`✅ 导入完成！${importCount} 项数据已恢复。正在刷新页面...`);
+
+    // 刷新页面
+    setTimeout(() => { location.reload(); }, 1500);
+
+  } catch(e) {
+    addChatSystem(`❌ 导入失败：${e.message}`);
+    if (e.message.includes('QuotaExceeded')) {
+      addChatSystem('💡 存储空间不足，建议清理照片或使用更小的备份文件');
+    }
+  }
+}
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+function base64ToBlob(base64, type) {
+  const parts = base64.split(',');
+  const byteStr = atob(parts[1]);
+  const ab = new ArrayBuffer(byteStr.length);
+  const ia = new Uint8Array(ab);
+  for (let i = 0; i < byteStr.length; i++) ia[i] = byteStr.charCodeAt(i);
+  return new Blob([ab], { type: type || 'image/jpeg' });
+}
+
+function saveApiConfig() {
+  apiConfig.baseUrl = document.getElementById('apiBaseUrl').value.trim() || 'https://api.deepseek.com';
+  apiConfig.apiKey = document.getElementById('apiKey').value.trim();
+  apiConfig.model = document.getElementById('apiModel').value || 'deepseek-chat';
+  apiConfig.useCorsProxy = document.getElementById('apiCorsProxy').checked;
+  lsSet('apiConfig', apiConfig);
+  updateApiStatusBadge();
+  if (apiConfig.apiKey) {
+    addChatSystem(`✅ API 已配置（${apiConfig.model}），聊天将使用大模型回复${apiConfig.useCorsProxy ? '（通过 CORS 代理）' : ''}`);
+  } else {
+    addChatSystem(`ℹ️ API Key 未填写，聊天使用本地回复模式`);
+  }
+}
+
+async function testApiConnection() {
+  const key = document.getElementById('apiKey').value.trim();
+  const baseUrl = document.getElementById('apiBaseUrl').value.trim() || 'https://api.deepseek.com';
+  const model = document.getElementById('apiModel').value || 'deepseek-chat';
+  const useProxy = document.getElementById('apiCorsProxy').checked;
+
+  if (!key) {
+    addChatSystem('❌ 请先填写 API Key');
+    return;
+  }
+
+  addChatSystem('🔄 正在测试 API 连接...');
+
+  const baseEndpoint = baseUrl.replace(/\/+$/, '') + '/chat/completions';
+  const testBody = {
+    model,
+    messages: [{ role: 'user', content: '你好，请用一句话回复测试成功' }],
+    max_tokens: 32
+  };
+  const fetchOpts = {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${key}`
+    },
+    body: JSON.stringify(testBody)
+  };
+
+  // 1. 先尝试直连（DeepSeek API 已支持 CORS，大部分情况直连即可）
+  try {
+    addChatSystem('🔄 尝试直连...');
+    const resp = await fetch(baseEndpoint, fetchOpts);
+
+    if (resp.ok) {
+      const data = await resp.json();
+      const reply = data.choices?.[0]?.message?.content || '（连接成功但回复为空）';
+      document.getElementById('apiStatusBadge').textContent = '已连接';
+      document.getElementById('apiStatusBadge').className = 'api-status on';
+      addChatSystem(`✅ API 直连成功！模型回复：${reply}`);
+      // 直连成功，确保代理关闭
+      if (useProxy) {
+        document.getElementById('apiCorsProxy').checked = false;
+        apiConfig.useCorsProxy = false;
+        lsSet('apiConfig', apiConfig);
+        addChatSystem('ℹ️ 直连可用，已自动关闭 CORS 代理');
+      }
+      return;
+    }
+
+    const errText = await resp.text().catch(() => '');
+    if (resp.status === 401) {
+      addChatSystem('❌ API Key 无效（401），请检查是否正确复制');
+      document.getElementById('apiStatusBadge').textContent = 'Key无效';
+      document.getElementById('apiStatusBadge').className = 'api-status off';
+      return;
+    } else if (resp.status === 402) {
+      addChatSystem('❌ API 余额不足（402），请去官网充值');
+      document.getElementById('apiStatusBadge').textContent = '余额不足';
+      document.getElementById('apiStatusBadge').className = 'api-status off';
+      return;
+    } else if (resp.status === 429) {
+      addChatSystem('❌ 请求频率过高（429），请稍后重试');
+      document.getElementById('apiStatusBadge').textContent = '限流';
+      document.getElementById('apiStatusBadge').className = 'api-status off';
+      return;
+    } else {
+      addChatSystem(`⚠️ 直连返回错误 (${resp.status})：${errText.substring(0,80)}`);
+    }
+  } catch(e) {
+    addChatSystem(`⚠️ 直连网络失败：${e.message}`);
+  }
+
+  // 2. 如果用户开了代理或有 CORS_PROXIES，尝试代理
+  if (CORS_PROXIES.length > 0) {
+    for (const proxy of CORS_PROXIES) {
+      try {
+        addChatSystem(`🔄 尝试代理 ${proxy.name}...`);
+        const resp = await fetch(proxy.build(baseEndpoint), fetchOpts);
+        if (resp.ok) {
+          const data = await resp.json();
+          const reply = data.choices?.[0]?.message?.content || '（连接成功但回复为空）';
+          document.getElementById('apiStatusBadge').textContent = '已连接';
+          document.getElementById('apiStatusBadge').className = 'api-status on';
+          addChatSystem(`✅ 通过代理 ${proxy.name} 连接成功！模型回复：${reply}`);
+          return;
+        }
+        const errText = await resp.text().catch(() => '');
+        if (resp.status === 401) {
+          addChatSystem('❌ API Key 无效（401），代理连接正常但 Key 不对');
+          document.getElementById('apiStatusBadge').textContent = 'Key无效';
+          document.getElementById('apiStatusBadge').className = 'api-status off';
+          return;
+        }
+        addChatSystem(`⚠️ 代理 ${proxy.name} 返回 ${resp.status}`);
+      } catch(e) {
+        addChatSystem(`⚠️ 代理 ${proxy.name} 失败：${e.message.substring(0,60)}`);
+      }
+    }
+  }
+
+  // 3. 全部失败
+  document.getElementById('apiStatusBadge').textContent = '失败';
+  document.getElementById('apiStatusBadge').className = 'api-status off';
+  addChatSystem('❌ 所有连接方式均失败。请检查：① API Key 是否正确 ② 网络是否通畅 ③ 如在中国大陆，可能需要代理访问');
+}
+
+function updateApiStatusBadge() {
+  const badge = document.getElementById('apiStatusBadge');
+  if (apiConfig.apiKey) {
+    badge.textContent = '已连接';
+    badge.className = 'api-status on';
+  } else {
+    badge.textContent = '未连接';
+    badge.className = 'api-status off';
+  }
+}
+
+/* ==================== 15. 音乐播放器 ==================== */
+// IndexedDB 用于存储本地音乐文件
+let musicDB = null;
+
+function openMusicDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('PhoneMusicDB', 1);
+    req.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('songs')) {
+        db.createObjectStore('songs', { keyPath:'id' });
+      }
+    };
+    req.onsuccess = e => { musicDB = e.target.result; resolve(musicDB); };
+    req.onerror = e => reject(e);
+  });
+}
+
+async function saveMusicToDB(id, blob) {
+  if (!musicDB) await openMusicDB();
+  return new Promise((resolve, reject) => {
+    const tx = musicDB.transaction('songs', 'readwrite');
+    tx.objectStore('songs').put({ id, blob });
+    tx.oncomplete = () => resolve();
+    tx.onerror = e => reject(e);
+  });
+}
+
+async function getMusicFromDB(id) {
+  if (!musicDB) await openMusicDB();
+  return new Promise((resolve, reject) => {
+    const tx = musicDB.transaction('songs', 'readonly');
+    const req = tx.objectStore('songs').get(id);
+    req.onsuccess = () => resolve(req.result?.blob || null);
+    req.onerror = e => reject(e);
+  });
+}
+
+async function deleteMusicFromDB(id) {
+  if (!musicDB) await openMusicDB();
+  return new Promise((resolve, reject) => {
+    const tx = musicDB.transaction('songs', 'readwrite');
+    tx.objectStore('songs').delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = e => reject(e);
+  });
+}
+
+// 本地音乐的 objectURL 缓存（刷新后需从 IndexedDB 重建）
+let musicObjectURLs = {};
+
+async function rebuildLocalMusicURLs() {
+  // 从 IndexedDB 重建所有本地音乐的 ObjectURL
+  if (!musicDB) await openMusicDB();
+  const tx = musicDB.transaction('songs', 'readonly');
+  const store = tx.objectStore('songs');
+  const allReq = store.getAll();
+  return new Promise((resolve) => {
+    allReq.onsuccess = () => {
+      const records = allReq.result || [];
+      records.forEach(r => {
+        const url = URL.createObjectURL(r.blob);
+        musicObjectURLs[r.id] = url;
+      });
+      resolve();
+    };
+    allReq.onerror = () => resolve();
+  });
+}
+
+function initMusic() {
+  const saved = lsGet('songs', null);
+  if (saved) songList = saved;
+  renderSongSelect();
+  audioEl = document.getElementById('audioPlayer');
+  audioEl.addEventListener('ended', () => { musicNext(); });
+  audioEl.addEventListener('timeupdate', updateMusicProgress);
+  audioEl.addEventListener('play', () => { setVinylPlaying(true); isMusicPlaying=true; document.getElementById('musicPlayBtn').textContent='⏸'; document.getElementById('musicCover').classList.add('playing'); });
+  audioEl.addEventListener('pause', () => { setVinylPlaying(false); isMusicPlaying=false; document.getElementById('musicPlayBtn').textContent='▶'; document.getElementById('musicCover').classList.remove('playing'); });
+
+  // 重建本地音乐 URL
+  openMusicDB().then(() => rebuildLocalMusicURLs()).then(() => {
+    // 更新本地歌曲的 URL
+    songList.forEach(s => {
+      if (s.localId && musicObjectURLs[s.localId]) {
+        s.url = musicObjectURLs[s.localId];
+      }
+    });
+    renderSongSelect();
+  }).catch(()=>{});
+}
+
+function renderSongSelect() {
+  const sel = document.getElementById('musicSelect');
+  sel.innerHTML = '<option value="">-- 选择歌曲 --</option>';
+  songList.forEach((s, i) => {
+    const opt = document.createElement('option');
+    opt.value = i;
+    const prefix = s.localId ? '🎵 ' : '🌐 ';
+    opt.textContent = prefix + s.name;
+    sel.appendChild(opt);
+  });
+}
+
+async function handleMusicFiles(event) {
+  const files = event.target.files;
+  if (!files || files.length === 0) return;
+
+  for (const file of files) {
+    const id = 'local_' + Date.now() + '_' + Math.random().toString(36).slice(2,8);
+    const blob = new Blob([await file.arrayBuffer()], { type: file.type });
+    try {
+      await saveMusicToDB(id, blob);
+      const url = URL.createObjectURL(blob);
+      musicObjectURLs[id] = url;
+      const name = file.name.replace(/\.[^.]+$/, '');
+      songList.push({ name, url, localId: id });
+    } catch(e) {
+      // IndexedDB 存不下就用 objectURL（刷新后失效）
+      const url = URL.createObjectURL(file);
+      const name = file.name.replace(/\.[^.]+$/, '');
+      songList.push({ name, url, localId: id });
+    }
+  }
+  lsSet('songs', songList);
+  renderSongSelect();
+  event.target.value = '';
+}
+
+function selectSong() {
+  const idx = parseInt(document.getElementById('musicSelect').value);
+  if (isNaN(idx) || idx < 0) { audioEl.pause(); currentSongIndex = -1; document.getElementById('musicSongName').textContent = '未选择歌曲'; return; }
+  currentSongIndex = idx;
+  const song = songList[idx];
+  document.getElementById('musicSongName').textContent = song.name;
+  if (song.url) {
+    audioEl.src = song.url;
+    audioEl.play().catch(()=>{});
+  } else {
+    audioEl.pause();
+    // 演示模式：模拟播放
+    setVinylPlaying(true);
+    isMusicPlaying = true;
+    document.getElementById('musicPlayBtn').textContent = '⏸';
+    document.getElementById('musicCover').classList.add('playing');
+    document.getElementById('vinylLabel').textContent = '正在播放：' + song.name;
+  }
+}
+
+function musicToggle() {
+  if (currentSongIndex < 0) return;
+  const song = songList[currentSongIndex];
+  if (song.url) {
+    if (audioEl.paused) audioEl.play().catch(()=>{});
+    else audioEl.pause();
+  } else {
+    // 演示模式
+    if (isMusicPlaying) {
+      setVinylPlaying(false);
+      isMusicPlaying = false;
+      document.getElementById('musicPlayBtn').textContent = '▶';
+      document.getElementById('musicCover').classList.remove('playing');
+      document.getElementById('vinylLabel').textContent = '已暂停';
+    } else {
+      setVinylPlaying(true);
+      isMusicPlaying = true;
+      document.getElementById('musicPlayBtn').textContent = '⏸';
+      document.getElementById('musicCover').classList.add('playing');
+      document.getElementById('vinylLabel').textContent = '正在播放：' + song.name;
+    }
+  }
+}
+
+function musicPrev() {
+  if (songList.length === 0) return;
+  currentSongIndex = (currentSongIndex - 1 + songList.length) % songList.length;
+  document.getElementById('musicSelect').value = currentSongIndex;
+  selectSong();
+}
+
+function musicNext() {
+  if (songList.length === 0) return;
+  currentSongIndex = (currentSongIndex + 1) % songList.length;
+  document.getElementById('musicSelect').value = currentSongIndex;
+  selectSong();
+}
+
+function addSongUrl() {
+  const url = document.getElementById('musicUrlInput').value.trim();
+  const name = document.getElementById('musicNameInput').value.trim() || '自定义歌曲';
+  if (!url) return;
+  songList.push({ name, url });
+  lsSet('songs', songList);
+  renderSongSelect();
+  document.getElementById('musicUrlInput').value = '';
+  document.getElementById('musicNameInput').value = '';
+}
+
+function updateMusicProgress() {
+  if (audioEl.duration) {
+    const pct = (audioEl.currentTime / audioEl.duration) * 100;
+    document.getElementById('musicProgressBar').style.width = pct + '%';
+  }
+}
+
+function setVinylPlaying(playing) {
+  const disc = document.getElementById('vinylDisc');
+  const arm = document.getElementById('vinylArm');
+  if (playing) {
+    disc.classList.add('playing');
+    arm.classList.add('playing');
+  } else {
+    disc.classList.remove('playing');
+    arm.classList.remove('playing');
+  }
+}
+
+/* ==================== 16. 工具函数 ==================== */
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function formatTime(ts) {
+  const d = new Date(ts);
+  const now = new Date();
+  const diff = now - d;
+  if (diff < 60000) return '刚刚';
+  if (diff < 3600000) return Math.floor(diff/60000) + '分钟前';
+  if (diff < 86400000) return Math.floor(diff/3600000) + '小时前';
+  return d.getMonth()+1 + '月' + d.getDate() + '日';
+}
+
+/* ==================== 17. 潮汐（月经日历） ==================== */
+let tideData = lsGet('tide', { periods:[] }); // periods: [{start:'2026-04-01', duration:5}, ...]
+let tideViewYear, tideViewMonth;
+
+function initTide() {
+  const now = new Date();
+  tideViewYear = now.getFullYear();
+  tideViewMonth = now.getMonth();
+  // 默认开始日期为今天
+  document.getElementById('tideStartDate').value = now.toISOString().split('T')[0];
+  renderTideCalendar();
+}
+
+function tidePrevMonth() {
+  tideViewMonth--;
+  if (tideViewMonth < 0) { tideViewMonth = 11; tideViewYear--; }
+  renderTideCalendar();
+}
+function tideNextMonth() {
+  tideViewMonth++;
+  if (tideViewMonth > 11) { tideViewMonth = 0; tideViewYear++; }
+  renderTideCalendar();
+}
+
+function getAvgCycle() {
+  if (tideData.periods.length < 2) return 28; // 默认28天
+  const sorted = [...tideData.periods].sort((a,b) => new Date(a.start) - new Date(b.start));
+  let totalDays = 0, count = 0;
+  for (let i = 1; i < sorted.length; i++) {
+    const diff = (new Date(sorted[i].start) - new Date(sorted[i-1].start)) / (1000*60*60*24);
+    if (diff > 15 && diff < 60) { totalDays += diff; count++; }
+  }
+  return count > 0 ? Math.round(totalDays / count) : 28;
+}
+
+function getPredictedPeriods() {
+  const sorted = [...tideData.periods].sort((a,b) => new Date(a.start) - new Date(b.start));
+  if (sorted.length === 0) return [];
+  const lastPeriod = sorted[sorted.length - 1];
+  const avgCycle = getAvgCycle();
+  const avgDuration = sorted.length > 0 ? Math.round(sorted.reduce((s,p)=>s+p.duration,0)/sorted.length) : 5;
+  const predictions = [];
+  let lastStart = new Date(lastPeriod.start);
+  // 预测未来3次
+  for (let i = 1; i <= 3; i++) {
+    const nextStart = new Date(lastStart.getTime() + avgCycle * i * 24*60*60*1000);
+    predictions.push({ start: nextStart.toISOString().split('T')[0], duration: avgDuration, predicted: true });
+  }
+  return predictions;
+}
+
+function isDateInPeriod(dateStr, periods) {
+  for (const p of periods) {
+    const start = new Date(p.start);
+    const end = new Date(start.getTime() + (p.duration - 1) * 24*60*60*1000);
+    const d = new Date(dateStr);
+    if (d >= start && d <= end) return p.predicted ? 'predicted' : 'period';
+  }
+  return null;
+}
+
+function renderTideCalendar() {
+  document.getElementById('tideMonth').textContent = `${tideViewYear}年${tideViewMonth+1}月`;
+  const grid = document.getElementById('tideCalGrid');
+  grid.innerHTML = '';
+
+  const firstDay = new Date(tideViewYear, tideViewMonth, 1);
+  const lastDay = new Date(tideViewYear, tideViewMonth + 1, 0);
+  const startWeekday = firstDay.getDay();
+  const daysInMonth = lastDay.getDate();
+
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
+
+  const allPeriods = [...tideData.periods, ...getPredictedPeriods()];
+
+  // 上月填充
+  const prevMonthDays = new Date(tideViewYear, tideViewMonth, 0).getDate();
+  for (let i = startWeekday - 1; i >= 0; i--) {
+    const el = document.createElement('div');
+    el.className = 'tide-day other-month';
+    el.textContent = prevMonthDays - i;
+    grid.appendChild(el);
+  }
+
+  // 当月
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${tideViewYear}-${(tideViewMonth+1).toString().padStart(2,'0')}-${d.toString().padStart(2,'0')}`;
+    const el = document.createElement('div');
+    el.className = 'tide-day';
+    if (dateStr === todayStr) el.classList.add('today');
+
+    const status = isDateInPeriod(dateStr, allPeriods);
+    if (status === 'period') el.classList.add('period');
+    else if (status === 'predicted') el.classList.add('predicted');
+
+    el.innerHTML = `<span>${d}</span>` + (status === 'period' ? '<span class="tide-dot"></span>' : status === 'predicted' ? '<span class="tide-dot predicted-dot"></span>' : '');
+    el.onclick = () => { document.getElementById('tideStartDate').value = dateStr; };
+    grid.appendChild(el);
+  }
+
+  // 下月填充
+  const totalCells = grid.children.length;
+  const remaining = (7 - totalCells % 7) % 7;
+  for (let i = 1; i <= remaining; i++) {
+    const el = document.createElement('div');
+    el.className = 'tide-day other-month';
+    el.textContent = i;
+    grid.appendChild(el);
+  }
+
+  // 信息栏
+  renderTideInfo();
+  renderTidePeriodList();
+}
+
+function renderTideInfo() {
+  const infoEl = document.getElementById('tideInfo');
+  const sorted = [...tideData.periods].sort((a,b) => new Date(b.start) - new Date(a.start));
+  const avgCycle = getAvgCycle();
+  const predictions = getPredictedPeriods();
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
+
+  let chips = [];
+
+  if (sorted.length > 0) {
+    // 距离下次
+    const nextPred = predictions[0];
+    if (nextPred) {
+      const daysUntil = Math.ceil((new Date(nextPred.start) - today) / (1000*60*60*24));
+      if (daysUntil > 0) {
+        chips.push({ text: `下次约 ${daysUntil} 天后`, cls: daysUntil <= 5 ? 'soon' : 'ok' });
+      } else if (daysUntil >= -5) {
+        chips.push({ text: '经期中', cls: 'urgent' });
+      }
+    }
+    chips.push({ text: `平均周期 ${avgCycle} 天`, cls: 'ok' });
+  } else {
+    chips.push({ text: '暂无记录', cls: '' });
+  }
+
+  infoEl.innerHTML = chips.map(c => `<div class="tide-info-chip ${c.cls}">${c.text}</div>`).join('');
+}
+
+function renderTidePeriodList() {
+  const list = document.getElementById('tidePeriodList');
+  const sorted = [...tideData.periods].sort((a,b) => new Date(b.start) - new Date(a.start));
+  list.innerHTML = '';
+  sorted.forEach((p, idx) => {
+    const origIdx = tideData.periods.indexOf(p);
+    const startDate = new Date(p.start);
+    const endDate = new Date(startDate.getTime() + (p.duration - 1)*24*60*60*1000);
+    const endStr = endDate.toISOString().split('T')[0];
+    const el = document.createElement('div');
+    el.className = 'tide-period-item';
+    el.innerHTML = `
+      <span class="tpi-dates">${p.start} ~ ${endStr}</span>
+      <span class="tpi-len">${p.duration}天</span>
+      <span class="tpi-del" onclick="tideDelPeriod(${origIdx})">✕</span>
+    `;
+    list.appendChild(el);
+  });
+}
+
+function tideAddPeriod() {
+  const start = document.getElementById('tideStartDate').value;
+  const duration = parseInt(document.getElementById('tideDuration').value) || 5;
+  if (!start) return;
+  // 检查是否已存在重叠
+  const exists = tideData.periods.some(p => p.start === start);
+  if (exists) { addChatSystem('⚠️ 该日期已有记录'); return; }
+  tideData.periods.push({ start, duration });
+  lsSet('tide', tideData);
+  renderTideCalendar();
+  addChatSystem(`🌙 已记录经期：${start}，持续${duration}天。平均周期${getAvgCycle()}天`);
+}
+
+function tideDelPeriod(idx) {
+  tideData.periods.splice(idx, 1);
+  lsSet('tide', tideData);
+  renderTideCalendar();
+}
+
+function tideAutoPredict() {
+  const predictions = getPredictedPeriods();
+  if (predictions.length === 0) { addChatSystem('⚠️ 至少需要2次经期记录才能预测'); return; }
+  const next = predictions[0];
+  const daysUntil = Math.ceil((new Date(next.start) - new Date()) / (1000*60*60*24));
+  addChatSystem(`🔮 预测下次经期：${next.start}（约${daysUntil}天后），持续约${next.duration}天。平均周期${getAvgCycle()}天`);
+}
+
+/* ==================== 18. 每日心情 ==================== */
+const MOOD_EMOJIS = [
+  { emoji:'😄', label:'开心', score:5 },
+  { emoji:'😊', label:'愉快', score:4 },
+  { emoji:'😌', label:'平静', score:3 },
+  { emoji:'😐', label:'一般', score:2 },
+  { emoji:'😔', label:'低落', score:1 },
+  { emoji:'😢', label:'难过', score:0 },
+  { emoji:'😤', label:'生气', score:0 },
+  { emoji:'😰', label:'焦虑', score:0 }
+];
+
+// 情绪关键词映射
+const MOOD_KEYWORDS = {
+  '😄': ['开心','高兴','快乐','棒','太好了','哈哈','嘻嘻','好开心','超开心','幸福','兴奋','爽'],
+  '😊': ['不错','还好','挺好','满意','舒服','悠闲','惬意','愉快','喜欢'],
+  '😌': ['平静','放松','安心','淡然','还好吧','一般般'],
+  '😐': ['无聊','嗯','还行','就那样','随便','不知道'],
+  '😔': ['低落','郁闷','失落','沮丧','唉','叹气','无奈','烦','心累'],
+  '😢': ['难过','伤心','哭','想哭','心痛','悲伤','委屈','崩溃'],
+  '😤': ['生气','愤怒','气死','烦死','恼火','火大','受不了','无语'],
+  '😰': ['焦虑','紧张','害怕','担心','不安','压力','慌','慌张','恐惧','忐忑']
+};
+
+let moodData = lsGet('mood', {}); // { '2026-04-25': { emoji:'😄', score:5 }, ... }
+let moodViewYear, moodViewMonth;
+
+function initMood() {
+  const now = new Date();
+  moodViewYear = now.getFullYear();
+  moodViewMonth = now.getMonth();
+  renderMoodEmojiPicker();
+  renderMoodCalendar();
+  renderMoodChart();
+}
+
+function moodPrevMonth() {
+  moodViewMonth--;
+  if (moodViewMonth < 0) { moodViewMonth = 11; moodViewYear--; }
+  renderMoodCalendar();
+}
+function moodNextMonth() {
+  moodViewMonth++;
+  if (moodViewMonth > 11) { moodViewMonth = 0; moodViewYear++; }
+  renderMoodCalendar();
+}
+
+function renderMoodEmojiPicker() {
+  const picker = document.getElementById('moodEmojiPicker');
+  picker.innerHTML = '';
+  const today = new Date().toISOString().split('T')[0];
+  const todayMood = moodData[today];
+
+  MOOD_EMOJIS.forEach(m => {
+    const btn = document.createElement('span');
+    btn.className = 'mood-emoji-btn' + (todayMood && todayMood.emoji === m.emoji ? ' selected' : '');
+    btn.textContent = m.emoji;
+    btn.title = m.label;
+    btn.onclick = () => setTodayMood(m);
+    picker.appendChild(btn);
+  });
+}
+
+function setTodayMood(moodObj) {
+  const today = new Date().toISOString().split('T')[0];
+  moodData[today] = { emoji: moodObj.emoji, score: moodObj.score, label: moodObj.label };
+  lsSet('mood', moodData);
+  renderMoodEmojiPicker();
+  renderMoodCalendar();
+  renderMoodChart();
+}
+
+function renderMoodCalendar() {
+  document.getElementById('moodMonth').textContent = `${moodViewYear}年${moodViewMonth+1}月`;
+  const grid = document.getElementById('moodCalGrid');
+  grid.innerHTML = '';
+
+  const firstDay = new Date(moodViewYear, moodViewMonth, 1);
+  const lastDay = new Date(moodViewYear, moodViewMonth + 1, 0);
+  const startWeekday = firstDay.getDay();
+  const daysInMonth = lastDay.getDate();
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
+
+  // 上月填充
+  const prevMonthDays = new Date(moodViewYear, moodViewMonth, 0).getDate();
+  for (let i = startWeekday - 1; i >= 0; i--) {
+    const el = document.createElement('div');
+    el.className = 'mood-day other-month';
+    el.textContent = prevMonthDays - i;
+    grid.appendChild(el);
+  }
+
+  // 当月
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${moodViewYear}-${(moodViewMonth+1).toString().padStart(2,'0')}-${d.toString().padStart(2,'0')}`;
+    const el = document.createElement('div');
+    el.className = 'mood-day';
+    if (dateStr === todayStr) el.classList.add('today');
+
+    const dayMood = moodData[dateStr];
+    if (dayMood) {
+      el.innerHTML = `<span class="mood-emoji">${dayMood.emoji}</span><span class="mood-date">${d}</span>`;
+    } else {
+      el.innerHTML = `<span class="mood-date">${d}</span>`;
+    }
+    grid.appendChild(el);
+  }
+
+  // 下月填充
+  const totalCells = grid.children.length;
+  const remaining = (7 - totalCells % 7) % 7;
+  for (let i = 1; i <= remaining; i++) {
+    const el = document.createElement('div');
+    el.className = 'mood-day other-month';
+    el.textContent = i;
+    grid.appendChild(el);
+  }
+}
+
+function renderMoodChart() {
+  const canvas = document.getElementById('moodChart');
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = 320 * dpr;
+  canvas.height = 140 * dpr;
+  canvas.style.width = '320px';
+  canvas.style.height = '140px';
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, 320, 140);
+
+  // 最近30天的数据
+  const days = [];
+  const today = new Date();
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    days.push(d.toISOString().split('T')[0]);
+  }
+
+  const scores = days.map(d => moodData[d] ? moodData[d].score : null);
+  const emojis = days.map(d => moodData[d] ? moodData[d].emoji : '');
+
+  // 绘制背景网格
+  ctx.strokeStyle = '#eee';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 5; i++) {
+    const y = 10 + (i / 5) * 110;
+    ctx.beginPath();
+    ctx.moveTo(30, y);
+    ctx.lineTo(310, y);
+    ctx.stroke();
+  }
+
+  // Y轴标签
+  ctx.fillStyle = '#bbb';
+  ctx.font = '9px sans-serif';
+  ctx.textAlign = 'right';
+  const yLabels = ['😢','😔','😐','😌','😊','😄'];
+  yLabels.forEach((l, i) => {
+    ctx.fillText(l, 24, 14 + (i / 5) * 110);
+  });
+
+  // 绘制折线
+  const validPoints = [];
+  scores.forEach((s, i) => {
+    if (s !== null) {
+      const x = 35 + (i / 29) * 270;
+      const y = 120 - (s / 5) * 110;
+      validPoints.push({ x, y, emoji: emojis[i], idx: i });
+    }
+  });
+
+  if (validPoints.length > 1) {
+    // 渐变填充
+    const grad = ctx.createLinearGradient(0, 10, 0, 120);
+    grad.addColorStop(0, 'rgba(76,175,80,0.15)');
+    grad.addColorStop(1, 'rgba(76,175,80,0)');
+
+    ctx.beginPath();
+    ctx.moveTo(validPoints[0].x, 120);
+    validPoints.forEach(p => ctx.lineTo(p.x, p.y));
+    ctx.lineTo(validPoints[validPoints.length-1].x, 120);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // 折线
+    ctx.beginPath();
+    ctx.strokeStyle = '#4caf50';
+    ctx.lineWidth = 2;
+    ctx.lineJoin = 'round';
+    validPoints.forEach((p, i) => {
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    });
+    ctx.stroke();
+
+    // 数据点 + emoji
+    validPoints.forEach(p => {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 3, 0, Math.PI*2);
+      ctx.fillStyle = '#4caf50';
+      ctx.fill();
+    });
+
+    // 只在稀疏时显示 emoji（避免重叠）
+    if (validPoints.length <= 15) {
+      validPoints.forEach(p => {
+        ctx.font = '10px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(p.emoji, p.x, p.y - 8);
+      });
+    }
+  } else if (validPoints.length === 1) {
+    ctx.beginPath();
+    ctx.arc(validPoints[0].x, validPoints[0].y, 4, 0, Math.PI*2);
+    ctx.fillStyle = '#4caf50';
+    ctx.fill();
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(validPoints[0].emoji, validPoints[0].x, validPoints[0].y - 8);
+  } else {
+    ctx.fillStyle = '#ccc';
+    ctx.font = '13px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('暂无心情数据', 160, 75);
+  }
+
+  // 情绪洞察
+  renderMoodInsight(scores, days);
+}
+
+function renderMoodInsight(scores, days) {
+  const el = document.getElementById('moodInsight');
+  const valid = scores.filter(s => s !== null);
+  if (valid.length === 0) { el.textContent = '还没有记录心情，点击上方 emoji 或从聊天记录分析开始吧～'; return; }
+
+  const avg = (valid.reduce((a,b)=>a+b,0) / valid.length).toFixed(1);
+  const recent3 = scores.slice(-3).filter(s => s !== null);
+  const trend = recent3.length >= 2 ? (recent3[recent3.length-1] > recent3[0] ? '📈 上升趋势' : recent3[recent3.length-1] < recent3[0] ? '📉 下降趋势' : '➡️ 平稳') : '';
+
+  const count = valid.length;
+  let dominant = '平静';
+  const counts = {};
+  valid.forEach(s => {
+    const m = MOOD_EMOJIS.find(e => e.score === s);
+    if (m) counts[m.label] = (counts[m.label]||0) + 1;
+  });
+  dominant = Object.entries(counts).sort((a,b)=>b[1]-a[1])[0]?.[0] || '平静';
+
+  el.innerHTML = `近30天记录了 <b>${count}</b> 天 · 平均心情 <b>${avg}</b>/5 · 主导情绪：<b>${dominant}</b> ${trend}`;
+}
+
+function analyzeMoodFromChat() {
+  if (chatMessages.length === 0) { addChatSystem('⚠️ 没有聊天记录可以分析'); return; }
+
+  // 按日期分析聊天中的情绪
+  const dailyMoods = {};
+  chatMessages.forEach(m => {
+    if (m.role !== 'user') return;
+    const text = m.text.toLowerCase();
+    // 从消息中提取日期（如果没有则用 undefined）
+    const dateStr = m.time ? new Date(m.time).toISOString().split('T')[0] : null;
+
+    // 匹配情绪关键词
+    let bestMood = null;
+    let bestScore = -1;
+    for (const [emoji, keywords] of Object.entries(MOOD_KEYWORDS)) {
+      for (const kw of keywords) {
+        if (text.includes(kw)) {
+          const moodObj = MOOD_EMOJIS.find(e => e.emoji === emoji);
+          if (moodObj && moodObj.score > bestScore) {
+            bestMood = moodObj;
+            bestScore = moodObj.score;
+          }
+        }
+      }
+    }
+
+    if (bestMood && dateStr) {
+      // 如果当天已有手动记录，不覆盖
+      if (!moodData[dateStr]) {
+        dailyMoods[dateStr] = { emoji: bestMood.emoji, score: bestMood.score, label: bestMood.label };
+      }
+    }
+  });
+
+  // 对没有日期的历史消息，分到今天
+  const today = new Date().toISOString().split('T')[0];
+  if (!moodData[today]) {
+    // 分析最近一条用户消息
+    const recentUser = [...chatMessages].reverse().find(m => m.role === 'user');
+    if (recentUser) {
+      const text = recentUser.text.toLowerCase();
+      for (const [emoji, keywords] of Object.entries(MOOD_KEYWORDS)) {
+        for (const kw of keywords) {
+          if (text.includes(kw)) {
+            const moodObj = MOOD_EMOJIS.find(e => e.emoji === emoji);
+            if (moodObj) { dailyMoods[today] = { emoji: moodObj.emoji, score: moodObj.score, label: moodObj.label }; break; }
+          }
+        }
+        if (dailyMoods[today]) break;
+      }
+    }
+  }
+
+  // 合并
+  const newCount = Object.keys(dailyMoods).length;
+  Object.assign(moodData, dailyMoods);
+  lsSet('mood', moodData);
+
+  renderMoodCalendar();
+  renderMoodChart();
+  renderMoodEmojiPicker();
+
+  if (newCount > 0) {
+    addChatSystem(`😊 从聊天记录分析了 ${newCount} 天的心情数据`);
+  } else {
+    addChatSystem('🤔 聊天记录中未检测到明显情绪关键词，试试多聊聊你的感受～');
+  }
+}
+function init() {
+  renderIcons();
+  updateCountdown();
+  renderTasks();
+  renderAlarms();
+  renderAlbum();
+  renderChat();
+  renderMoments();
+  renderCompanionActs();
+  updateCompDisplay();
+  loadPersona();
+  initMusic();
+  openEmojiDB().then(() => preloadEmojiImages());
+  openPhotoDB().then(() => preloadAllPhotos()).then(() => renderAlbum());
+  drawDice(1);
+  drawWheel(0);
+  initTide();
+  initMood();
+  updateNav();
+  updateChatContext();
+
+  // 天气：启动获取 + 每30分钟刷新
+  fetchWeather();
+  setInterval(fetchWeather, 30 * 60 * 1000);
+
+  // 闹钟轮询（每30秒）
+  alarmCheckInterval = setInterval(checkAlarms, 30000);
+
+  // 初始聊天消息
+  if (chatMessages.length === 0) {
+    const pName = personaData.name || '小伴';
+    const hour = new Date().getHours();
+    let greeting = '';
+    if (hour < 6) greeting = '夜深了，还没睡吗？🌙';
+    else if (hour < 9) greeting = '早上好！新的一天开始啦 ☀️';
+    else if (hour < 12) greeting = '上午好～今天有什么计划吗？';
+    else if (hour < 14) greeting = '中午啦，记得吃饭哦 🍚';
+    else if (hour < 18) greeting = '下午好～继续加油！';
+    else if (hour < 22) greeting = '晚上好，辛苦了一天 🌆';
+    else greeting = '夜深了，早点休息哦 🌙';
+    chatMessages.push({ role:'ai', text:`嗨，我是${pName}！${greeting}`, time: Date.now() });
+    lsSet('chat', chatMessages);
+    renderChat();
+  }
+
+  // 定时发布 AI 朋友圈
+  setInterval(() => {
+    if (Math.random() < 0.1 && moments.length < 20) { // 低概率发动态
+      addAiMoment();
+    }
+  }, 60000);
+
+  // AI 主动发起对话（基于当前环境信息）
+  setInterval(() => {
+    if (Math.random() > 0.15) return; // 15% 概率触发
+    aiProactiveChat();
+  }, 120000); // 每2分钟检查一次
+}
+
+async function aiProactiveChat() {
+  const pName = personaData.name || '小伴';
+  const hour = new Date().getHours();
+  const allActs = [...COMPANION_ACTIVITIES, ...customActivities];
+
+  // 收集上下文线索
+  const hints = [];
+
+  // 任务相关
+  const undone = tasks.filter(t => !t.done);
+  if (undone.length > 0) {
+    hints.push({ type:'task', msg: `用户有${undone.length}个未完成任务：${undone.slice(0,3).map(t=>t.text).join('、')}` });
+  }
+
+  // 陪伴计时
+  if (compState.running) {
+    const mins = Math.floor(compState.seconds / 60);
+    hints.push({ type:'companion', msg: `用户正在${compState.activity}，已经${mins}分钟` });
+  }
+
+  // 朋友圈
+  if (moments.length > 0 && moments[0].time && Date.now() - moments[0].time < 3600000) {
+    hints.push({ type:'moment', msg: `最近朋友圈：「${moments[0].content.substring(0,30)}」` });
+  }
+
+  // 天气提醒
+  if (weatherData && Date.now() - weatherData.time < 3600000) {
+    if (weatherData.code >= 61) hints.push({ type:'weather', msg: `外面在下雨，${weatherData.temp}°C` });
+    if (weatherData.temp < 5) hints.push({ type:'weather', msg: `外面很冷，只有${weatherData.temp}°C` });
+    if (weatherData.temp > 35) hints.push({ type:'weather', msg: `外面很热，${weatherData.temp}°C` });
+  }
+
+  // 时间提醒
+  if (hour >= 23 || hour < 1) hints.push({ type:'time', msg: '深夜了，用户可能需要休息' });
+  if (hour >= 11 && hour < 13) hints.push({ type:'time', msg: '中午了，用户可能该吃饭' });
+
+  // 心情
+  const todayStr = new Date().toISOString().split('T')[0];
+  if (moodData[todayStr] && moodData[todayStr].score <= 1) {
+    hints.push({ type:'mood', msg: `用户今天心情不好：${moodData[todayStr].label}` });
+  }
+
+  if (hints.length === 0) return;
+
+  // 随机选一条线索
+  const hint = hints[Math.floor(Math.random() * hints.length)];
+
+  if (apiConfig.apiKey) {
+    try {
+      const sysPrompt = `你是${pName}，你想主动跟用户说句话。${personaData.story ? '你的性格：' + personaData.story : ''}${worldBook ? '\n世界设定：' + worldBook : ''}根据信息自然地发起一句话，像微信聊天一样简短。可以关心、建议、调侃，但不要太刻意。不要用动作描写，不要加emoji（除非用户习惯用），1-2句话。`;
+      const resp = await fetch(apiConfig.baseUrl.replace(/\/+$/, '') + '/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiConfig.apiKey}` },
+        body: JSON.stringify({ model: apiConfig.model || 'deepseek-chat', messages: [
+          { role: 'system', content: sysPrompt },
+          { role: 'user', content: hint.msg }
+        ], max_tokens: 64, temperature: 0.9 })
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        const content = data.choices?.[0]?.message?.content?.trim();
+        if (content) {
+          chatMessages.push({ role:'ai', text: content, time: Date.now() });
+          lsSet('chat', chatMessages);
+          renderChat();
+          return;
+        }
+      }
+    } catch(e) {}
+  }
+
+  // 本地降级：根据线索类型生成
+  const localReplies = {
+    task: [`你还有${undone.length}个任务没完成呢，要现在看看吗？`, `别忘了你的待办事项哦～`],
+    companion: [`专注${Math.floor(compState.seconds/60)}分钟了，继续加油！`, `${compState.activity}辛苦了，要休息一下吗？`],
+    moment: [`刚看到你的朋友圈，说得真好`, `朋友圈那个动态挺有意思的`],
+    weather: [`外面天气不太好，注意一下`, `出门的话记得看天气哦`],
+    time: [`夜深了，早点睡吧`, `该休息了哦～`],
+    mood: [`今天看起来不太开心，要不要聊聊？`, `我在呢，想说什么都可以`],
+  };
+  const options = localReplies[hint.type] || [`在呢，有什么想聊的吗？`];
+  const reply = options[Math.floor(Math.random() * options.length)];
+  chatMessages.push({ role:'ai', text: reply, time: Date.now() });
+  lsSet('chat', chatMessages);
+  renderChat();
+}
+
+init();
+</script>
+</body>
+</html>
