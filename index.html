@@ -636,7 +636,7 @@ ul{list-style:none;}
         <div class="persona-field" style="flex-direction:row;align-items:center;gap:10px;">
           <label style="min-width:auto;">CORS 代理</label>
           <input type="checkbox" id="apiCorsProxy" style="width:18px;height:18px;accent-color:#1e1e1e;">
-          <span style="font-size:11px;color:#aaa;">通常不需要，直连即可</span>
+          <span style="font-size:11px;color:#888;">在中国大陆访问 DeepSeek 时建议开启</span>
         </div>
         <button class="persona-save" onclick="saveApiConfig()">保存 API 配置</button>
         <button class="persona-save" style="background:#e0e0e0;color:#1e1e1e;margin-top:4px;" onclick="testApiConnection()">测试连接</button>
@@ -2097,7 +2097,7 @@ async function sendChat() {
     const fallback = generateLocalReply(text);
     let errMsg = '';
     if (e.message.includes('Failed to fetch') || e.message.includes('NetworkError')) {
-      errMsg = '网络连接失败，请检查 API Key 和网络。如在中国大陆可能需要科学上网。';
+      errMsg = '网络连接失败，已自动尝试代理，请检查网络或 API Key。可在设置中查看连接状态。';
     } else if (e.message.includes('401')) {
       errMsg = 'API Key 无效，请检查。';
     } else if (e.message.includes('402')) {
@@ -2111,9 +2111,11 @@ async function sendChat() {
   }
 }
 
-/* ---- CORS 代理（备用，大部分 API 已支持 CORS 直连） ---- */
+/* ---- CORS 代理（在中国大陆访问 DeepSeek API 时需要） ---- */
 const CORS_PROXIES = [
   { name:'corsproxy.io', build: u => 'https://corsproxy.io/?url=' + encodeURIComponent(u) },
+  { name:'corsproxy.ru', build: u => 'https://corsproxy.ru/?url=' + encodeURIComponent(u) },
+  { name:'corsproxy.ge', build: u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u) },
 ];
 let corsProxyIndex = 0;
 
@@ -2254,29 +2256,56 @@ async function callLLMApi(userText) {
     temperature: 0.8
   };
 
-  const resp = await fetch(apiUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiConfig.apiKey}`
-    },
-    body: JSON.stringify(body)
-  }).catch(async e => {
-    // 网络错误（通常是 CORS）→ 尝试代理重试
-    const baseEndpoint = apiConfig.baseUrl.replace(/\/+$/, '') + '/chat/completions';
-    
-    if (!apiConfig.useCorsProxy) {
-      // 代理未开：不再自动开启代理，因为 DeepSeek API 已支持 CORS
-      // 直连失败说明不是 CORS 问题，而是网络/key/余额等问题
-    }
-    
-    throw e;
-  });
+  // 执行 fetch，直连失败时自动轮询代理
+  let resp = null;
+  let lastError = null;
 
-  if (!resp.ok) {
-    const errText = await resp.text().catch(() => '');
-    throw new Error(`API ${resp.status}: ${errText.substring(0,100)}`);
+  // 尝试一次 fetch 的辅助函数
+  const doFetch = async (url) => {
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiConfig.apiKey}`
+      },
+      body: JSON.stringify(body)
+    });
+    if (!r.ok) {
+      const errText = await r.text().catch(() => '');
+      throw new Error(`API ${r.status}: ${errText.substring(0,100)}`);
+    }
+    return r;
+  };
+
+  // 第 1 轮：按用户设置尝试（直连 或 已选代理）
+  try {
+    resp = await doFetch(apiUrl);
+  } catch(e) {
+    lastError = e;
   }
+
+  // 第 2 轮：直连失败 → 自动尝试所有可用代理
+  if (!resp) {
+    for (let i = 0; i < CORS_PROXIES.length; i++) {
+      const proxy = CORS_PROXIES[i];
+      const proxyUrl = proxy.build(apiConfig.baseUrl.replace(/\/+$/, '') + '/chat/completions');
+      // 如果已开代理且是之前选的，跳过（已试过）
+      if (apiConfig.useCorsProxy && i === corsProxyIndex) continue;
+      try {
+        resp = await doFetch(proxyUrl);
+        // 代理成功 → 记住以便下次复用
+        apiConfig.useCorsProxy = true;
+        corsProxyIndex = i;
+        lsSet('apiConfig', apiConfig);
+        addChatSystem('🌐 已自动切换至代理 ' + proxy.name + '，可在设置中关闭');
+        break;
+      } catch(e) {
+        lastError = e;
+      }
+    }
+  }
+
+  if (!resp) throw lastError || new Error('所有连接方式均失败');
 
   const data = await resp.json();
   const content = data.choices?.[0]?.message?.content;
@@ -2917,11 +2946,6 @@ function loadPersona() {
 
   // 加载 API 配置
   apiConfig = lsGet('apiConfig', { baseUrl:'https://api.deepseek.com', apiKey:'', model:'deepseek-chat', useCorsProxy:false });
-  // 自动修复：DeepSeek API 已支持 CORS 直连，如果之前开了代理则自动关闭
-  if (apiConfig.useCorsProxy && (!apiConfig.baseUrl || apiConfig.baseUrl.includes('deepseek.com'))) {
-    apiConfig.useCorsProxy = false;
-    lsSet('apiConfig', apiConfig);
-  }
   document.getElementById('apiBaseUrl').value = apiConfig.baseUrl || 'https://api.deepseek.com';
   document.getElementById('apiKey').value = apiConfig.apiKey || '';
   document.getElementById('apiModel').value = apiConfig.model || 'deepseek-chat';
