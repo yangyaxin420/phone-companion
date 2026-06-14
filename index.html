@@ -1778,6 +1778,7 @@ function renderExpenseCats() {
     };
     grid.appendChild(btn);
   });
+}
 
 function addExpense() {
   const amount = parseFloat(document.getElementById('expAmount').value);
@@ -4313,7 +4314,6 @@ async function aiProactiveChat() {
   chatMessages.push({ role:'ai', text: reply, time: Date.now() });
   lsSet('chat', chatMessages);
   renderChat();
-}
 }
 
 init();
