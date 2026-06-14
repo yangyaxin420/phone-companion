@@ -861,6 +861,23 @@ function navigateTo(pageId, skipAnim) {
       newEl.classList.remove('anim-in-right');
     }, 300);
   }
+
+/* 微信风格联系人列表 */
+.secret-contact-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f0f0f0;cursor:pointer;transition:background .1s;}
+.secret-contact-item:active{background:#f5f5f5;}
+.secret-contact-item .sci-avatar{width:44px;height:44px;border-radius:12px;background:#e8e8e8;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;}
+.secret-contact-item .sci-info{flex:1;min-width:0;}
+.secret-contact-item .sci-name-row{display:flex;align-items:center;gap:6px;margin-bottom:2px;}
+.secret-contact-item .sci-nickname{font-size:14px;font-weight:500;color:#333;}
+.secret-contact-item .sci-lastmsg{font-size:12px;color:#999;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.secret-contact-item .sci-time{font-size:10px;color:#ccc;white-space:nowrap;flex-shrink:0;}
+.convo-bubble{display:flex;margin-bottom:8px;}
+.convo-bubble.me{justify-content:flex-end;}
+.convo-bubble.them{justify-content:flex-start;}
+.convo-text{max-width:75%;padding:10px 14px;border-radius:16px;font-size:14px;line-height:1.5;word-break:break-word;}
+.convo-bubble.me .convo-text{background:#1e1e1e;color:#f8f8f8;border-bottom-right-radius:4px;}
+.convo-bubble.them .convo-text{background:#e8e8e8;color:#1e1e1e;border-bottom-left-radius:4px;}
+
   currentPage = pageId;
 
   // 关闭表情面板
@@ -1665,9 +1682,9 @@ function renderExpense() {
   const totalExpense = monthRecs.filter(r => r.type !== 'income').reduce((s,r) => s + r.amount, 0);
   const totalIncome = monthRecs.filter(r => r.type === 'income').reduce((s,r) => s + r.amount, 0);
   document.getElementById('expSummary').innerHTML =
-    '<div class="expense-summary-item"><div class="amount income">+' + totalIncome.toFixed(0) + '</div><div class="label">收入</div></div>' +
-    '<div class="expense-summary-item"><div class="amount expense">-' + totalExpense.toFixed(0) + '</div><div class="label">支出</div></div>' +
-    '<div class="expense-summary-item"><div class="amount">' + (totalIncome - totalExpense).toFixed(0) + '</div><div class="label">结余</div></div>';
+    '<div class="expense-summary-item"><div class="amount income">+' + totalIncome.toFixed(2) + '</div><div class="label">收入</div></div>' +
+    '<div class="expense-summary-item"><div class="amount expense">-' + totalExpense.toFixed(2) + '</div><div class="label">支出</div></div>' +
+    '<div class="expense-summary-item"><div class="amount">' + (totalIncome - totalExpense).toFixed(2) + '</div><div class="label">结余</div></div>';
   // 记录列表（最近50条）
   const list = document.getElementById('expList');
   list.innerHTML = '';
@@ -1683,7 +1700,7 @@ function renderExpense() {
       '<div class="ei-left"><span class="ei-cat">' + escHtml(r.category) + '</span>' +
       (r.note ? '<span class="ei-note">' + escHtml(r.note) + '</span>' : '') +
       '<span style="font-size:10px;color:#ddd;">' + (r.date||'') + '</span></div>' +
-      '<div><span class="ei-amount ' + r.type + '">' + (r.type==='income'?'+':'-') + r.amount.toFixed(0) + '</span>' +
+      '<div><span class="ei-amount ' + r.type + '">' + (r.type==='income'?'+':'-') + r.amount.toFixed(2) + '</span>' +
       '<span class="ei-del" onclick="delExpense(\'' + r.id + '\')">✕</span></div>';
     list.appendChild(el);
   });
@@ -1706,6 +1723,55 @@ function exportExpense() {
 }
 
 /* ==================== 11. Secret ==================== */
+
+/* ---- AI 生成查手机动态内容 ---- */
+let secretGenerated = null;
+let secretGeneratedTime = 0;
+
+async function generateSecretContent() {
+  const pName = personaData.name || '小伴';
+  // 有 API Key 且距离上次生成超过10分钟 → 重新生成
+  if (apiConfig.apiKey && (!secretGenerated || Date.now() - secretGeneratedTime > 600000)) {
+    const prompt = `你现在是${pName}，请用JSON格式生成以下手机内容（不要额外文字，只输出JSON）：
+
+1. 你的微信聊天列表：6个联系人，包含emoji头像、名字、"nickname"（你给他们的备注/外号，要有个性）、最后一条消息预览、时间
+2. 你和其中3个联系人的完整对话（每个3-6条消息，要有来有回，符合你毒舌暴躁但内心软的性格）
+3. 你的相册：8张照片（emoji、标题、时间）
+4. 你的最近播放：6首歌（歌名、歌手、时间）
+
+联系人的例子：蛋糕店老板、快递员、楼下咖啡店员、房东、朋友、家人等
+
+JSON格式：
+{
+  "contacts": [{ "id":"1", "avatar":"🎂", "name":"甜时蛋糕", "nickname":"备注名", "lastMsg":"最后一条消息", "time":"时间" }],
+  "conversations": { "1": [{ "from":"me", "text":"..." }, { "from":"them", "text":"..." }] },
+  "album": [{ "emoji":"🌅", "label":"标题", "time":"时间" }],
+  "playlist": [{ "title":"歌名", "artist":"歌手", "time":"时间" }]
+}`;
+
+    try {
+      const reply = await callLLMApi(prompt);
+      // 尝试从回复中提取 JSON
+      const jsonMatch = reply.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        secretGenerated = parsed;
+        secretGeneratedTime = Date.now();
+        return parsed;
+      }
+    } catch(e) { /* 静默失败，用静态内容兜底 */ }
+  }
+  return null;
+}
+
+function getSecretNickname(contactId) {
+  if (secretGenerated && secretGenerated.contacts) {
+    const c = secretGenerated.contacts.find(c => c.id === contactId);
+    if (c && c.nickname) return c.nickname;
+  }
+  return null;
+}
+
 function showSecretDesk() {
   document.getElementById('secretDesk').style.display = 'flex';
   document.getElementById('secretContent').style.display = 'none';
@@ -1722,79 +1788,129 @@ function showSecretChat() {
   document.getElementById('secretAiName').textContent = pName;
   const container = document.getElementById('secretContent');
 
+  // 打开时尝试用 API 生成动态内容（异步，不阻塞）
+  generateSecretContent();
+
+  // 优先用 API 生成的动态内容
+  const useApi = secretGenerated && secretGenerated.contacts;
+  const contacts = useApi ? secretGenerated.contacts : [
+    { id:'you', avatar:'💬', name:'你', nickname:'她', lastMsg:'', time:'' },
+    { id:'1', avatar:'🎂', name:'甜时蛋糕', nickname:'蛋糕店', lastMsg:'明天来取蛋糕～', time:'下午' },
+    { id:'2', avatar:'📦', name:'顺丰快递', nickname:'快递', lastMsg:'包裹已放保安室', time:'上午' },
+    { id:'3', avatar:'☕', name:'楼下咖啡', nickname:'咖啡小哥', lastMsg:'老样子哈', time:'早上' },
+    { id:'4', avatar:'🏪', name:'便利店老板', nickname:'老板', lastMsg:'再不来我拆了😏', time:'昨天' },
+  ];
+
+  // 获取你今天和AI的聊天记录
   const today = new Date().toISOString().split('T')[0];
   const todayMsgs = chatMessages.filter(m => m.time && new Date(m.time).toISOString().split('T')[0] === today);
-  const now = new Date();
-  const todayLabel = `${now.getMonth()+1}月${now.getDate()}日`;
-  const hr = now.getHours();
-  const min = now.getMinutes();
+  const yourLastMsg = todayMsgs.length > 0 ? todayMsgs[todayMsgs.length-1].text.substring(0,20) : '';
 
-  // 模拟和别人的对话
-  const contacts = [
-    {
-      name: '🎂 甜时蛋糕',
-      msgs: [
+  let h = '<div style="font-size:12px;color:#999;padding:0 0 8px;">微信</div>';
+
+  // 你和AI的对话（置顶）
+  if (yourLastMsg) {
+    const yourNote = getSecretNickname('you') || '她';
+    h += '<div class="secret-contact-item" onclick="showSecretConvo(\'you\')">' +
+      '<div class="sci-avatar">💬</div>' +
+      '<div class="sci-info"><div class="sci-name-row"><span class="sci-nickname">' + escHtml(yourNote) + '</span></div>' +
+      '<div class="sci-lastmsg">' + escHtml(yourLastMsg) + '</div></div>' +
+      '<div class="sci-time">现在</div></div>';
+  }
+
+  // 其他联系人
+  contacts.forEach(function(c) {
+    if (c.id === 'you') return; // 已单独处理
+    const nickname = getSecretNickname(c.id) || c.nickname || c.name.replace(/^[^\s]+\s/, '');
+    h += '<div class="secret-contact-item" onclick="showSecretConvo(\'' + c.id + '\')">' +
+      '<div class="sci-avatar">' + c.avatar + '</div>' +
+      '<div class="sci-info"><div class="sci-name-row"><span class="sci-nickname">' + escHtml(nickname) + '</span></div>' +
+      '<div class="sci-lastmsg">' + escHtml(c.lastMsg || '') + '</div></div>' +
+      '<div class="sci-time">' + escHtml(c.time || '') + '</div></div>';
+  });
+
+  h += '<div style="font-size:10px;color:#ddd;text-align:center;padding:16px 0 8px;">—— 没有更多了 ——</div>';
+  container.innerHTML = h;
+}
+
+function showSecretConvo(contactId) {
+  document.getElementById('secretTitle').textContent = '💬 聊天记录';
+  document.getElementById('secretBackBtn').onclick = showSecretChat;
+  const container = document.getElementById('secretContent');
+  const pName = personaData.name || '小伴';
+
+  // 查找联系人信息
+  var contact = null;
+  if (contactId === 'you') {
+    contact = { name:'你', avatar:'💬', nickname: getSecretNickname('you') || '她' };
+  } else if (secretGenerated && secretGenerated.contacts) {
+    contact = secretGenerated.contacts.find(function(c) { return c.id === contactId; });
+  }
+
+  var nickname = (contact && contact.nickname) ? contact.nickname : ((contact && contact.name) ? contact.name.replace(/^[^\s]+\s/, '') : '联系人');
+  var avatar = (contact && contact.avatar) ? contact.avatar : '💬';
+  var displayName = contactId === 'you' ? nickname : ((contact && contact.name) || nickname);
+
+  // 获取对话内容
+  var msgs = [];
+  if (contactId === 'you') {
+    var today = new Date().toISOString().split('T')[0];
+    msgs = chatMessages.filter(function(m) { return m.time && new Date(m.time).toISOString().split('T')[0] === today; });
+  } else if (secretGenerated && secretGenerated.conversations && secretGenerated.conversations[contactId]) {
+    msgs = secretGenerated.conversations[contactId];
+  } else {
+    // 静态兜底
+    var staticConvos = {
+      '1': [
         { from:'them', text:'您好，蛋糕做好了，明天来取～' },
         { from:'me', text:'好，她喜欢芋泥，别太甜' },
-        { from:'them', text:'糖减半了，用的动物奶油' },
-        { from:'me', text:'盒子选好看点的' },
-        { from:'them', text:'😄 放心，配丝带' },
-      ]
-    },
-    {
-      name: '📦 顺丰快递',
-      msgs: [
+        { from:'them', text:'糖减半了，用的动物奶油，配丝带😄' },
+      ],
+      '2': [
         { from:'them', text:'您包裹已放保安室，请及时取件' },
         { from:'me', text:'嗯' },
-      ]
-    },
-    {
-      name: '☕ 楼下咖啡',
-      msgs: [
+      ],
+      '3': [
         { from:'them', text:'帅哥今天美式还是拿铁？' },
         { from:'me', text:'拿铁，多加份浓缩' },
         { from:'them', text:'好嘞老样子' },
-      ]
-    },
-    {
-      name: '🏪 便利店老板',
-      msgs: [
+      ],
+      '4': [
         { from:'them', text:'快递在我这放三天了😏' },
         { from:'me', text:'……忘了' },
         { from:'them', text:'再不来我拆开看了啊' },
         { from:'me', text:'你敢' },
-      ]
-    },
-  ];
-
-  let h = `<div style="font-size:12px;color:#999;padding:0 0 8px;">${pName}的最近聊天</div>`;
-
-  // 你和AI的对话
-  if (todayMsgs.length > 0) {
-    h += `<div class="secret-contact-header">💬 与你的对话</div>`;
-    todayMsgs.forEach(m => {
-      if (m.role === 'ai')
-        h += `<div class="secret-chat-item"><span class="sci-name me">${escHtml(pName)}</span><span>${escHtml(m.text)}</span></div>`;
-      else if (m.role === 'user')
-        h += `<div class="secret-chat-item"><span class="sci-name other">你</span><span>${escHtml(m.text)}</span></div>`;
-      else
-        h += `<div class="secret-chat-item"><span style="font-size:11px;color:#999;">${escHtml(m.text)}</span></div>`;
-    });
+      ],
+    };
+    msgs = staticConvos[contactId] || [];
   }
 
-  // 和其他人的对话
-  contacts.forEach(conv => {
-    const contactShort = conv.name.replace(/^[^\s]+\s/, '');
-    h += `<div class="secret-contact-header">${conv.name}</div>`;
-    conv.msgs.forEach(m => {
-      if (m.from === 'me')
-        h += `<div class="secret-chat-item"><span class="sci-name me">${escHtml(pName)}</span><span>${escHtml(m.text)}</span></div>`;
-      else
-        h += `<div class="secret-chat-item"><span class="sci-name other">${escHtml(contactShort)}</span><span>${escHtml(m.text)}</span></div>`;
-    });
+  if (msgs.length === 0) {
+    container.innerHTML = '<div style="text-align:center;color:#ccc;padding:40px;font-size:13px;">暂无消息</div>';
+    return;
+  }
+
+  // 对话头部
+  var h = '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #eee;margin-bottom:8px;">' +
+    '<div style="font-size:28px;">' + avatar + '</div>' +
+    '<div><div style="font-size:15px;font-weight:600;">' + escHtml(displayName) + '</div>' +
+    '<div style="font-size:11px;color:#999;">' + (nickname !== displayName ? '备注：' + escHtml(nickname) : '') + '</div></div></div>';
+
+  // 对话气泡
+  msgs.forEach(function(m) {
+    var isMe = m.from === 'me' || m.role === 'ai';
+    var isSystem = m.role === 'system';
+    if (isSystem) {
+      h += '<div style="text-align:center;font-size:11px;color:#999;padding:8px 0;">' + escHtml(m.text) + '</div>';
+    } else {
+      h += '<div class="convo-bubble ' + (isMe ? 'me' : 'them') + '">' +
+        '<div class="convo-text">' + escHtml(m.text) + '</div></div>';
+    }
   });
 
   container.innerHTML = h;
+  // 滚动到底部（最新消息）
+  setTimeout(function() { container.scrollTop = container.scrollHeight; }, 50);
 }
 
 function showSecretNotes() {
@@ -1882,38 +1998,35 @@ function showSecretPlaylist() {
   const now = new Date();
   const hr = now.getHours();
 
-  // 根据时间段推荐不同氛围
-  const timeGreeting = hr < 6 ? '深夜' : hr < 9 ? '清晨' : hr < 12 ? '上午' : hr < 14 ? '午后' : hr < 18 ? '下午' : hr < 21 ? '傍晚' : '夜晚';
-  const recentlyPlayed = [
-    { icon:'🎧', title:'路过人间', artist:'郁可唯', time:`${timeGreeting} · 刚刚` },
-    { icon:'🎧', title:'小美满', artist:'周深', time:`昨天` },
-    { icon:'🎧', title:'唯一', artist:'告五人', time:'昨天' },
-    { icon:'🎧', title:'想你的风吹到了这里', artist:'-', time:'前天' },
-    { icon:'🎧', title:'起风了', artist:'买辣椒也用券', time:'3天前' },
+  // 优先用 API 生成的动态内容
+  const useApi = secretGenerated && secretGenerated.playlist;
+  const recentlyPlayed = useApi ? secretGenerated.playlist : [
+    { title:'路过人间', artist:'郁可唯', time:'刚刚' },
+    { title:'小美满', artist:'周深', time:'昨天' },
+    { title:'唯一', artist:'告五人', time:'昨天' },
+    { title:'起风了', artist:'买辣椒也用券', time:'前天' },
+    { title:'喜欢你', artist:'陈洁仪', time:'4天前' },
   ];
+
+  const timeGreeting = hr < 6 ? '深夜' : hr < 9 ? '清晨' : hr < 12 ? '上午' : hr < 14 ? '午后' : hr < 18 ? '下午' : hr < 21 ? '傍晚' : '夜晚';
+  if (recentlyPlayed.length > 0 && recentlyPlayed[0].time === '刚刚') {
+    recentlyPlayed[0].time = timeGreeting + ' · 刚刚';
+  }
 
   const playlists = [
     { name: '🌙 安静的时候', songs: ['钢琴曲','月半小夜曲','路过人间','起风了'] },
-    { name: '☀️ 想到她的时候', songs: ['小美满','唯一','想你的风吹到了这里','喜欢你'] },
+    { name: '☀️ 想到她的时候', songs: ['小美满','唯一','喜欢你','想你的风吹到了这里'] },
     { name: '🎧 一个人发呆', songs: ['走神','空白格','好久不见','夜曲'] },
   ];
 
-  let h = `<div style="font-size:12px;color:#999;padding:0 0 8px;">${pName}最近在听</div>`;
-  h += `<div class="playlist-header">🎶 最近播放</div>`;
-  recentlyPlayed.forEach(s => {
-    h += `<div class="secret-playlist-item">
-      <div class="sp-icon">${s.icon}</div>
-      <div class="sp-info">
-        <div class="sp-title">${escHtml(s.title)}</div>
-        <div class="sp-artist">${escHtml(s.artist)}</div>
-      </div>
-      <div class="sp-time">${escHtml(s.time)}</div>
-    </div>`;
+  let h = '<div style="font-size:12px;color:#999;padding:0 0 8px;">' + escHtml(pName) + '最近在听</div>';
+  h += '<div class="playlist-header">🎶 最近播放</div>';
+  recentlyPlayed.forEach(function(s) {
+    h += '<div class="secret-playlist-item"><div class="sp-icon">🎧</div><div class="sp-info"><div class="sp-title">' + escHtml(s.title) + '</div><div class="sp-artist">' + escHtml(s.artist || '') + '</div></div><div class="sp-time">' + escHtml(s.time) + '</div></div>';
   });
-  h += `<div class="playlist-header">📋 我的歌单</div>`;
-  playlists.forEach(p => {
-    h += `<div class="secret-note-card"><div class="sn-text" style="font-weight:600;">${escHtml(p.name)}</div>
-      <div style="font-size:12px;color:#888;margin-top:4px;">${escHtml(p.songs.join(' · '))}</div></div>`;
+  h += '<div class="playlist-header">📋 我的歌单</div>';
+  playlists.forEach(function(p) {
+    h += '<div class="secret-note-card"><div class="sn-text" style="font-weight:600;">' + escHtml(p.name) + '</div><div style="font-size:12px;color:#888;margin-top:4px;">' + escHtml(p.songs.join(' · ')) + '</div></div>';
   });
   container.innerHTML = h;
 }
@@ -1925,33 +2038,28 @@ function showSecretAlbum() {
   document.getElementById("secretTitle").textContent = "🖼 " + (personaData.name || "AI") + "的相册";
   const container = document.getElementById("secretContent");
   const pName = personaData.name || "小伴";
-  const now = new Date();
-  const todayStr = `${now.getMonth()+1}月${now.getDate()}日`;
-  const hr = now.getHours();
 
-  // 动态相册：根据时间/日期生成不同的照片
-  const dayPhotos = [
-    { emoji:"🌅", label:"今天的晚霞", time:`${todayStr} ${String(hr-1).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}` },
-    { emoji:"☕", label:"她喝咖啡", time:`${todayStr} 下午` },
-    { emoji:"🐱", label:"楼下小猫", time:`昨天` },
-    { emoji:"📖", label:"她认真的时候", time:`昨天` },
-    { emoji:"🍰", label:"蛋糕店看到的", time:`前天` },
-    { emoji:"🌧", label:"下雨了", time:'3天前' },
-    { emoji:"🌙", label:"今晚月亮", time:'3天前' },
-    { emoji:"🍜", label:"这家面不错", time:'4天前' },
-    { emoji:"🌸", label:"路边的花", time:'5天前' },
+  // 优先用 API 生成的动态内容
+  const useApi = secretGenerated && secretGenerated.album;
+  const photos = useApi ? secretGenerated.album : [
+    { emoji:"🌅", label:"今天的晚霞", time:"今天" },
+    { emoji:"☕", label:"她喝咖啡", time:"今天" },
+    { emoji:"🐱", label:"楼下小猫", time:"昨天" },
+    { emoji:"📖", label:"她认真的时候", time:"昨天" },
+    { emoji:"🍰", label:"蛋糕店看到的", time:"前天" },
+    { emoji:"🌧", label:"下雨了", time:"3天前" },
+    { emoji:"🌙", label:"今晚月亮", time:"3天前" },
+    { emoji:"🌸", label:"路边的花", time:"5天前" },
   ];
 
-  let h = `<div style="font-size:12px;color:#999;padding:0 0 8px;">${pName}的相册 · ${Math.floor(20+Math.random()*50)}张照片</div>`;
+  let h = '<div style="font-size:12px;color:#999;padding:0 0 8px;">' + escHtml(pName) + '的相册 · ' + Math.floor(20+Math.random()*50) + '张照片</div>';
   h += '<div class="secret-photo-grid">';
-  dayPhotos.forEach(p => {
-    h += `<div class="secret-photo-item"><div class="sp-emoji">${p.emoji}</div><div class="sp-label">${escHtml(p.label)}</div></div>`;
+  photos.forEach(function(p) {
+    h += '<div class="secret-photo-item"><div class="sp-emoji">' + p.emoji + '</div><div class="sp-label">' + escHtml(p.label) + '</div></div>';
   });
-  h += '</div>';
-  // 时间戳小字
-  h += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;">';
-  dayPhotos.forEach(p => {
-    h += `<div class="secret-photo-time">${escHtml(p.time)}</div>`;
+  h += '</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;">';
+  photos.forEach(function(p) {
+    h += '<div class="secret-photo-time">' + escHtml(p.time) + '</div>';
   });
   h += '</div>';
   container.innerHTML = h;
@@ -2339,7 +2447,7 @@ async function sendChat() {
     expRecords.push({ id: Date.now() + "_" + Math.random().toString(36).slice(2,6), amount: expenseParsed.amount, type: expenseParsed.type, category: expenseParsed.category, note: text.substring(0,20), date: new Date().toISOString().split("T")[0] });
     saveExpRecords(expRecords);
     renderExpense();
-    chatMessages.push({ role:"system", text: "💰 已自动记账：" + (expenseParsed.type === "income" ? "+" : "") + expenseParsed.amount.toFixed(0) + "元 (" + expenseParsed.category + ")", time: Date.now() });
+    chatMessages.push({ role:"system", text: "💰 已自动记账：" + (expenseParsed.type === "income" ? "+" : "") + expenseParsed.amount.toFixed(2) + "元 (" + expenseParsed.category + ")", time: Date.now() });
     lsSet('chat', chatMessages);
     renderChat();
   }
@@ -2686,7 +2794,7 @@ function generateLocalReply(text) {
         records.push({ id: Date.now() + "_" + Math.random().toString(36).slice(2,6), amount, type: "expense", category, note: t.substring(0,20), date: new Date().toISOString().split("T")[0] });
         saveExpRecords(records);
         renderExpense();
-        return "💰 已自动记账：" + category + " " + amount.toFixed(0) + "元";
+        return "💰 已自动记账：" + category + " " + amount.toFixed(2) + "元";
       }
     }
   }
@@ -2703,7 +2811,7 @@ function generateLocalReply(text) {
         records.push({ id: Date.now() + "_" + Math.random().toString(36).slice(2,6), amount, type: "income", category, note: t.substring(0,20), date: new Date().toISOString().split("T")[0] });
         saveExpRecords(records);
         renderExpense();
-        return "💰 已自动记账：" + category + " +" + amount.toFixed(0) + "元";
+        return "💰 已自动记账：" + category + " +" + amount.toFixed(2) + "元";
       }
     }
   }
