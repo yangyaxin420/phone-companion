@@ -1857,8 +1857,8 @@ function delExpense(id) {
   var records = getExpRecords();
   records = records.filter(function(r) { return r.id !== id; });
   saveExpRecords(records);
-  if (expenseActiveTab === "detail") { renderExpenseDetail(); }
   renderExpense();
+  try { renderExpenseDetail(); } catch(e) {}
 }
 
 function exportExpense() {
@@ -3076,6 +3076,7 @@ function addMoment(user, content, photo) {
 async function aiCommentMoment(index) {
   if (!apiConfig.apiKey || index >= moments.length) return;
   const m = moments[index];
+  if (m.user === (personaData.name || '小伴')) return; // 不评论自己的动态
   const pName = personaData.name || '小伴';
   const personaDesc = personaData.story ? `\n你的性格/背景：${personaData.story}` : '';
   try {
@@ -3157,10 +3158,12 @@ async function aiReplyComment(index) {
   if (!apiConfig.apiKey || index >= moments.length) return;
   const m = moments[index];
   const pName = personaData.name || '小伴';
+  var isMyMoment = m.user === pName;
   const lastComment = m.comments[m.comments.length - 1];
   if (!lastComment || lastComment.user === pName) return;
   try {
-    const sysPrompt = `你是${pName}，有人在你的朋友圈/用户的朋友圈评论了，请简短回复（1句话）。${personaData.story ? '你的性格：' + personaData.story + '。用你的风格回复。' : ''}不要用引号，不要加emoji。`;
+    var ownerLabel = isMyMoment ? "你的" : "用户的";
+    const sysPrompt = `你是${pName}，有人在${ownerLabel}朋友圈评论了，请简短回复（1句话）。${personaData.story ? '你的性格：' + personaData.story + '。用你的风格回复。' : ''}不要用引号，不要加emoji。`;
     const resp = await fetch(apiConfig.baseUrl.replace(/\/+$/, '') + '/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiConfig.apiKey}` },
