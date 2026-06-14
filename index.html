@@ -11,7 +11,7 @@
 <style>
 /* ==================== 1. 基础重置 ==================== */
 *{margin:0;padding:0;box-sizing:border-box;}
-html,body{width:100%;height:100%;background:#111;display:flex;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB',sans-serif;color:#1e1e1e;overflow:hidden;}
+html,body{width:100%;height:100%;background:#f8f8f8;display:flex;align-items:flex-start;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB',sans-serif;color:#1e1e1e;overflow:hidden;}
 ::-webkit-scrollbar{display:none;}
 *{scrollbar-width:none;-ms-overflow-style:none;}
 button{border:none;background:none;cursor:pointer;font:inherit;color:inherit;}
@@ -19,18 +19,18 @@ input,textarea,select{font:inherit;color:inherit;border:none;outline:none;backgr
 ul{list-style:none;}
 
 /* ==================== 2. 手机外壳 ==================== */
-.phone-frame{width:375px;height:700px;max-height:calc(100dvh - 48px);border-radius:44px;background:#f8f8f8;position:relative;overflow:hidden;box-shadow:0 0 0 8px #222,0 0 40px rgba(0,0,0,.6),inset 0 0 2px rgba(255,255,255,.1);}
+.phone-frame{width:375px;height:700px;max-height:100dvh;border-radius:0;background:#f8f8f8;position:relative;overflow:hidden;}
 .phone-screen{width:100%;height:100%;display:flex;flex-direction:column;position:relative;}
 
 /* 手机端全屏模式 */
 @media (max-width:420px) {
-  .phone-frame{width:100vw;height:100dvh;border-radius:0;box-shadow:none;}
+  .phone-frame{width:100vw;height:100dvh;}
   .status-bar{padding-top:env(safe-area-inset-top,0);height:auto;min-height:28px;padding-left:20px;padding-right:20px;}
   .bottom-nav{padding-bottom:env(safe-area-inset-bottom,0);height:auto;min-height:50px;}
 }
 /* 平板/中等屏幕居中 */
 @media (min-width:421px) and (max-width:768px) {
-  .phone-frame{border-radius:30px;box-shadow:0 0 0 6px #222,0 0 30px rgba(0,0,0,.4);}
+  .phone-frame{}
 }
 
 /* ==================== 3. 状态栏 ==================== */
