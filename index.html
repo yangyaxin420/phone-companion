@@ -419,6 +419,21 @@ ul{list-style:none;}
 .mood-emoji-picker{display:flex;gap:6px;flex-wrap:wrap;}
 .mood-emoji-btn{font-size:22px;padding:4px;border-radius:8px;cursor:pointer;transition:transform .1s;}
 .mood-emoji-btn:active{transform:scale(.9);}
+/* 微信风格联系人列表 */
+.secret-contact-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f0f0f0;cursor:pointer;transition:background .1s;}
+.secret-contact-item:active{background:#f5f5f5;}
+.secret-contact-item .sci-avatar{width:44px;height:44px;border-radius:12px;background:#e8e8e8;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;}
+.secret-contact-item .sci-info{flex:1;min-width:0;}
+.secret-contact-item .sci-name-row{display:flex;align-items:center;gap:6px;margin-bottom:2px;}
+.secret-contact-item .sci-nickname{font-size:14px;font-weight:500;color:#333;}
+.secret-contact-item .sci-lastmsg{font-size:12px;color:#999;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.secret-contact-item .sci-time{font-size:10px;color:#ccc;white-space:nowrap;flex-shrink:0;}
+.convo-bubble{display:flex;margin-bottom:8px;}
+.convo-bubble.me{justify-content:flex-end;}
+.convo-bubble.them{justify-content:flex-start;}
+.convo-text{max-width:75%;padding:10px 14px;border-radius:16px;font-size:14px;line-height:1.5;word-break:break-word;}
+.convo-bubble.me .convo-text{background:#1e1e1e;color:#f8f8f8;border-bottom-right-radius:4px;}
+.convo-bubble.them .convo-text{background:#e8e8e8;color:#1e1e1e;border-bottom-left-radius:4px;}
 .mood-emoji-btn.selected{background:#e8e8e8;}
 .mood-insight{font-size:12px;color:#888;padding:6px 0;line-height:1.6;}
 </style>
@@ -862,21 +877,6 @@ function navigateTo(pageId, skipAnim) {
     }, 300);
   }
 
-/* 微信风格联系人列表 */
-.secret-contact-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f0f0f0;cursor:pointer;transition:background .1s;}
-.secret-contact-item:active{background:#f5f5f5;}
-.secret-contact-item .sci-avatar{width:44px;height:44px;border-radius:12px;background:#e8e8e8;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;}
-.secret-contact-item .sci-info{flex:1;min-width:0;}
-.secret-contact-item .sci-name-row{display:flex;align-items:center;gap:6px;margin-bottom:2px;}
-.secret-contact-item .sci-nickname{font-size:14px;font-weight:500;color:#333;}
-.secret-contact-item .sci-lastmsg{font-size:12px;color:#999;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.secret-contact-item .sci-time{font-size:10px;color:#ccc;white-space:nowrap;flex-shrink:0;}
-.convo-bubble{display:flex;margin-bottom:8px;}
-.convo-bubble.me{justify-content:flex-end;}
-.convo-bubble.them{justify-content:flex-start;}
-.convo-text{max-width:75%;padding:10px 14px;border-radius:16px;font-size:14px;line-height:1.5;word-break:break-word;}
-.convo-bubble.me .convo-text{background:#1e1e1e;color:#f8f8f8;border-bottom-right-radius:4px;}
-.convo-bubble.them .convo-text{background:#e8e8e8;color:#1e1e1e;border-bottom-left-radius:4px;}
 
   currentPage = pageId;
 
