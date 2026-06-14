@@ -19,12 +19,12 @@ input,textarea,select{font:inherit;color:inherit;border:none;outline:none;backgr
 ul{list-style:none;}
 
 /* ==================== 2. 手机外壳 ==================== */
-.phone-frame{width:375px;height:700px;border-radius:44px;background:#f8f8f8;position:relative;overflow:hidden;box-shadow:0 0 0 8px #222,0 0 40px rgba(0,0,0,.6),inset 0 0 2px rgba(255,255,255,.1);}
+.phone-frame{width:375px;height:700px;max-height:calc(100dvh - 48px);border-radius:44px;background:#f8f8f8;position:relative;overflow:hidden;box-shadow:0 0 0 8px #222,0 0 40px rgba(0,0,0,.6),inset 0 0 2px rgba(255,255,255,.1);}
 .phone-screen{width:100%;height:100%;display:flex;flex-direction:column;position:relative;}
 
 /* 手机端全屏模式 */
 @media (max-width:420px) {
-  .phone-frame{width:100vw;height:100vh;border-radius:0;box-shadow:none;}
+  .phone-frame{width:100vw;height:100dvh;border-radius:0;box-shadow:none;}
   .status-bar{padding-top:env(safe-area-inset-top,0);height:auto;min-height:28px;padding-left:20px;padding-right:20px;}
   .bottom-nav{padding-bottom:env(safe-area-inset-bottom,0);height:auto;min-height:50px;}
 }
