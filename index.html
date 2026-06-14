@@ -278,6 +278,10 @@ ul{list-style:none;}
 .expense-tabs{display:flex;gap:4px;background:#eee;border-radius:10px;padding:3px;margin:8px 16px 0;flex-shrink:0;}
 .expense-tab{padding:6px 0;flex:1;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;transition:all .1s;text-align:center;background:transparent;color:#888;}
 .expense-tab.active{background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.1);color:#1e1e1e;}
+.expense-stats-tabs{display:flex;gap:4px;background:#eee;border-radius:10px;padding:3px;margin-bottom:8px;}
+.expense-stats-tab{padding:6px 0;flex:1;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;transition:all .1s;text-align:center;background:transparent;color:#888;}
+.expense-stats-tab.active{background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.1);color:#1e1e1e;}
+
 /* 明细按天分组 */
 .expense-date-group{font-size:13px;font-weight:700;color:#555;padding:10px 0 4px;border-top:1px solid #eee;margin-top:4px;}
 .expense-date-group:first-child{border-top:none;margin-top:0;}
@@ -533,32 +537,22 @@ ul{list-style:none;}
     <div class="expense-tabs">
       <button class="expense-tab active" data-tab="expense" onclick="switchExpenseTab('expense')">支出</button>
       <button class="expense-tab" data-tab="income" onclick="switchExpenseTab('income')">收入</button>
-      <button class="expense-tab" data-tab="detail" onclick="switchExpenseTab('detail')">明细</button>
+      <button class="expense-tab" data-tab="stats" onclick="switchExpenseTab('stats')">统计</button>
     </div>
     <div class="expense-page">
-      <!-- 支出/收入：只显示统计+图表 -->
-      <div id="expenseChartArea">
-        <div class="expense-summary" id="expSummary"></div>
-        <canvas id="expChart" width="320" height="120" style="width:100%;height:120px;border-radius:10px;background:#fafafa;margin-bottom:8px;"></canvas>
-        <canvas id="expLineChart" width="320" height="100" style="width:100%;height:100px;border-radius:10px;background:#fafafa;"></canvas>
+      <div id="expenseListArea">
+        <div class="expense-list" id="expDetailList"></div>
       </div>
-      <!-- 明细：按天分组的记录 + 快速添加 -->
-      <div id="expenseDetailArea" style="display:none;">
-        <div class="expense-form" style="margin-bottom:8px;">
-          <div class="expense-form-row">
-            <input type="number" id="expAmount" placeholder="金额" step="0.01" min="0" style="flex:1;">
-            <input type="date" id="expDate" style="width:140px;">
-          </div>
-          <div class="expense-cat-grid" id="expCatGrid"></div>
-          <div class="expense-form-row">
-            <select id="expDetailType" style="flex:0 0 70px;border:1px solid #ddd;border-radius:10px;padding:8px;font-size:13px;">
-              <option value="expense">支出</option>
-              <option value="income">收入</option>
-            </select>
-            <input type="text" id="expNote" placeholder="备注（选填）" style="flex:1;">
-            <button onclick="addExpense()" style="padding:8px 18px;border-radius:10px;background:#1e1e1e;color:#f8f8f8;font-size:13px;font-weight:600;">记录</button>
-          </div>
+      <div id="expenseStatsArea" style="display:none;">
+        <div class="expense-summary" id="expSummary"></div>
+        <div class="expense-stats-tabs">
+          <button class="expense-stats-tab active" data-stab="expense" onclick="switchStatsTab('expense')">支出分类</button>
+          <button class="expense-stats-tab" data-stab="income" onclick="switchStatsTab('income')">收入分类</button>
         </div>
+        <canvas id="expChart" width="320" height="200" style="width:100%;height:200px;border-radius:10px;background:#fafafa;"></canvas>
+      </div>
+    </div>
+  </div>
         <div class="expense-detail-list" id="expDetailList"></div>
       </div>
     </div>
@@ -849,7 +843,6 @@ const ICONS = [
   { id:'secret',   symbol:'◎', name:'Secret',page:'page-secret' },
   { id:'moments',  symbol:'○', name:'朋友圈',page:'page-moments' },
   { id:'tide',     symbol:'☽', name:'潮汐',  page:'page-tide' },
-  { id:'mood',  symbol:'☺', name:'心情',  page:'page-mood' },
   { id:'persona',  symbol:'≡', name:'人设',  page:'page-persona' }
 ];
 
@@ -1756,51 +1749,112 @@ function switchExpenseTab(tab) {
   expenseActiveTab = tab;
   document.querySelectorAll('.expense-tab').forEach(function(t) { t.classList.remove('active'); });
   document.querySelector('.expense-tab[data-tab="' + tab + '"]').classList.add('active');
-  if (tab === 'detail') {
-    document.getElementById('expenseChartArea').style.display = 'none';
-    document.getElementById('expenseDetailArea').style.display = 'block';
-    renderExpenseDetail();
+  if (tab === 'stats') {
+    document.getElementById('expenseListArea').style.display = 'none';
+    document.getElementById('expenseStatsArea').style.display = 'block';
+    renderExpenseStats();
   } else {
-    document.getElementById('expenseChartArea').style.display = 'block';
-    document.getElementById('expenseDetailArea').style.display = 'none';
-    expSetType(tab);
-    renderExpense();
+    document.getElementById('expenseListArea').style.display = 'block';
+    document.getElementById('expenseStatsArea').style.display = 'none';
+    renderExpenseList(tab);
   }
 }
 
-function renderExpenseDetail() {
+function switchStatsTab(tab) {
+  document.querySelectorAll('.expense-stats-tab').forEach(function(t) { t.classList.remove('active'); });
+  document.querySelector('.expense-stats-tab[data-stab="' + tab + '"]').classList.add('active');
+  renderExpenseStats();
+}
+
+function renderExpenseList(type) {
   const records = getExpRecords();
-  if (records.length === 0) {
-    document.getElementById('expDetailList').innerHTML = '<div style="text-align:center;color:#ccc;padding:20px;font-size:13px;">还没有记录</div>';
+  const filtered = records.filter(function(r) { return type === 'income' ? r.type === 'income' : r.type !== 'income'; });
+  if (filtered.length === 0) {
+    document.getElementById('expDetailList').innerHTML = '<div style="text-align:center;color:#ccc;padding:40px;font-size:13px;">还没有' + (type==='income'?'收入':'支出') + '记录</div>';
     return;
   }
-  const sorted = [...records].sort(function(a,b) { return (a.date||'') > (b.date||'') ? -1 : 1; });
+  const sorted = [...filtered].sort(function(a,b) { return (a.date||'') > (b.date||'') ? -1 : 1; });
   const groups = {};
   sorted.forEach(function(r) {
-    const d = r.date || '未知日期';
-    if (!groups[d]) groups[d] = [];
-    groups[d].push(r);
+    if (!groups[r.date]) groups[r.date] = [];
+    groups[r.date].push(r);
   });
   let h = '';
   Object.keys(groups).forEach(function(date) {
     const items = groups[date];
-    const dayExpense = items.filter(function(r) { return r.type !== 'income'; }).reduce(function(s,r) { return s + r.amount; }, 0);
-    const dayIncome = items.filter(function(r) { return r.type === 'income'; }).reduce(function(s,r) { return s + r.amount; }, 0);
     h += '<div class="expense-date-group">' + escHtml(date) + '</div>';
-    h += '<div class="expense-date-summary">支出 ' + dayExpense.toFixed(2) + ' / 收入 +' + dayIncome.toFixed(2) + ' / 结余 ' + (dayIncome - dayExpense).toFixed(2) + '</div>';
     items.forEach(function(r) {
       h += '<div class="expense-detail-item">' +
         '<div class="edi-left"><span class="edi-cat">' + escHtml(r.category) + '</span>' +
-        '<span style="font-size:10px;color:#ddd;">' + (r.type==='income'?'📈':'📉') + '</span>' +
         (r.note ? '<span class="edi-note">' + escHtml(r.note) + '</span>' : '') + '</div>' +
         '<div><span class="edi-amount ' + r.type + '">' + (r.type==='income'?'+':'-') + r.amount.toFixed(2) + '</span>' +
         '<span class="edi-del" onclick="delExpense(\'' + r.id + '\')">✕</span></div></div>';
     });
+    const dayTotal = items.reduce(function(s,r) { return s + r.amount; }, 0);
+    h += '<div style="font-size:11px;color:#999;text-align:right;padding:2px 8px 8px;border-bottom:1px solid #f0f0f0;">小计：' + dayTotal.toFixed(2) + '</div>';
   });
   document.getElementById('expDetailList').innerHTML = h;
 }
 
-function renderExpenseCats() {
+function renderExpenseStats() {
+  const records = getExpRecords();
+  const now = new Date();
+  const monthPrefix = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+  const monthRecs = records.filter(function(r) { return r.date && r.date.startsWith(monthPrefix); });
+  const totalExpense = monthRecs.filter(function(r) { return r.type !== 'income'; }).reduce(function(s,r) { return s + r.amount; }, 0);
+  const totalIncome = monthRecs.filter(function(r) { return r.type === 'income'; }).reduce(function(s,r) { return s + r.amount; }, 0);
+  document.getElementById('expSummary').innerHTML =
+    '<div class="expense-summary-item"><div class="amount expense">-' + totalExpense.toFixed(2) + '</div><div class="label">支出</div></div>' +
+    '<div class="expense-summary-item"><div class="amount income">+' + totalIncome.toFixed(2) + '</div><div class="label">收入</div></div>' +
+    '<div class="expense-summary-item"><div class="amount">' + (totalIncome - totalExpense).toFixed(2) + '</div><div class="label">结余</div></div>';
+  renderExpensePieChart();
+}
+
+function renderExpensePieChart() {
+  const canvas = document.getElementById('expChart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+  const records = getExpRecords();
+  const now = new Date();
+  const monthPrefix = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+  const monthRecs = records.filter(function(r) { return r.date && r.date.startsWith(monthPrefix); });
+  const statsType = document.querySelector('.expense-stats-tab.active')?.dataset?.stab || 'expense';
+  const filtered = monthRecs.filter(function(r) { return statsType === 'income' ? r.type === 'income' : r.type !== 'income'; });
+  if (filtered.length === 0) {
+    ctx.fillStyle = '#ccc'; ctx.font = '12px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('暂无数据', w/2, h/2);
+    return;
+  }
+  const catTotals = {};
+  filtered.forEach(function(r) { if (!catTotals[r.category]) catTotals[r.category] = 0; catTotals[r.category] += r.amount; });
+  const cats = Object.keys(catTotals);
+  const total = filtered.reduce(function(s,r) { return s + r.amount; }, 0);
+  const pieColors = ['#e76f51','#f4a261','#e9c46a','#2a9d8f','#264653','#a855f7','#ec4899','#f97316','#06b6d4','#84cc16'];
+  var cx = 70, cy = 90, radius = 65;
+  var angle = -Math.PI / 2;
+  cats.forEach(function(cat, i) {
+    var slice = (catTotals[cat] / total) * Math.PI * 2;
+    ctx.beginPath(); ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, radius, angle, angle + slice);
+    ctx.closePath();
+    ctx.fillStyle = pieColors[i % pieColors.length];
+    ctx.fill();
+    angle += slice;
+  });
+  // 图例
+  var lx = 150, ly = 8;
+  cats.forEach(function(cat, i) {
+    ctx.fillStyle = pieColors[i % pieColors.length];
+    ctx.fillRect(lx, ly + i * 18, 12, 12);
+    ctx.fillStyle = '#555';
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'left';
+    var pct = (catTotals[cat] / total * 100).toFixed(0);
+    ctx.fillText(cat + ' ' + catTotals[cat].toFixed(0) + '元 (' + pct + '%)', lx + 16, ly + i * 18 + 10);
+  });
+}function renderExpenseCats() {
   const grid = document.getElementById('expCatGrid');
   if (!grid) return;
   grid.innerHTML = '';
@@ -1839,18 +1893,7 @@ function getExpRecords() { try { var r = JSON.parse(localStorage.getItem('expens
 function saveExpRecords(v) { localStorage.setItem('expense_records', JSON.stringify(v)); }
 
 function renderExpense() {
-  setTimeout(renderExpenseChart, 50);
-  setTimeout(renderExpenseLineChart, 100);
-  const records = getExpRecords();
-  const now = new Date();
-  const monthPrefix = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
-  const monthRecs = records.filter(r => r.date && r.date.startsWith(monthPrefix));
-  const totalExpense = monthRecs.filter(r => r.type !== 'income').reduce((s,r) => s + r.amount, 0);
-  const totalIncome = monthRecs.filter(r => r.type === 'income').reduce((s,r) => s + r.amount, 0);
-  document.getElementById('expSummary').innerHTML =
-    '<div class="expense-summary-item"><div class="amount income">+' + totalIncome.toFixed(2) + '</div><div class="label">收入</div></div>' +
-    '<div class="expense-summary-item"><div class="amount expense">-' + totalExpense.toFixed(2) + '</div><div class="label">支出</div></div>' +
-    '<div class="expense-summary-item"><div class="amount">' + (totalIncome - totalExpense).toFixed(2) + '</div><div class="label">结余</div></div>';
+  if (typeof renderExpenseList === 'function') renderExpenseList('expense');
 }
 
 function delExpense(id) {
@@ -2062,6 +2105,8 @@ function showSecretConvo(contactId) {
 }
 
 function showSecretNotes() {
+  // 触发记忆更新
+  generateSecretContent();
   document.getElementById('secretDesk').style.display = 'none';
   document.getElementById('secretContent').style.display = 'block';
   document.getElementById('secretBackBtn').style.display = 'inline';
@@ -2078,6 +2123,19 @@ function showSecretNotes() {
     return;
   }
   container.innerHTML = '<div style="font-size:11px;color:#bbb;padding:4px 0 8px;">' + pName + '偷偷记下的笔记</div>';
+  // 优先显示记忆
+  if (memories.length > 0) {
+    var recentMemories = memories.slice(-30).reverse();
+    recentMemories.forEach(function(mem) {
+      var d = new Date(mem.time);
+      var timeStr = d.getMonth()+1 + '月' + d.getDate() + '日 ' + d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+      var noteEl = document.createElement('div');
+      noteEl.className = 'secret-note-card';
+      noteEl.innerHTML = '<div class="sn-time">' + timeStr + '</div><div class="sn-text">' + escHtml(mem.text) + '</div>';
+      container.appendChild(noteEl);
+    });
+    return;
+  }
   notes.forEach(n => {
     const el = document.createElement('div');
     el.className = 'secret-note-card';
@@ -2573,6 +2631,20 @@ document.addEventListener('click', (e) => {
   }
 });
 
+/* ---- 记忆系统 ---- */
+let memories = lsGet('memories', []);
+
+function saveMemory(text) {
+  memories.push({ text: text, time: Date.now() });
+  if (memories.length > 200) memories = memories.slice(-200);
+  lsSet('memories', memories);
+}
+
+function getRecentMemories(count) {
+  var recent = memories.slice(-(count || 30));
+  return recent.map(function(m) { return m.text; }).join('\n');
+}
+
 function addChatSystem(text) {
   chatMessages.push({ role:'system', text, time: Date.now() });
   lsSet('chat', chatMessages);
@@ -2587,6 +2659,8 @@ async function sendChat() {
   lsSet('chat', chatMessages);
   inp.value = '';
   renderChat();
+  // 记住用户说的话
+  saveMemory(text);
 
   // === 自动记账检测（放 try 外面，不管 API 成不成功都跑）===
   const expenseParsed = parseExpenseFromChat(text);
@@ -2666,6 +2740,12 @@ async function callLLMApi(userText) {
   const pName = personaData.name || '小伴';
   const personaPart = personaData.story ? `\n\n你的人设背景：${personaData.story}` : '';
   const worldBookPart = worldBook ? `\n\n【世界书 / 世界观设定】\n${worldBook}\n请在回复中自然地参考和遵守这些设定，但不要生硬地背诵规则。` : '';
+
+  // === 记忆注入 ===
+  var memoryBlock = getRecentMemories(20);
+  if (memoryBlock) {
+    contextBlock += '\n【AI的记忆 - 用户曾说过】\n' + memoryBlock;
+  }
 
   // === 动态上下文注入：让 AI 感知用户当前状态 ===
   const now = new Date();
@@ -2861,7 +2941,11 @@ function parseAiActions(reply) {
     actions.push({ type: 'schedule', content: match[1].trim() });
   }
   // 从显示文本中移除指令标记
-  display = display.replace(taskRegex, '').replace(schedRegex, '').replace(/\n{3,}/g, '\n\n').trim();
+    const alarmRegex = /\[ALARM:(.*?)\|(\d{1,2}:\d{2})\]/g;
+  while ((match = alarmRegex.exec(reply)) !== null) {
+    actions.push({ type: 'alarm', label: match[1].trim(), time: match[2].trim() });
+  }
+  display = display.replace(taskRegex, '').replace(schedRegex, '').replace(alarmRegex, '').replace(/\n{3,}/g, '\n\n').trim();
   return { display, actions };
 }
 
@@ -3792,6 +3876,12 @@ function renderTideCalendar() {
     el.className = 'tide-day';
     if (dateStr === todayStr) el.classList.add('today');
 
+    var dayMood = getTideMood(dateStr);
+    if (dayMood) { var moodSpan = document.createElement('div'); moodSpan.style.cssText = 'font-size:11px;line-height:1;margin-top:1px;'; moodSpan.textContent = dayMood.emoji; el.appendChild(moodSpan); }
+
+    // 点击设置心情
+    el.onclick = function() { showTideMoodPicker(dateStr); };
+
     const status = isDateInPeriod(dateStr, allPeriods);
     if (status === 'period') el.classList.add('period');
     else if (status === 'predicted') el.classList.add('predicted');
@@ -3865,6 +3955,19 @@ function renderTidePeriodList() {
   });
 }
 
+var tideMoodData = lsGet('tideMood', {});
+
+function setTideMood(dateStr, mood) {
+  tideMoodData[dateStr] = mood;
+  lsSet('tideMood', tideMoodData);
+  saveMemory('今天心情：' + mood.emoji + ' ' + mood.label);
+  renderTideCalendar();
+}
+
+function getTideMood(dateStr) {
+  return tideMoodData[dateStr] || null;
+}
+
 function tideAddPeriod() {
   const start = document.getElementById('tideStartDate').value;
   const duration = parseInt(document.getElementById('tideDuration').value) || 5;
@@ -3882,6 +3985,35 @@ function tideDelPeriod(idx) {
   tideData.periods.splice(idx, 1);
   lsSet('tide', tideData);
   renderTideCalendar();
+}
+
+function showTideMoodPicker(dateStr) {
+  var picker = document.getElementById('tideMoodPicker');
+  if (!picker) return;
+  var options = document.getElementById('tideMoodOptions');
+  if (!options) return;
+  var moods = [
+    { emoji:'😄', label:'开心', score:5 },
+    { emoji:'😊', label:'愉快', score:4 },
+    { emoji:'😌', label:'平静', score:3 },
+    { emoji:'😐', label:'一般', score:2 },
+    { emoji:'😔', label:'低落', score:1 },
+    { emoji:'😢', label:'难过', score:0 },
+    { emoji:'😤', label:'生气', score:0 },
+    { emoji:'😰', label:'焦虑', score:0 }
+  ];
+  options.innerHTML = '';
+  moods.forEach(function(m) {
+    var btn = document.createElement('button');
+    btn.style.cssText = 'padding:6px 10px;border-radius:10px;background:#f0f0f0;font-size:16px;cursor:pointer;margin:2px;';
+    btn.textContent = m.emoji + ' ' + m.label;
+    btn.onclick = function() {
+      setTideMood(dateStr, m);
+      picker.style.display = 'none';
+    };
+    options.appendChild(btn);
+  });
+  picker.style.display = 'block';
 }
 
 function tideAutoPredict() {
@@ -4228,7 +4360,6 @@ function init() {
   loadPersona();
   openEmojiDB().then(() => preloadEmojiImages());
   initTide();
-  initMood();
   updateNav();
   updateChatContext();
 
