@@ -882,6 +882,14 @@ function showStorageWarning() { addChatSystem('⚠️ 存储空间不足，部�
 /* ==================== 3. 导航系统 ==================== */
 const allPages = document.querySelectorAll('.page');
 
+// Page-level error handler
+window.addEventListener("error", function(e) {
+  var errEl = document.createElement("div");
+  errEl.style.cssText = "position:fixed;top:0;left:0;width:100%;padding:16px;background:#e55;color:#fff;font-size:13px;z-index:9999;word-break:break-all;";
+  errEl.textContent = "❌ " + (e.message || e.error?.message || "未知错误");
+  document.body.prepend(errEl);
+});
+
 function navigateTo(pageId, skipAnim) {
   if (pageId === currentPage) return;
   const oldEl = document.getElementById(currentPage);
