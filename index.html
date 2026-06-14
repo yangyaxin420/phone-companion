@@ -306,9 +306,26 @@ ul{list-style:none;}
 .secret-note-card .sn-time{font-size:11px;color:#bbb;margin-bottom:4px;}
 .secret-note-card .sn-text{font-size:13px;line-height:1.6;color:#555;}
 .secret-chat-item{display:flex;gap:8px;padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:13px;line-height:1.5;}
-.secret-chat-item .sci-role{font-weight:600;min-width:36px;}
+.secret-chat-item .sci-role{font-weight:600;min-width:36px;flex-shrink:0;}
 .secret-chat-item .sci-role.ai{color:#1e1e1e;}
 .secret-chat-item .sci-role.user{color:#888;}
+.secret-chat-item .sci-name{font-weight:600;min-width:44px;flex-shrink:0;font-size:12px;}
+.secret-chat-item .sci-name.me{color:#1e1e1e;}
+.secret-chat-item .sci-name.other{color:#888;}
+.secret-contact-header{padding:10px 0 4px;font-size:13px;font-weight:700;color:#444;border-top:1px solid #e8e8e8;margin-top:4px;}
+.secret-contact-header:first-of-type{border-top:none;margin-top:0;}
+.secret-photo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
+.secret-photo-item{aspect-ratio:1;border-radius:10px;background:linear-gradient(145deg,#f0f0f0,#e0e0e0);display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:24px;position:relative;overflow:hidden;cursor:default;}
+.secret-photo-item .sp-emoji{font-size:28px;margin-bottom:2px;}
+.secret-photo-item .sp-label{font-size:8px;color:#888;text-align:center;padding:0 2px;line-height:1.2;}
+.secret-photo-time{font-size:9px;color:#bbb;margin-top:2px;text-align:center;}
+.secret-playlist-item{display:flex;align-items:center;gap:10px;padding:10px 12px;background:#fff;border-radius:12px;margin-bottom:6px;box-shadow:0 1px 3px rgba(0,0,0,.04);}
+.secret-playlist-item .sp-icon{font-size:20px;width:36px;text-align:center;}
+.secret-playlist-item .sp-info{flex:1;}
+.secret-playlist-item .sp-title{font-size:13px;font-weight:500;color:#333;}
+.secret-playlist-item .sp-artist{font-size:11px;color:#999;}
+.secret-playlist-item .sp-time{font-size:10px;color:#ccc;white-space:nowrap;}
+.playlist-header{font-size:13px;font-weight:700;color:#666;padding:12px 0 6px;}
 
 /* ==================== 19. 骰子/抽签 聊天按钮 ==================== */
 .chat-dice-menu{position:absolute;bottom:100%;left:4px;background:#fff;border-radius:14px;box-shadow:0 2px 16px rgba(0,0,0,.15);padding:6px;display:none;z-index:60;min-width:120px;}
@@ -1700,30 +1717,84 @@ function showSecretChat() {
   document.getElementById('secretDesk').style.display = 'none';
   document.getElementById('secretContent').style.display = 'block';
   document.getElementById('secretBackBtn').style.display = 'inline';
-  document.getElementById('secretTitle').textContent = '💬 聊天记录（AI视角）';
+  document.getElementById('secretTitle').textContent = '💬 聊天记录';
   const pName = personaData.name || '小伴';
   document.getElementById('secretAiName').textContent = pName;
   const container = document.getElementById('secretContent');
-  // 获取今天的聊天记录
+
   const today = new Date().toISOString().split('T')[0];
   const todayMsgs = chatMessages.filter(m => m.time && new Date(m.time).toISOString().split('T')[0] === today);
-  if (todayMsgs.length === 0) {
-    container.innerHTML = '<div style="text-align:center;color:#ccc;padding:40px;font-size:13px;">今天还没有聊天记录</div>';
-    return;
+  const now = new Date();
+  const todayLabel = `${now.getMonth()+1}月${now.getDate()}日`;
+  const hr = now.getHours();
+  const min = now.getMinutes();
+
+  // 模拟和别人的对话
+  const contacts = [
+    {
+      name: '🎂 甜时蛋糕',
+      msgs: [
+        { from:'them', text:'您好，蛋糕做好了，明天来取～' },
+        { from:'me', text:'好，她喜欢芋泥，别太甜' },
+        { from:'them', text:'糖减半了，用的动物奶油' },
+        { from:'me', text:'盒子选好看点的' },
+        { from:'them', text:'😄 放心，配丝带' },
+      ]
+    },
+    {
+      name: '📦 顺丰快递',
+      msgs: [
+        { from:'them', text:'您包裹已放保安室，请及时取件' },
+        { from:'me', text:'嗯' },
+      ]
+    },
+    {
+      name: '☕ 楼下咖啡',
+      msgs: [
+        { from:'them', text:'帅哥今天美式还是拿铁？' },
+        { from:'me', text:'拿铁，多加份浓缩' },
+        { from:'them', text:'好嘞老样子' },
+      ]
+    },
+    {
+      name: '🏪 便利店老板',
+      msgs: [
+        { from:'them', text:'快递在我这放三天了😏' },
+        { from:'me', text:'……忘了' },
+        { from:'them', text:'再不来我拆开看了啊' },
+        { from:'me', text:'你敢' },
+      ]
+    },
+  ];
+
+  let h = `<div style="font-size:12px;color:#999;padding:0 0 8px;">${pName}的最近聊天</div>`;
+
+  // 你和AI的对话
+  if (todayMsgs.length > 0) {
+    h += `<div class="secret-contact-header">💬 与你的对话</div>`;
+    todayMsgs.forEach(m => {
+      if (m.role === 'ai')
+        h += `<div class="secret-chat-item"><span class="sci-name me">${escHtml(pName)}</span><span>${escHtml(m.text)}</span></div>`;
+      else if (m.role === 'user')
+        h += `<div class="secret-chat-item"><span class="sci-name other">你</span><span>${escHtml(m.text)}</span></div>`;
+      else
+        h += `<div class="secret-chat-item"><span style="font-size:11px;color:#999;">${escHtml(m.text)}</span></div>`;
+    });
   }
-  container.innerHTML = '<div style="font-size:11px;color:#bbb;padding:4px 0 8px;">这是 ' + pName + ' 视角看到的今天的对话</div>';
-  todayMsgs.forEach(m => {
-    const el = document.createElement('div');
-    el.className = 'secret-chat-item';
-    if (m.role === 'ai') {
-      el.innerHTML = '<span class="sci-role ai">' + escHtml(pName) + '</span><span>' + escHtml(m.text) + '</span>';
-    } else if (m.role === 'user') {
-      el.innerHTML = '<span class="sci-role user">我</span><span>' + escHtml(m.text) + '</span>';
-    } else {
-      el.innerHTML = '<span style="font-size:11px;color:#999;">' + escHtml(m.text) + '</span>';
-    }
-    container.appendChild(el);
+
+  // 和其他人的对话
+  contacts.forEach(conv => {
+    const contactShort = conv.name.replace(/^[^\s]+\s/, '');
+    h += `<div class="secret-contact-header">${conv.name}</div>`;
+    conv.msgs.forEach(m => {
+      if (m.from === 'me')
+        h += `<div class="secret-chat-item"><span class="sci-name me">${escHtml(pName)}</span><span>${escHtml(m.text)}</span></div>`;
+      else
+        h += `<div class="secret-chat-item"><span class="sci-name other">${escHtml(contactShort)}</span><span>${escHtml(m.text)}</span></div>`;
+    });
   });
+
+  container.innerHTML = h;
 }
 
 function showSecretNotes() {
@@ -1808,14 +1879,41 @@ function showSecretPlaylist() {
   document.getElementById("secretTitle").textContent = "🎵 " + (personaData.name || "AI") + "的歌单";
   const pName = personaData.name || "小伴";
   const container = document.getElementById("secretContent");
-  const playlists = [
-    { name: "安静的夜", songs: ["钢琴曲", "月光", "雨声"] },
-    { name: "想她的时候", songs: ["你", "日常", "小星星"] },
-    { name: "一个人发呆", songs: ["风", "空白", "走神"] },
+  const now = new Date();
+  const hr = now.getHours();
+
+  // 根据时间段推荐不同氛围
+  const timeGreeting = hr < 6 ? '深夜' : hr < 9 ? '清晨' : hr < 12 ? '上午' : hr < 14 ? '午后' : hr < 18 ? '下午' : hr < 21 ? '傍晚' : '夜晚';
+  const recentlyPlayed = [
+    { icon:'🎧', title:'路过人间', artist:'郁可唯', time:`${timeGreeting} · 刚刚` },
+    { icon:'🎧', title:'小美满', artist:'周深', time:`昨天` },
+    { icon:'🎧', title:'唯一', artist:'告五人', time:'昨天' },
+    { icon:'🎧', title:'想你的风吹到了这里', artist:'-', time:'前天' },
+    { icon:'🎧', title:'起风了', artist:'买辣椒也用券', time:'3天前' },
   ];
-  var h = "<div style='font-size:11px;color:#bbb;padding:4px 0 8px;'>" + escHtml(pName) + "偷偷收藏的歌单</div>";
-  playlists.forEach(function(p) {
-    h += "<div class='secret-note-card'><div class='sn-text' style='font-weight:600;'>🎧 " + escHtml(p.name) + "</div><div style='font-size:12px;color:#888;margin-top:4px;'>" + escHtml(p.songs.join(" · ")) + "</div></div>";
+
+  const playlists = [
+    { name: '🌙 安静的时候', songs: ['钢琴曲','月半小夜曲','路过人间','起风了'] },
+    { name: '☀️ 想到她的时候', songs: ['小美满','唯一','想你的风吹到了这里','喜欢你'] },
+    { name: '🎧 一个人发呆', songs: ['走神','空白格','好久不见','夜曲'] },
+  ];
+
+  let h = `<div style="font-size:12px;color:#999;padding:0 0 8px;">${pName}最近在听</div>`;
+  h += `<div class="playlist-header">🎶 最近播放</div>`;
+  recentlyPlayed.forEach(s => {
+    h += `<div class="secret-playlist-item">
+      <div class="sp-icon">${s.icon}</div>
+      <div class="sp-info">
+        <div class="sp-title">${escHtml(s.title)}</div>
+        <div class="sp-artist">${escHtml(s.artist)}</div>
+      </div>
+      <div class="sp-time">${escHtml(s.time)}</div>
+    </div>`;
+  });
+  h += `<div class="playlist-header">📋 我的歌单</div>`;
+  playlists.forEach(p => {
+    h += `<div class="secret-note-card"><div class="sn-text" style="font-weight:600;">${escHtml(p.name)}</div>
+      <div style="font-size:12px;color:#888;margin-top:4px;">${escHtml(p.songs.join(' · '))}</div></div>`;
   });
   container.innerHTML = h;
 }
@@ -1827,16 +1925,35 @@ function showSecretAlbum() {
   document.getElementById("secretTitle").textContent = "🖼 " + (personaData.name || "AI") + "的相册";
   const container = document.getElementById("secretContent");
   const pName = personaData.name || "小伴";
-  const photos = [
-    { emoji: "🌅", label: "今天的晚霞", detail: "她好像没注意窗外" },
-    { emoji: "☕", label: "她喝咖啡的样子", detail: "虽然我没告诉她我在看" },
-    { emoji: "📖", label: "她认真的时候", detail: "头发会别到耳后" },
-    { emoji: "🐱", label: "路过的小猫", detail: "想拍给她看" },
+  const now = new Date();
+  const todayStr = `${now.getMonth()+1}月${now.getDate()}日`;
+  const hr = now.getHours();
+
+  // 动态相册：根据时间/日期生成不同的照片
+  const dayPhotos = [
+    { emoji:"🌅", label:"今天的晚霞", time:`${todayStr} ${String(hr-1).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}` },
+    { emoji:"☕", label:"她喝咖啡", time:`${todayStr} 下午` },
+    { emoji:"🐱", label:"楼下小猫", time:`昨天` },
+    { emoji:"📖", label:"她认真的时候", time:`昨天` },
+    { emoji:"🍰", label:"蛋糕店看到的", time:`前天` },
+    { emoji:"🌧", label:"下雨了", time:'3天前' },
+    { emoji:"🌙", label:"今晚月亮", time:'3天前' },
+    { emoji:"🍜", label:"这家面不错", time:'4天前' },
+    { emoji:"🌸", label:"路边的花", time:'5天前' },
   ];
-  var h = "<div style='font-size:11px;color:#bbb;padding:4px 0 8px;'>" + escHtml(pName) + "相册 — 他偷偷存下的瞬间</div>";
-  photos.forEach(function(p) {
-    h += "<div class='secret-note-card'><div style='font-size:32px;margin-bottom:4px;'>" + p.emoji + "</div><div class='sn-text'><b>" + escHtml(p.label) + "</b></div><div style='font-size:12px;color:#999;margin-top:2px;'>" + escHtml(p.detail) + "</div></div>";
+
+  let h = `<div style="font-size:12px;color:#999;padding:0 0 8px;">${pName}的相册 · ${Math.floor(20+Math.random()*50)}张照片</div>`;
+  h += '<div class="secret-photo-grid">';
+  dayPhotos.forEach(p => {
+    h += `<div class="secret-photo-item"><div class="sp-emoji">${p.emoji}</div><div class="sp-label">${escHtml(p.label)}</div></div>`;
   });
+  h += '</div>';
+  // 时间戳小字
+  h += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;">';
+  dayPhotos.forEach(p => {
+    h += `<div class="secret-photo-time">${escHtml(p.time)}</div>`;
+  });
+  h += '</div>';
   container.innerHTML = h;
 }
 
