@@ -11,7 +11,7 @@
 <style>
 /* ==================== 1. 基础重置 ==================== */
 *{margin:0;padding:0;box-sizing:border-box;}
-html,body{width:100%;height:100%;background:#f8f8f8;display:flex;align-items:flex-start;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB',sans-serif;color:#1e1e1e;overflow:hidden;}
+html,body{width:100%;height:100%;background:#f8f8f8;display:flex;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB',sans-serif;color:#1e1e1e;overflow:hidden;}
 ::-webkit-scrollbar{display:none;}
 *{scrollbar-width:none;-ms-overflow-style:none;}
 button{border:none;background:none;cursor:pointer;font:inherit;color:inherit;}
@@ -756,29 +756,8 @@ ul{list-style:none;}
     </div>
   </div>
 
-  <!-- ===== 每日心情 ===== -->
-  <div class="page" id="page-mood">
-    <div class="sub-page-header">每日心情 😊</div>
-    <div class="mood-page">
-      <div class="mood-cal-header">
-        <button onclick="moodPrevMonth()">◀</button>
-        <div class="mood-month" id="moodMonth"></div>
-        <button onclick="moodNextMonth()">▶</button>
-      </div>
-      <div class="mood-weekdays"><span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span></div>
-      <div class="mood-cal-grid" id="moodCalGrid"></div>
-      <div class="mood-today-section">
-        <div class="mood-today-title">今天的心情</div>
-        <div class="mood-emoji-picker" id="moodEmojiPicker"></div>
-      </div>
-      <div class="mood-chart-section">
-        <div class="mood-chart-title">📊 近30天情绪变化</div>
-        <div class="mood-chart-wrap"><canvas id="moodChart" width="320" height="140"></canvas></div>
-        <div class="mood-insight" id="moodInsight"></div>
-        <button class="tide-btn tide-btn-secondary" style="width:100%;text-align:center;margin-top:4px;" onclick="analyzeMoodFromChat()">🔍 从聊天记录分析心情</button>
-      </div>
-    </div>
-  </div>
+  <!-- ===== 每日心情（已合并到经期） ===== -->
+  <div class="page" id="page-mood"><div style="padding:20px;text-align:center;color:#999;font-size:13px;">心情已合并到经期日历 📅</div></div>
 
 </div><!-- content-area -->
 
