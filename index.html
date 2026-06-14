@@ -1805,25 +1805,6 @@ function renderExpense() {
     '<div class="expense-summary-item"><div class="amount income">+' + totalIncome.toFixed(2) + '</div><div class="label">收入</div></div>' +
     '<div class="expense-summary-item"><div class="amount expense">-' + totalExpense.toFixed(2) + '</div><div class="label">支出</div></div>' +
     '<div class="expense-summary-item"><div class="amount">' + (totalIncome - totalExpense).toFixed(2) + '</div><div class="label">结余</div></div>';
-  // 记录列表（最近50条）
-  const list = document.getElementById('expList');
-  list.innerHTML = '';
-  const sorted = [...records].sort((a,b) => (a.date||'') > (b.date||'') ? -1 : 1).slice(0, 50);
-  if (sorted.length === 0) {
-    list.innerHTML = '<div style="text-align:center;color:#ccc;padding:20px;font-size:13px;">还没有记录</div>';
-    return;
-  }
-  sorted.forEach(r => {
-    const el = document.createElement('div');
-    el.className = 'expense-item';
-    el.innerHTML =
-      '<div class="ei-left"><span class="ei-cat">' + escHtml(r.category) + '</span>' +
-      (r.note ? '<span class="ei-note">' + escHtml(r.note) + '</span>' : '') +
-      '<span style="font-size:10px;color:#ddd;">' + (r.date||'') + '</span></div>' +
-      '<div><span class="ei-amount ' + r.type + '">' + (r.type==='income'?'+':'-') + r.amount.toFixed(2) + '</span>' +
-      '<span class="ei-del" onclick="delExpense(\'' + r.id + '\')">✕</span></div>';
-    list.appendChild(el);
-  });
 }
 
 function delExpense(id) {
