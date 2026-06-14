@@ -2215,6 +2215,18 @@ async function sendChat() {
   inp.value = '';
   renderChat();
 
+  // === 自动记账检测（放 try 外面，不管 API 成不成功都跑）===
+  const expenseParsed = parseExpenseFromChat(text);
+  if (expenseParsed) {
+    const expRecords = getExpRecords();
+    expRecords.push({ id: Date.now() + "_" + Math.random().toString(36).slice(2,6), amount: expenseParsed.amount, type: expenseParsed.type, category: expenseParsed.category, note: text.substring(0,20), date: new Date().toISOString().split("T")[0] });
+    saveExpRecords(expRecords);
+    renderExpense();
+    chatMessages.push({ role:"system", text: "💰 已自动记账：" + (expenseParsed.type === "income" ? "+" : "") + expenseParsed.amount.toFixed(0) + "元 (" + expenseParsed.category + ")", time: Date.now() });
+    lsSet('chat', chatMessages);
+    renderChat();
+  }
+
   // 显示打字动画
   const typing = document.getElementById('chatTyping');
   typing.classList.add('show');
@@ -2230,16 +2242,7 @@ async function sendChat() {
       reply = generateLocalReply(text);
     }
     typing.classList.remove('show');
-    
-    // 自动记账检测
-    var expenseParsed = parseExpenseFromChat(text);
-    if (expenseParsed) {
-      var expRecords = getExpRecords();
-      expRecords.push({ id: Date.now() + "_" + Math.random().toString(36).slice(2,6), amount: expenseParsed.amount, type: expenseParsed.type, category: expenseParsed.category, note: text.substring(0,20), date: new Date().toISOString().split("T")[0] });
-      saveExpRecords(expRecords);
-      renderExpense();
-      chatMessages.push({ role:"system", text: "💰 已自动记账：" + (expenseParsed.type === "income" ? "+" : "") + expenseParsed.amount.toFixed(0) + "元 (" + expenseParsed.category + ")", time: Date.now() });
-    }
+
 // 解析 AI 回复中的操作指令
     const parsed = parseAiActions(reply);
     chatMessages.push({ role:'ai', text:parsed.display, time: Date.now() });
