@@ -406,6 +406,13 @@ ul{list-style:none;}
 .tide-btn-primary{background:#e91e63;color:#fff;}
 .tide-btn-secondary{background:#f5f5f5;color:#666;}
 .tide-btn:active{opacity:.8;}
+
+/* 心情选择器 */
+.tide-mood-picker{display:none;padding:12px 16px;border-top:1px solid #eee;background:#fafafa;}
+.tide-mood-picker-title{font-size:14px;font-weight:700;margin-bottom:8px;text-align:center;}
+.tide-mood-options{display:flex;flex-wrap:wrap;justify-content:center;gap:4px;}
+.tide-mood-options button{padding:8px 12px;border-radius:12px;background:#f0f0f0;font-size:18px;cursor:pointer;border:none;transition:all .1s;}
+.tide-mood-options button:active{transform:scale(.92);background:#e0e0e0;}
 .tide-period-list{margin-top:8px;}
 .tide-period-item{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#fafafa;border-radius:10px;margin-bottom:4px;font-size:12px;}
 .tide-period-item .tpi-dates{color:#333;}
@@ -748,6 +755,13 @@ ul{list-style:none;}
           <button class="tide-btn tide-btn-secondary" onclick="tideAutoPredict()">自动预测下月</button>
         </div>
         <div class="tide-period-list" id="tidePeriodList"></div>
+      </div>
+
+      <!-- 心情选择器弹窗 -->
+      <div class="tide-mood-picker" id="tideMoodPicker">
+        <div class="tide-mood-picker-title">今天的心情？</div>
+        <div class="tide-mood-options" id="tideMoodOptions"></div>
+        <button class="tide-btn tide-btn-secondary" style="width:100%;margin-top:8px;" onclick="document.getElementById('tideMoodPicker').style.display='none'">关闭</button>
       </div>
     </div>
   </div>
