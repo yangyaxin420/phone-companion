@@ -2735,18 +2735,19 @@ async function callLLMApi(userText) {
   const personaPart = personaData.story ? `\n\n你的人设背景：${personaData.story}` : '';
   const worldBookPart = worldBook ? `\n\n【世界书 / 世界观设定】\n${worldBook}\n请在回复中自然地参考和遵守这些设定，但不要生硬地背诵规则。` : '';
 
-  // === 记忆注入 ===
-  var memoryBlock = getRecentMemories(20);
-  if (memoryBlock) {
-    contextBlock += '\n【AI的记忆 - 用户曾说过】\n' + memoryBlock;
-  }
-
   // === 动态上下文注入：让 AI 感知用户当前状态 ===
   const now = new Date();
   const timeStr = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
   const dateStr = `${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日`;
 
   let contextBlock = `\n\n【当前环境信息 - 你可以主动提及这些内容，但不要每次都提，自然融入对话即可】`;
+
+  // === 记忆注入 ===
+  var memoryBlock = getRecentMemories(20);
+  if (memoryBlock) {
+    contextBlock += '\n【AI的记忆 - 用户曾说过】\n' + memoryBlock;
+  }
+
   contextBlock += `\n当前时间：${dateStr} ${timeStr}`;
 
   // 天气
