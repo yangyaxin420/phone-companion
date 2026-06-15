@@ -753,7 +753,7 @@ ul{list-style:none;}
   </div>
 
   <!-- ===== 每日心情（已合并到经期） ===== -->
-  <div class="page" id="page-mood"><div style="padding:20px;text-align:center;color:#999;font-size:13px;">心情已合并到经期日历 📅</div></div>
+  <div class="page" id="page-mood"><div style="padding:20px;text-align:center;color:#999;font-size:13px;">点击潮汐日历中的日期即可记录心情 📅</div></div>
 
 </div><!-- content-area -->
 
@@ -3857,17 +3857,13 @@ function renderTideCalendar() {
     if (dateStr === todayStr) el.classList.add('today');
 
     var dayMood = getTideMood(dateStr);
-    if (dayMood) { var moodSpan = document.createElement('div'); moodSpan.style.cssText = 'font-size:11px;line-height:1;margin-top:1px;'; moodSpan.textContent = dayMood.emoji; el.appendChild(moodSpan); }
-
-    // 点击设置心情
-    el.onclick = function() { showTideMoodPicker(dateStr); };
-
     const status = isDateInPeriod(dateStr, allPeriods);
     if (status === 'period') el.classList.add('period');
     else if (status === 'predicted') el.classList.add('predicted');
 
-    el.innerHTML = `<span>${d}</span>` + (status === 'period' ? '<span class="tide-dot"></span>' : status === 'predicted' ? '<span class="tide-dot predicted-dot"></span>' : '');
-    el.onclick = function() { document.getElementById('tideStartDate').value = dateStr; };
+    const moodHtml = dayMood ? '<div style="font-size:11px;line-height:1;margin-top:1px;">' + dayMood.emoji + '</div>' : '';
+    el.innerHTML = '<span>' + d + '</span>' + moodHtml + (status === 'period' ? '<span class="tide-dot"></span>' : status === 'predicted' ? '<span class="tide-dot predicted-dot"></span>' : '');
+    el.onclick = function(ds) { return function() { showTideMoodPicker(ds); }; }(dateStr);
     grid.appendChild(el);
   }
 
