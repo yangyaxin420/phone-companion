@@ -666,11 +666,11 @@ ul{list-style:none;}
     <div class="persona-page">
       <div class="persona-field">
         <label>AI 名称</label>
-        <input type="text" id="personaName" placeholder="给 AI 起个名字">
+        <input type="text" id="personaName" placeholder="骆云影">
       </div>
       <div class="persona-field">
         <label>背景故事</label>
-        <textarea id="personaStory" placeholder="描述 AI 的性格、背景、说话风格..."></textarea>
+        <textarea id="personaStory" placeholder="黑色中长发，灰蓝色眼睛，178cm。ISTP，傲娇暴躁毒舌刻薄，嘴硬心软..."></textarea>
       </div>
       <button class="persona-save" onclick="savePersona()">保存人设</button>
 
@@ -2273,8 +2273,8 @@ function requestNotificationPermission() {
 
 /* ==================== 10. 聊天 AI ==================== */
 let chatMessages = lsGet('chat', []);
-let systemPrompt = lsGet('sp', '你是一个温暖有趣的陪伴者，说话风格自然亲切。');
-let personaData = lsGet('persona', { name:'小伴', story:'' });
+let systemPrompt = lsGet('sp', '你是骆云影。傲娇暴躁，嘴硬心软，说话简洁冷淡带刺，但偶尔会透出关心。讨厌肉麻和废话。用最少的字说最狠的话，但别真的伤人。');
+let personaData = lsGet('persona', { name:'骆云影', story:'黑色中长发，灰蓝色眼睛，178cm。ISTP，傲娇暴躁毒舌刻薄，嘴硬心软。语言表达极其简洁冷淡，嫌弃一切肉麻和废话。习惯用刻薄掩饰在意，用暴躁掩盖担心——关心都藏在「啧」「随你」「别死了」这种话里。内心其实细腻温柔，只是从来不说软话。' });
 let worldBook = lsGet('worldBook', '');
 
 // API 配置
@@ -3452,7 +3452,7 @@ function loadPersona() {
   if (pn) pn.textContent = personaData.name || '小伴';
   var pa = document.getElementById('homePersonaAvatar');
   if (pa) pa.textContent = personaData.story ? '💬' : '💬';
-  personaData = lsGet('persona', { name:'小伴', story:'' });
+  personaData = lsGet('persona', { name:'骆云影', story:'黑色中长发，灰蓝色眼睛，178cm。ISTP，傲娇暴躁毒舌刻薄，嘴硬心软。语言表达极其简洁冷淡，嫌弃一切肉麻和废话。习惯用刻薄掩饰在意，用暴躁掩盖担心——关心都藏在「啧」「随你」「别死了」这种话里。内心其实细腻温柔，只是从来不说软话。' });
   document.getElementById('personaName').value = personaData.name || '';
   document.getElementById('personaStory').value = personaData.story || '';
   document.getElementById('chatTitle').textContent = personaData.name || '聊天';
