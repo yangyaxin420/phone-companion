@@ -1,25 +1,19 @@
-const CACHE = 'phone-v2';
+const CACHE = 'phone-v3';
+const SW_VERSION = 3;
 
 self.addEventListener('install', e => {
+  console.log('[SW] Install v' + SW_VERSION);
   self.skipWaiting();
 });
 
 self.addEventListener('activate', e => {
+  console.log('[SW] Activate v' + SW_VERSION);
   e.waitUntil(clients.claim());
 });
 
 self.addEventListener('fetch', e => {
   e.respondWith(
-    caches.match(e.request).then(r => {
-      if (r) return r;
-      return fetch(e.request).then(res => {
-        if (res && res.ok) {
-          const clone = res.clone();
-          caches.open(CACHE).then(c => c.put(e.request, clone));
-        }
-        return res;
-      });
-    }).catch(() => new Response('Offline', {status: 503}))
+    caches.match(e.request).then(r => r || fetch(e.request))
   );
 });
 

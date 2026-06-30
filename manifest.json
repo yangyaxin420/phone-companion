@@ -1,7 +1,7 @@
 {
-  "name": "我的手机 - AI陪伴",
+  "name": "我的手机",
   "short_name": "我的手机",
-  "description": "以角色陪伴为核心的互动工具",
+  "description": "AI陪伴 · 聊天 · 专注 · 记录",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",
