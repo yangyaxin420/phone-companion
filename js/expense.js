@@ -282,6 +282,14 @@ function exportExpense() {
   a.click(); URL.revokeObjectURL(url);
 }
 
+function clearAllExpense() {
+  if (!confirm('确认清空所有记账数据？删除后不可恢复。建议先导出备份。')) return;
+  if (!confirm('真的全部删除？')) return;
+  saveExpRecords([]);
+  renderExpense();
+  addChatSystem('🗑 所有记账数据已清空');
+}
+
 function importExpense(event) {
   const file = event.target.files[0];
   if (!file) return;

@@ -164,4 +164,20 @@
   {"id":"1779720096168_conv","amount":8.2,"type":"expense","category":"餐饮","note":"宵夜泡面雪糕","date":"2026-05-25"},
   {"id":"1779720066162_conv","amount":13,"type":"expense","category":"水果","note":"晚上西瓜 烤肠","date":"2026-05-25"},
   {"id":"1779720042497_conv","amount":14,"type":"expense","category":"餐饮","note":"午饭凉皮","date":"2026-05-25"}
+,
+  {"id":"add_001","amount":24.38,"type":"expense","category":"餐饮","note":"麻辣烫","date":"2026-06-28"},
+  {"id":"add_002","amount":5,"type":"expense","category":"购物","note":"收二手计算器","date":"2026-06-28"},
+  {"id":"add_003","amount":3,"type":"expense","category":"购物","note":"收戒指","date":"2026-06-28"},
+  {"id":"add_004","amount":18.8,"type":"expense","category":"餐饮","note":"三明治","date":"2026-06-28"},
+  {"id":"add_005","amount":5.98,"type":"expense","category":"日用","note":"洗衣服","date":"2026-06-28"},
+  {"id":"add_006","amount":11.8,"type":"expense","category":"水果","note":"水果","date":"2026-06-28"},
+  {"id":"add_007","amount":22,"type":"expense","category":"餐饮","note":"馄饨","date":"2026-06-28"},
+  {"id":"add_008","amount":5.5,"type":"expense","category":"餐饮","note":"泡面","date":"2026-06-28"},
+  {"id":"add_009","amount":8,"type":"expense","category":"零食","note":"零食","date":"2026-06-28"},
+  {"id":"add_010","amount":5,"type":"expense","category":"餐饮","note":"馕","date":"2026-06-28"},
+  {"id":"add_011","amount":3.5,"type":"expense","category":"日用","note":"宿舍订水","date":"2026-06-28"},
+  {"id":"add_012","amount":12,"type":"expense","category":"餐饮","note":"饭","date":"2026-06-28"},
+  {"id":"add_013","amount":7,"type":"expense","category":"零食","note":"冰淇淋","date":"2026-06-28"},
+  {"id":"add_014","amount":6,"type":"expense","category":"其他","note":"代取","date":"2026-06-28"},
+  {"id":"add_015","amount":1097,"type":"income","category":"工资","note":"工资赚了","date":"2026-06-28"}
 ]

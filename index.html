@@ -547,6 +547,7 @@ ul{list-style:none;}
       <div style="display:flex;gap:6px;">
         <button onclick="document.getElementById('expImportInput').click()" style="font-size:13px;background:none;border:none;cursor:pointer;color:#888;">📥导入</button>
         <button onclick="exportExpense()" style="font-size:13px;background:none;border:none;cursor:pointer;color:#888;">📤导出</button>
+        <button onclick="clearAllExpense()" style="font-size:13px;background:none;border:none;cursor:pointer;color:#e55;">🗑清空</button>
       </div>
       <input type="file" id="expImportInput" accept=".json" style="display:none;" onchange="importExpense(event)">
     </div>
