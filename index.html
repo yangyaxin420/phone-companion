@@ -544,7 +544,11 @@ ul{list-style:none;}
   <div class="page" id="page-expense">
     <div class="sub-page-header" style="display:flex;justify-content:space-between;align-items:center;">
       <span>💰 记账</span>
-      <button onclick="exportExpense()" style="font-size:14px;background:none;border:none;cursor:pointer;color:#888;">📤导出</button>
+      <div style="display:flex;gap:6px;">
+        <button onclick="document.getElementById('expImportInput').click()" style="font-size:13px;background:none;border:none;cursor:pointer;color:#888;">📥导入</button>
+        <button onclick="exportExpense()" style="font-size:13px;background:none;border:none;cursor:pointer;color:#888;">📤导出</button>
+      </div>
+      <input type="file" id="expImportInput" accept=".json" style="display:none;" onchange="importExpense(event)">
     </div>
     <div class="expense-tabs">
       <button class="expense-tab active" data-tab="expense" onclick="switchExpenseTab('expense')">支出</button>

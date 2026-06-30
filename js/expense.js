@@ -281,3 +281,24 @@ function exportExpense() {
   a.href = url; a.download = '记账数据_' + new Date().toISOString().split('T')[0] + '.json';
   a.click(); URL.revokeObjectURL(url);
 }
+
+function importExpense(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  event.target.value = '';
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!Array.isArray(data)) { alert('文件格式不对，请选择正确的记账数据文件'); return; }
+      const existing = getExpRecords();
+      const merged = [...data, ...existing];
+      saveExpRecords(merged);
+      renderExpense();
+      addChatSystem('✅ 已导入 ' + data.length + ' 条记账数据');
+    } catch(err) {
+      alert('导入失败：' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
