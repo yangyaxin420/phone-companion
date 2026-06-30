@@ -49,14 +49,14 @@ function saveWorldBook() {
 }
 
 function saveApiConfig() {
-  apiConfig.baseUrl = document.getElementById('apiBaseUrl').value.trim() || 'https://api.deepseek.com';
   apiConfig.apiKey = document.getElementById('apiKey').value.trim();
-  apiConfig.model = document.getElementById('apiModel').value || 'deepseek-chat';
-  apiConfig.useCorsProxy = document.getElementById('apiCorsProxy').checked;
+  // 保留已有配置，只更新 key
+  if (!apiConfig.baseUrl) apiConfig.baseUrl = 'https://api.deepseek.com';
+  if (!apiConfig.model) apiConfig.model = 'deepseek-chat';
   lsSet('apiConfig', apiConfig);
   updateApiStatusBadge();
   if (apiConfig.apiKey) {
-    addChatSystem(`✅ API 已配置（${apiConfig.model}），聊天将使用大模型回复${apiConfig.useCorsProxy ? '（通过 CORS 代理）' : ''}`);
+    addChatSystem(`✅ API Key 已保存，聊天将使用大模型回复`);
   } else {
     addChatSystem(`ℹ️ API Key 未填写，聊天使用本地回复模式`);
   }
@@ -64,56 +64,30 @@ function saveApiConfig() {
 
 async function testApiConnection() {
   const key = document.getElementById('apiKey').value.trim();
-  const baseUrl = document.getElementById('apiBaseUrl').value.trim() || 'https://api.deepseek.com';
-  const model = document.getElementById('apiModel').value || 'deepseek-chat';
-  const useProxy = document.getElementById('apiCorsProxy').checked;
   if (!key) { addChatSystem('❌ 请先填写 API Key'); return; }
+  const baseUrl = apiConfig.baseUrl || 'https://api.deepseek.com';
+  const model = apiConfig.model || 'deepseek-chat';
   addChatSystem('🔄 正在测试 API 连接...');
   const baseEndpoint = baseUrl.replace(/\/+$/, '') + '/chat/completions';
   const testBody = { model, messages: [{ role: 'user', content: '你好，请用一句话回复测试成功' }], max_tokens: 32 };
   const fetchOpts = { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` }, body: JSON.stringify(testBody) };
   try {
-    addChatSystem('🔄 尝试直连...');
+    addChatSystem('🔄 尝试连接 DeepSeek API...');
     const resp = await fetch(baseEndpoint, fetchOpts);
     if (resp.ok) {
       const data = await resp.json();
-      const reply = data.choices?.[0]?.message?.content || '（连接成功但回复为空）';
-      document.getElementById('apiStatusBadge').textContent = '已连接';
-      document.getElementById('apiStatusBadge').className = 'api-status on';
-      addChatSystem(`✅ API 直连成功！模型回复：${reply}`);
-      if (useProxy) {
-        document.getElementById('apiCorsProxy').checked = false;
-        apiConfig.useCorsProxy = false;
-        lsSet('apiConfig', apiConfig);
-        addChatSystem('ℹ️ 直连可用，已自动关闭 CORS 代理');
-      }
+      const reply = data.choices?.[0]?.message?.content || '（成功）';
+      addChatSystem(`✅ API 连接成功！回复：${reply}`);
       return;
     }
     const errText = await resp.text().catch(() => '');
-    if (resp.status === 401) { addChatSystem('❌ API Key 无效（401）'); }
-    else if (resp.status === 402) { addChatSystem('❌ API 余额不足（402）'); }
-    else if (resp.status === 429) { addChatSystem('❌ 请求频率过高（429）'); }
-    else { addChatSystem(`⚠️ 直连返回错误 (${resp.status})`); }
-  } catch(e) { addChatSystem(`⚠️ 直连网络失败：${e.message}`); }
-  if (CORS_PROXIES.length > 0) {
-    for (const proxy of CORS_PROXIES) {
-      try {
-        addChatSystem(`🔄 尝试代理 ${proxy.name}...`);
-        const resp = await fetch(proxy.build(baseEndpoint), fetchOpts);
-        if (resp.ok) {
-          const data = await resp.json();
-          const reply = data.choices?.[0]?.message?.content || '（成功）';
-          document.getElementById('apiStatusBadge').textContent = '已连接';
-          document.getElementById('apiStatusBadge').className = 'api-status on';
-          addChatSystem(`✅ 通过代理 ${proxy.name} 连接成功！`);
-          return;
-        }
-      } catch(e) { addChatSystem(`⚠️ 代理 ${proxy.name} 失败`); }
-    }
+    if (resp.status === 401) { addChatSystem('❌ API Key 无效（401），请检查是否正确复制'); }
+    else if (resp.status === 402) { addChatSystem('❌ API 余额不足，请去 DeepSeek 官网充值'); }
+    else if (resp.status === 429) { addChatSystem('❌ 请求频率过高，稍后再试'); }
+    else { addChatSystem(`⚠️ 错误 (${resp.status})：${errText.substring(0,80)}`); }
+  } catch(e) {
+    addChatSystem(`⚠️ 网络失败：${e.message}。如在境内可能需要代理或使用其他 API`);
   }
-  document.getElementById('apiStatusBadge').textContent = '失败';
-  document.getElementById('apiStatusBadge').className = 'api-status off';
-  addChatSystem('❌ 所有连接方式均失败');
 }
 
 function updateApiStatusBadge() {
