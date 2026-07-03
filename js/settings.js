@@ -1,4 +1,6 @@
 /* ==================== 设置页 ==================== */
+const APP_VERSION = "v3.2.1 (2026.07.03)";
+
 const DEFAULT_SETTINGS = {
   proactiveMsg: true,
   autoMoments: true,
@@ -9,6 +11,8 @@ const DEFAULT_SETTINGS = {
 let settings = lsGet('settings', DEFAULT_SETTINGS);
 
 function loadSettings() {
+  var verEl = document.getElementById('appVersionDisplay');
+  if (verEl && typeof APP_VERSION !== 'undefined') verEl.textContent = APP_VERSION;
   settings = lsGet('settings', DEFAULT_SETTINGS);
   const toggles = ['proactiveMsg','autoMoments','notifications','charPrivacy'];
   toggles.forEach(function(key) {
