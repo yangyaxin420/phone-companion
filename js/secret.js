@@ -90,9 +90,9 @@ JSON格式：
             });
             if (!parsed.conversations) parsed.conversations = {};
             parsed.conversations['ai_' + c.id] = [
-              { from:'me', text:'最近怎么样' },
+              { from:'me', text:'你最近忙什么呢' },
               { from:'them', text:'还行吧，你呢' },
-              { from:'me', text:'老样子' }
+              { from:'me', text:'老样子呗' }
             ];
           }
         });
@@ -170,9 +170,13 @@ JSON格式：
       : [{ title:'空城', artist:'杨坤', time:'刚刚' },{ title:'演员', artist:'薛之谦', time:'昨天' },{ title:'丑八怪', artist:'薛之谦', time:'昨天' },{ title:'像我这样的人', artist:'毛不易', time:'前天' },{ title:'平凡之路', artist:'朴树', time:'4天前' }];
 
     // 所有联系人确保有conversations条目
-    contacts.forEach(c => {
+    contacts.forEach(function(c) {
       if (c.id !== 'you' && !convos[c.id]) {
-        convos[c.id] = [{ from:'me', text:'最近怎么样' },{ from:'them', text:'挺好的' }];
+        convos[c.id] = isTsundere
+          ? [{ from:'them', text:'找我有事？' },{ from:'me', text:'没事不能找你？' },{ from:'them', text:'……行吧' }]
+          : isGentle
+          ? [{ from:'them', text:'好久不见呀~' },{ from:'me', text:'是呀，最近还好吗' },{ from:'them', text:'挺好的，想你了！' }]
+          : [{ from:'them', text:'在吗' },{ from:'me', text:'在' },{ from:'them', text:'行' }];
       }
     });
 
