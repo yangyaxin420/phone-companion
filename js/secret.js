@@ -626,6 +626,186 @@ function requestNotificationPermission() {
   }
 }
 
+/* ===== 相册（按性格动态生成） ===== */
+function getPersonalityAlbum(pName, charId) {
+  var charPers = getCharPersona(charId);
+  var story = (charPers.story || '').toLowerCase();
+  var isTsundere = /傲娇|毒舌|暴躁|刻薄|冷淡/.test(story);
+  var isGentle = /温柔|温暖|亲切|可爱|软/.test(story);
+
+  // 记忆注入：从聊天记录提取照片灵感
+  var charMsgs = chatData[charId] || [];
+  var userTexts = charMsgs.filter(function(m) { return m.role === 'user'; }).map(function(m) { return m.text; }).join(' ');
+  var hasFood = /吃|饭|食堂|外卖|好吃|饿|喝|奶茶|咖啡/.test(userTexts);
+  var hasStudy = /考|试|学习|上课|作业|论文|复习|六级/.test(userTexts);
+  var hasMood = /累|烦|难过|不开心|伤心|焦虑/.test(userTexts);
+  var hasPet = /猫|狗|宠物/.test(userTexts);
+  var hasNature = /花|树|天空|海|雨|雪/.test(userTexts);
+
+  // 性格基础照片池
+  var pool = [];
+  if (isTsundere) {
+    pool = [
+      { emoji:"🌅", label:"今天的晚霞", time:"今天" },
+      { emoji:"☕", label:"她喝的咖啡", time:"今天" },
+      { emoji:"🐱", label:"楼下流浪猫", time:"昨天" },
+      { emoji:"🍰", label:"蛋糕店新品", time:"昨天" },
+      { emoji:"🌧", label:"下雨了", time:"前天" },
+      { emoji:"🌙", label:"今晚月亮", time:"3天前" },
+      { emoji:"📖", label:"她认真的时候", time:"3天前" },
+      { emoji:"🌸", label:"路边的花", time:"5天前" },
+      { emoji:"🎧", label:"听到一首歌想到她", time:"昨天" },
+      { emoji:"☁️", label:"今天的云", time:"今天" },
+      { emoji:"🌃", label:"夜景", time:"2天前" },
+      { emoji:"🍜", label:"深夜食堂", time:"4天前" },
+    ];
+  } else if (isGentle) {
+    pool = [
+      { emoji:"🌸", label:"今天买的花", time:"今天" },
+      { emoji:"☀️", label:"好天气", time:"今天" },
+      { emoji:"🐱", label:"猫咖的小橘", time:"昨天" },
+      { emoji:"📚", label:"新买的书", time:"昨天" },
+      { emoji:"🎵", label:"听到一首好歌", time:"前天" },
+      { emoji:"🌧", label:"听雨", time:"3天前" },
+      { emoji:"🍰", label:"做了蛋糕", time:"4天前" },
+      { emoji:"🌙", label:"月色很美", time:"5天前" },
+      { emoji:"☕", label:"午后的咖啡", time:"今天" },
+      { emoji:"🕯", label:"香薰蜡烛", time:"昨天" },
+      { emoji:"🌿", label:"阳台的植物", time:"3天前" },
+      { emoji:"🧸", label:"她送的小礼物", time:"上周" },
+    ];
+  } else {
+    pool = [
+      { emoji:"☕", label:"早上的咖啡", time:"今天" },
+      { emoji:"📱", label:"刷到有趣的新闻", time:"今天" },
+      { emoji:"🍜", label:"晚饭", time:"昨天" },
+      { emoji:"💻", label:"工作", time:"昨天" },
+      { emoji:"🌧", label:"下雨", time:"前天" },
+      { emoji:"🎮", label:"打游戏", time:"3天前" },
+      { emoji:"🍺", label:"朋友聚会", time:"4天前" },
+      { emoji:"🌙", label:"深夜", time:"5天前" },
+      { emoji:"🏃", label:"跑步", time:"今天" },
+      { emoji:"📰", label:"新闻截图", time:"昨天" },
+      { emoji:"🎬", label:"电影票根", time:"3天前" },
+      { emoji:"🏪", label:"便利店", time:"4天前" },
+    ];
+  }
+
+  // 根据聊天内容动态追加照片
+  if (hasFood && !pool.find(function(p) { return p.label.indexOf('吃') !== -1 || p.label.indexOf('饭') !== -1; })) {
+    pool.push({ emoji:"🍽", label:"今天吃了好吃的", time:"今天" });
+  }
+  if (hasStudy) pool.push({ emoji:"📝", label:"她在学习", time:"今天" });
+  if (hasMood) pool.push({ emoji:"💭", label:"今天心情不太好", time:"今天" });
+  if (hasPet) pool.push({ emoji:"🐾", label:"可爱的小动物", time:"昨天" });
+  if (hasNature) pool.push({ emoji:"🌳", label:"窗外的景色", time:"今天" });
+
+  // 随机打乱并选取8-12张
+  var shuffled = pool.sort(function() { return Math.random() - 0.5; });
+  var count = 8 + Math.floor(Math.random() * 5);
+  return shuffled.slice(0, count);
+}
+
+function showSecretAlbum() {
+  document.getElementById("secretDesk").style.display = "none";
+  document.getElementById("secretContent").style.display = "block";
+  document.getElementById("secretBackBtn").style.display = "inline";
+  document.getElementById("secretTitle").textContent = "🖼 " + (getSecretCharName()) + "的相册";
+  const container = document.getElementById("secretContent");
+  const pName = getSecretCharName();
+
+  // 优先用AI生成的数据，否则用性格动态池
+  const data = getSecretForChar(secretCharId);
+  var photos = (data && data.album) ? data.album : getPersonalityAlbum(pName, secretCharId);
+
+  var totalText = photos.length + Math.floor(Math.random() * 10) + '张照片';
+  let h = '<div style="font-size:12px;color:#999;padding:0 0 8px;">' + escHtml(pName) + '的相册 · ' + totalText + '</div>';
+  h += '<div class="secret-photo-grid">';
+  photos.forEach(function(p) {
+    h += '<div class="secret-photo-item"><div class="sp-emoji">' + p.emoji + '</div><div class="sp-label">' + escHtml(p.label) + '</div></div>';
+  });
+  h += '</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;">';
+  photos.forEach(function(p) {
+    h += '<div class="secret-photo-time">' + escHtml(p.time) + '</div>';
+  });
+  h += '</div>';
+  container.innerHTML = h;
+}
+
+/* ===== 歌单（按性格动态 + 聊天推荐收录） ===== */
+function getPersonalityPlaylist(pName, charId) {
+  var charPers = getCharPersona(charId);
+  var story = (charPers.story || '').toLowerCase();
+  var isTsundere = /傲娇|毒舌|暴躁|刻薄|冷淡/.test(story);
+  var isGentle = /温柔|温暖|亲切|可爱|软/.test(story);
+
+  // 性格基础歌单
+  var songs = isTsundere
+    ? [{ title:'路过人间', artist:'郁可唯', time:'刚刚' },
+       { title:'唯一', artist:'告五人', time:'昨天' },
+       { title:'起风了', artist:'买辣椒也用券', time:'昨天' },
+       { title:'小半', artist:'陈粒', time:'前天' },
+       { title:'喜欢你', artist:'陈洁仪', time:'4天前' },
+       { title:'南山南', artist:'马頔', time:'5天前' },
+       { title:'烟火里的尘埃', artist:'华晨宇', time:'上周' }]
+    : isGentle
+    ? [{ title:'小美满', artist:'周深', time:'刚刚' },
+       { title:'日常', artist:'田馥甄', time:'昨天' },
+       { title:'暖暖', artist:'梁静茹', time:'昨天' },
+       { title:'小手拉大手', artist:'梁静茹', time:'前天' },
+       { title:'陪你度过漫长岁月', artist:'陈奕迅', time:'3天前' },
+       { title:'遇见', artist:'孙燕姿', time:'5天前' },
+       { title:'日落', artist:'橘子海', time:'上周' }]
+    : [{ title:'空城', artist:'杨坤', time:'刚刚' },
+       { title:'演员', artist:'薛之谦', time:'昨天' },
+       { title:'丑八怪', artist:'薛之谦', time:'昨天' },
+       { title:'像我这样的人', artist:'毛不易', time:'前天' },
+       { title:'平凡之路', artist:'朴树', time:'4天前' },
+       { title:'理想三旬', artist:'陈鸿宇', time:'5天前' },
+       { title:'消愁', artist:'毛不易', time:'上周' }];
+
+  // 注入聊天推荐歌曲
+  var recommended = getRecommendedSongs(charId);
+  if (recommended.length > 0) {
+    recommended.forEach(function(song) {
+      if (!songs.find(function(s) { return s.title === song.title; })) {
+        songs.unshift({ title: song.title, artist: song.artist || '你推荐的', time: song.time || '最近' });
+      }
+    });
+  }
+
+  return songs;
+}
+
+/* ---- 聊天推荐歌曲检测和存储 ---- */
+function getRecommendedSongs(charId) {
+  try { return JSON.parse(localStorage.getItem('recSongs_' + charId)) || []; } catch(e) { return []; }
+}
+
+function saveRecommendedSongs(charId, songs) {
+  localStorage.setItem('recSongs_' + charId, JSON.stringify(songs));
+}
+
+function detectSongFromChat(text, charId) {
+  // 匹配歌曲推荐模式："推荐/推荐给你/给你推荐 + 歌名"
+  var match = text.match(/(?:推荐|安利|分享)(?:给你)?[：: ]?\s*(.+?)(?:这首歌|这首|吧|~|～|$)/);
+  if (!match) {
+    // 简单匹配：带有"歌"或"听"字的消息
+    match = text.match(/(?:最近在听|听了|听到|听了一首)[：: ]?\s*(.+?)(?:这首歌|这首|吧|~|～|$)/);
+  }
+  if (match && match[1] && match[1].length < 20) {
+    var songs = getRecommendedSongs(charId);
+    var songName = match[1].trim();
+    if (!songs.find(function(s) { return s.title.indexOf(songName) !== -1 || songName.indexOf(s.title) !== -1; })) {
+      songs.push({ title: songName, artist: '', time: new Date().toLocaleDateString('zh-CN') });
+      if (songs.length > 20) songs = songs.slice(-20);
+      saveRecommendedSongs(charId, songs);
+      return true;
+    }
+  }
+  return false;
+}
+
 function showSecretPlaylist() {
   document.getElementById("secretDesk").style.display = "none";
   document.getElementById("secretContent").style.display = "block";
@@ -637,27 +817,42 @@ function showSecretPlaylist() {
   const hr = now.getHours();
 
   const data = getSecretForChar(secretCharId);
-  const useApi = data && data.playlist;
-  const recentlyPlayed = useApi ? data.playlist : [
-    { title:'路过人间', artist:'郁可唯', time:'刚刚' },
-    { title:'小美满', artist:'周深', time:'昨天' },
-    { title:'唯一', artist:'告五人', time:'昨天' },
-    { title:'起风了', artist:'买辣椒也用券', time:'前天' },
-    { title:'喜欢你', artist:'陈洁仪', time:'4天前' },
-  ];
+  const recentlyPlayed = (data && data.playlist) ? data.playlist : getPersonalityPlaylist(pName, secretCharId);
 
   const timeGreeting = hr < 6 ? '深夜' : hr < 9 ? '清晨' : hr < 12 ? '上午' : hr < 14 ? '午后' : hr < 18 ? '下午' : hr < 21 ? '傍晚' : '夜晚';
   if (recentlyPlayed.length > 0 && recentlyPlayed[0].time === '刚刚') {
     recentlyPlayed[0].time = timeGreeting + ' · 刚刚';
   }
 
-  const playlists = [
-    { name: '🌙 安静的时候', songs: ['钢琴曲','月半小夜曲','路过人间','起风了'] },
-    { name: '☀️ 想到她的时候', songs: ['小美满','唯一','喜欢你','想你的风吹到了这里'] },
-    { name: '🎧 一个人发呆', songs: ['走神','空白格','好久不见','夜曲'] },
-  ];
+  // 性格化歌单分类
+  var charPers = getCharPersona(secretCharId);
+  var story = (charPers.story || '').toLowerCase();
+  var isTsundere = /傲娇|毒舌|暴躁|刻薄|冷淡/.test(story);
+  var isGentle = /温柔|温暖|亲切|可爱|软/.test(story);
+
+  var playlists = isTsundere
+    ? [{ name: '🌙 一个人听', songs: ['路过人间','小半','南山南','消愁'] },
+       { name: '☀️ 关于她', songs: ['唯一','喜欢你','起风了','烟火里的尘埃'] },
+       { name: '🎧 深夜歌单', songs: ['夜曲','走神','空白格','好久不见'] }]
+    : isGentle
+    ? [{ name: '🌙 安静的时候', songs: ['小美满','遇见','日落','日常'] },
+       { name: '☀️ 开心歌单', songs: ['暖暖','小手拉大手','陪你度过漫长岁月','好日子'] },
+       { name: '🌸 想她的时候', songs: ['喜欢你','独家记忆','情书','慢慢喜欢你'] }]
+    : [{ name: '🎧 通勤歌单', songs: ['空城','演员','平凡之路','理想三旬'] },
+       { name: '🌙 深夜emo', songs: ['像我这样的人','消愁','丑八怪','孤勇者'] },
+       { name: '⚡ 提神', songs: ['追梦赤子心','光年之外','无名之辈','你的答案'] }];
 
   let h = '<div style="font-size:12px;color:#999;padding:0 0 8px;">' + escHtml(pName) + '最近在听</div>';
+
+  // 来自你推荐的歌（如果有）
+  var recSongs = getRecommendedSongs(secretCharId);
+  if (recSongs.length > 0) {
+    h += '<div class="playlist-header" style="color:#667eea;">💝 来自你的推荐</div>';
+    recSongs.forEach(function(s) {
+      h += '<div class="secret-playlist-item" style="border-left:3px solid #667eea;"><div class="sp-icon">🎁</div><div class="sp-info"><div class="sp-title">' + escHtml(s.title) + '</div><div class="sp-artist">' + (s.artist ? escHtml(s.artist) : '你推荐的') + '</div></div><div class="sp-time">' + escHtml(s.time) + '</div></div>';
+    });
+  }
+
   h += '<div class="playlist-header">🎶 最近播放</div>';
   recentlyPlayed.forEach(function(s) {
     h += '<div class="secret-playlist-item"><div class="sp-icon">🎧</div><div class="sp-info"><div class="sp-title">' + escHtml(s.title) + '</div><div class="sp-artist">' + escHtml(s.artist || '') + '</div></div><div class="sp-time">' + escHtml(s.time) + '</div></div>';
@@ -666,40 +861,6 @@ function showSecretPlaylist() {
   playlists.forEach(function(p) {
     h += '<div class="secret-note-card"><div class="sn-text" style="font-weight:600;">' + escHtml(p.name) + '</div><div style="font-size:12px;color:#888;margin-top:4px;">' + escHtml(p.songs.join(' · ')) + '</div></div>';
   });
-  container.innerHTML = h;
-}
-
-function showSecretAlbum() {
-  document.getElementById("secretDesk").style.display = "none";
-  document.getElementById("secretContent").style.display = "block";
-  document.getElementById("secretBackBtn").style.display = "inline";
-  document.getElementById("secretTitle").textContent = "🖼 " + (getSecretCharName()) + "的相册";
-  const container = document.getElementById("secretContent");
-  const pName = getSecretCharName();
-
-  const data = getSecretForChar(secretCharId);
-  const useApi = data && data.album;
-  const photos = useApi ? data.album : [
-    { emoji:"🌅", label:"今天的晚霞", time:"今天" },
-    { emoji:"☕", label:"她喝咖啡", time:"今天" },
-    { emoji:"🐱", label:"楼下小猫", time:"昨天" },
-    { emoji:"📖", label:"她认真的时候", time:"昨天" },
-    { emoji:"🍰", label:"蛋糕店看到的", time:"前天" },
-    { emoji:"🌧", label:"下雨了", time:"3天前" },
-    { emoji:"🌙", label:"今晚月亮", time:"3天前" },
-    { emoji:"🌸", label:"路边的花", time:"5天前" },
-  ];
-
-  let h = '<div style="font-size:12px;color:#999;padding:0 0 8px;">' + escHtml(pName) + '的相册 · ' + Math.floor(20+Math.random()*50) + '张照片</div>';
-  h += '<div class="secret-photo-grid">';
-  photos.forEach(function(p) {
-    h += '<div class="secret-photo-item"><div class="sp-emoji">' + p.emoji + '</div><div class="sp-label">' + escHtml(p.label) + '</div></div>';
-  });
-  h += '</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;">';
-  photos.forEach(function(p) {
-    h += '<div class="secret-photo-time">' + escHtml(p.time) + '</div>';
-  });
-  h += '</div>';
   container.innerHTML = h;
 }
 

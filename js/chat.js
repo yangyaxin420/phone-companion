@@ -605,6 +605,11 @@ async function sendChat() {
     renderChat();
   }
 
+  // 歌曲推荐检测
+  if (typeof detectSongFromChat === 'function' && text.length > 2) {
+    detectSongFromChat(text, currentCharId);
+  }
+
   const typing = document.getElementById('chatTyping');
   typing.classList.add('show');
 
@@ -1157,4 +1162,118 @@ function sendProactiveMessage(text, char) {
   if (currentPage !== 'page-chat' && typeof addChatSystem === 'function') {
     addChatSystem('💬 ' + char.name + '：' + text);
   }
+}
+
+/* ==================== 语音输入 ==================== */
+var voiceRecognition = null;
+var voiceFinalText = '';
+var voiceStopped = false;
+
+function startVoiceInput() {
+  var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    alert('您的浏览器不支持语音输入，请使用 Chrome 或 Edge');
+    return;
+  }
+
+  var overlay = document.getElementById('voiceOverlay');
+  var icon = document.getElementById('voiceIcon');
+  var status = document.getElementById('voiceStatus');
+  var result = document.getElementById('voiceResult');
+  var sendBtn = document.getElementById('voiceSendBtn');
+
+  overlay.style.display = 'flex';
+  icon.textContent = '🎤';
+  status.textContent = '正在听…';
+  result.style.display = 'none';
+  result.textContent = '';
+  sendBtn.style.display = 'none';
+  document.getElementById('voiceCancelBtn').textContent = '取消';
+  voiceFinalText = '';
+  voiceStopped = false;
+
+  voiceRecognition = new SpeechRecognition();
+  voiceRecognition.lang = 'zh-CN';
+  voiceRecognition.continuous = true;
+  voiceRecognition.interimResults = true;
+  voiceRecognition.maxAlternatives = 1;
+
+  voiceRecognition.onresult = function(event) {
+    var interim = '';
+    var final = '';
+    for (var i = event.resultIndex; i < event.results.length; i++) {
+      var transcript = event.results[i][0].transcript;
+      if (event.results[i].isFinal) {
+        final += transcript;
+      } else {
+        interim += transcript;
+      }
+    }
+    if (final) {
+      voiceFinalText += final;
+      result.style.display = 'block';
+      result.textContent = voiceFinalText + (interim ? '…' : '');
+      sendBtn.style.display = 'inline-block';
+      document.getElementById('voiceCancelBtn').textContent = '重新录';
+    } else if (interim) {
+      result.style.display = 'block';
+      result.textContent = interim + '…';
+    }
+    icon.style.transform = 'scale(1.1)';
+    setTimeout(function() { icon.style.transform = 'scale(1)'; }, 200);
+  };
+
+  voiceRecognition.onerror = function(event) {
+    if (event.error === 'no-speech') {
+      status.textContent = '没有听到声音，再试一次';
+      return;
+    }
+    if (event.error === 'aborted') return;
+    status.textContent = '出错：' + event.error;
+    icon.textContent = '❌';
+  };
+
+  voiceRecognition.onend = function() {
+    if (voiceStopped) return;
+    if (voiceFinalText) {
+      status.textContent = '已识别';
+      icon.textContent = '✅';
+    } else {
+      status.textContent = '没有识别到内容，再试一次';
+      icon.textContent = '🎤';
+      try { voiceRecognition.start(); } catch(e) {}
+    }
+  };
+
+  try {
+    voiceRecognition.start();
+  } catch(e) {
+    status.textContent = '启动失败：' + e.message;
+  }
+}
+
+function stopVoiceInput() {
+  voiceStopped = true;
+  if (voiceRecognition) {
+    try { voiceRecognition.stop(); } catch(e) {}
+    voiceRecognition = null;
+  }
+  document.getElementById('voiceOverlay').style.display = 'none';
+}
+
+function confirmVoiceInput() {
+  voiceStopped = true;
+  if (voiceRecognition) {
+    try { voiceRecognition.stop(); } catch(e) {}
+    voiceRecognition = null;
+  }
+  document.getElementById('voiceOverlay').style.display = 'none';
+  if (voiceFinalText) {
+    var input = document.getElementById('chatInput');
+    if (input) {
+      input.value = voiceFinalText;
+      sendChat();
+    }
+  }
+  voiceFinalText = '';
 }

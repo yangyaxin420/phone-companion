@@ -676,6 +676,7 @@ ul{list-style:none;}
           <button onclick="sendLottery()">🎯 抽签</button>
         </div>
         <textarea id="chatInput" rows="1" placeholder="说点什么..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}"></textarea>
+        <button class="chat-send-btn" id="chatMicBtn" onclick="startVoiceInput()" title="语音输入">🎤</button>
         <button class="chat-send-btn" onclick="sendChat()">↑</button>
         <div class="emoji-panel" id="emojiPanel">
           <div class="emoji-panel-tabs">
@@ -693,6 +694,19 @@ ul{list-style:none;}
             <input type="file" id="emojiImageInput" accept="image/*" style="display:none;" onchange="handleEmojiImageSelect(event)">
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 语音输入弹窗 ===== -->
+  <div id="voiceOverlay" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,.5);z-index:100;flex-direction:column;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:24px;padding:32px;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.2);width:280px;">
+      <div id="voiceIcon" style="font-size:56px;margin-bottom:12px;transition:all .3s;">🎤</div>
+      <div id="voiceStatus" style="font-size:14px;color:#888;margin-bottom:16px;">点击开始录音</div>
+      <div id="voiceResult" style="font-size:16px;color:#333;min-height:40px;padding:8px 12px;background:#f5f5f5;border-radius:12px;margin-bottom:16px;display:none;line-height:1.5;"></div>
+      <div style="display:flex;gap:8px;justify-content:center;">
+        <button id="voiceCancelBtn" onclick="stopVoiceInput()" style="padding:10px 20px;border-radius:12px;background:#f0f0f0;color:#666;font-size:14px;font-weight:600;cursor:pointer;border:none;flex:1;">取消</button>
+        <button id="voiceSendBtn" onclick="confirmVoiceInput()" style="padding:10px 20px;border-radius:12px;background:#1e1e1e;color:#fff;font-size:14px;font-weight:600;cursor:pointer;border:none;flex:1;display:none;">发送</button>
       </div>
     </div>
   </div>
