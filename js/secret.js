@@ -593,20 +593,23 @@ function showSecretNotes() {
     h += '</div></div>';
   }
 
-  // === 关键记忆 ===
+  // === 关键记忆（只显示与当前角色有关的） ===
   if (typeof memories !== 'undefined' && memories.length > 0) {
-    var recentMemories = memories.slice(-20).reverse();
-    var memTitle = isTsundere ? '🧠 她说过的话（我才没刻意记）' : isGentle ? '🧠 关于她的事 ♡' : '🧠 记录：用户信息';
-    h += '<div class="secret-note-card">';
-    h += '<div class="sn-time">' + memTitle + '</div>';
-    recentMemories.forEach(function(mem) {
-      var d = new Date(mem.time);
-      var timeStr = d.getMonth()+1 + '月' + d.getDate() + '日';
-      h += '<div style="font-size:12px;color:#555;padding:4px 0;border-bottom:1px solid #f5f5f5;line-height:1.6;">' +
-        '<span style="color:#bbb;font-size:10px;">' + timeStr + '</span> ' +
-        escHtml(mem.text) + '</div>';
-    });
-    h += '</div>';
+    var charMemories = memories.filter(function(m) { return !m.charId || m.charId === secretCharId; });
+    if (charMemories.length > 0) {
+      var recentMemories = charMemories.slice(-20).reverse();
+      var memTitle = isTsundere ? '🧠 她说过的话（我才没刻意记）' : isGentle ? '🧠 关于她的事 ♡' : '🧠 记录：用户信息';
+      h += '<div class="secret-note-card">';
+      h += '<div class="sn-time">' + memTitle + '</div>';
+      recentMemories.forEach(function(mem) {
+        var d = new Date(mem.time);
+        var timeStr = d.getMonth()+1 + '月' + d.getDate() + '日';
+        h += '<div style="font-size:12px;color:#555;padding:4px 0;border-bottom:1px solid #f5f5f5;line-height:1.6;">' +
+          '<span style="color:#bbb;font-size:10px;">' + timeStr + '</span> ' +
+          escHtml(mem.text) + '</div>';
+      });
+      h += '</div>';
+    }
   }
 
   // === 角色心声（性格化） ===

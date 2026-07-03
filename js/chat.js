@@ -186,7 +186,7 @@ function addChatSystem(text) {
 let memories = lsGet('memories', []);
 
 function saveMemory(text) {
-  memories.push({ text: text, time: Date.now() });
+  memories.push({ text: text, time: Date.now(), charId: currentCharId });
   if (memories.length > 200) memories = memories.slice(-200);
   lsSet('memories', memories);
 }
