@@ -290,47 +290,68 @@ async function showSecretChat() {
   document.getElementById('secretAiName').textContent = pName;
   const container = document.getElementById('secretContent');
 
-  // 等待数据生成完成
   await generateSecretContent(secretCharId);
-
   const data = getSecretForChar(secretCharId);
-  const useApi = data && data.contacts;
-  const contacts = useApi ? data.contacts : [
-    { id:'you', avatar:'💬', name:'你', nickname:'她', lastMsg:'', time:'' },
-    { id:'1', avatar:'🎂', name:'甜时蛋糕', nickname:'蛋糕店', lastMsg:'明天来取蛋糕～', time:'下午' },
-    { id:'2', avatar:'📦', name:'顺丰快递', nickname:'快递', lastMsg:'包裹已放保安室', time:'上午' },
-    { id:'3', avatar:'☕', name:'楼下咖啡', nickname:'咖啡小哥', lastMsg:'老样子哈', time:'早上' },
-    { id:'4', avatar:'🏪', name:'便利店老板', nickname:'老板', lastMsg:'再不来我拆了😏', time:'昨天' },
-  ];
+  var contacts = (data && data.contacts) ? data.contacts : generateLocalContacts();
 
-  const today = new Date().toISOString().split('T')[0];
-  const charMsgs = chatData[secretCharId] || [];
-  const todayMsgs = charMsgs.filter(m => m.time && new Date(m.time).toISOString().split('T')[0] === today);
-  const yourLastMsg = todayMsgs.length > 0 ? todayMsgs[todayMsgs.length-1].text.substring(0,20) : '';
+  var today = new Date().toISOString().split('T')[0];
+  var charMsgs = chatData[secretCharId] || [];
+  var todayMsgs = charMsgs.filter(function(m) { return m.time && new Date(m.time).toISOString().split('T')[0] === today; });
+  var yourLastMsg = todayMsgs.length > 0 ? todayMsgs[todayMsgs.length-1].text.substring(0,20) : '';
 
   let h = '<div style="font-size:12px;color:#999;padding:0 0 8px;">微信</div>';
 
   if (yourLastMsg) {
-    const yourNote = getSecretNickname('you') || '她';
     h += '<div class="secret-contact-item" onclick="showSecretConvo(\'you\')">' +
       '<div class="sci-avatar">💬</div>' +
-      '<div class="sci-info"><div class="sci-name-row"><span class="sci-nickname">' + escHtml(yourNote) + '</span></div>' +
+      '<div class="sci-info"><div class="sci-name-row"><span class="sci-nickname">她</span></div>' +
       '<div class="sci-lastmsg">' + escHtml(yourLastMsg) + '</div></div>' +
       '<div class="sci-time">现在</div></div>';
   }
 
   contacts.forEach(function(c) {
     if (c.id === 'you') return;
-    const nickname = getSecretNickname(c.id) || c.nickname || c.name.replace(/^[^\s]+\s/, '');
+    var nickname = c.nickname || c.name;
+    var lastMsg = c.lastMsg || '';
+    if (data && data.conversations && data.conversations[c.id] && data.conversations[c.id].length > 0) {
+      var conv = data.conversations[c.id];
+      var last = conv[conv.length - 1];
+      if (last && last.text) lastMsg = last.text.substring(0, 20);
+    }
     h += '<div class="secret-contact-item" onclick="showSecretConvo(\'' + c.id + '\')">' +
       '<div class="sci-avatar">' + c.avatar + '</div>' +
       '<div class="sci-info"><div class="sci-name-row"><span class="sci-nickname">' + escHtml(nickname) + '</span></div>' +
-      '<div class="sci-lastmsg">' + escHtml(c.lastMsg || '') + '</div></div>' +
+      '<div class="sci-lastmsg">' + escHtml(lastMsg) + '</div></div>' +
       '<div class="sci-time">' + escHtml(c.time || '') + '</div></div>';
   });
 
   h += '<div style="font-size:10px;color:#ddd;text-align:center;padding:16px 0 8px;">—— 没有更多了 ——</div>';
   container.innerHTML = h;
+}
+
+function generateLocalContacts() {
+  var cp = getCharPersona(secretCharId);
+  var s = (cp.story || '').toLowerCase();
+  var isT = /傲娇|毒舌|暴躁|刻薄|冷淡/.test(s);
+  var isG = /温柔|温暖|亲切|可爱|软/.test(s);
+  return [
+    { id:'you', avatar:'💬', name:'你', nickname:'她', lastMsg:'', time:'' },
+    { id:'1', name: isT ? '甜时蛋糕' : isG ? '花语花店' : '楼下超市', avatar: isT ? '🎂' : isG ? '🌸' : '🏪', nickname:'', lastMsg:'', time:'下午' },
+    { id:'2', name:'顺丰快递', avatar:'📦', nickname:'快递', lastMsg:'', time:'上午' },
+    { id:'3', name: isG ? '转角咖啡' : '楼下便利店', avatar: isG ? '☕' : '🏪', nickname:'', lastMsg:'', time:'早上' },
+  ];
+}
+
+function getPersonalityConvo(cid, isT, isG) {
+  var cs = {
+    '1': isT ? [{ from:'them', text:'您好，蛋糕做好了' },{ from:'me', text:'嗯，糖减半了吧' },{ from:'them', text:'减了，动物奶油，放心' },{ from:'me', text:'行' }]
+           : isG ? [{ from:'them', text:'今天有新的粉玫瑰哦' },{ from:'me', text:'好看，包一束吧' },{ from:'them', text:'好嘞，送给谁的呀☺️' }]
+                 : [{ from:'them', text:'老板，这个月会员日有活动' },{ from:'me', text:'什么活动' },{ from:'them', text:'满100减15' },{ from:'me', text:'哦，那来一箱牛奶' }],
+    '2': [{ from:'them', text:'您包裹已放保安室，请及时取件' },{ from:'me', text:'嗯' }],
+    '3': isG ? [{ from:'them', text:'今天也是老样子吗☺️' },{ from:'me', text:'嗯，老样子' },{ from:'them', text:'好嘞' }]
+             : [{ from:'them', text:'新进了关东煮' },{ from:'me', text:'来一份' },{ from:'them', text:'好嘞！' }],
+  };
+  return cs[cid] || null;
 }
 
 function showSecretConvo(contactId) {
@@ -339,17 +360,26 @@ function showSecretConvo(contactId) {
   const container = document.getElementById('secretContent');
   const pName = getSecretCharName();
 
-  var contact = null;
   const data = getSecretForChar(secretCharId);
+  var cp = getCharPersona(secretCharId);
+  var s = (cp.story || '').toLowerCase();
+  var isT = /傲娇|毒舌|暴躁|刻薄|冷淡/.test(s);
+  var isG = /温柔|温暖|亲切|可爱|软/.test(s);
+
+  var contact = null;
   if (contactId === 'you') {
-    contact = { name:'你', avatar:'💬', nickname: getSecretNickname('you') || '她' };
+    contact = { name:'你', avatar:'💬', nickname:'她' };
   } else if (data && data.contacts) {
     contact = data.contacts.find(function(c) { return c.id === contactId; });
   }
+  if (!contact) {
+    var name = contactId === '3' ? (isG ? '转角咖啡' : '楼下便利店') : (isT ? '甜时蛋糕' : isG ? '花语花店' : '楼下超市');
+    contact = { name: name, avatar: '💬' };
+  }
 
-  var nickname = (contact && contact.nickname) ? contact.nickname : ((contact && contact.name) ? contact.name.replace(/^[^\s]+\s/, '') : '联系人');
-  var avatar = (contact && contact.avatar) ? contact.avatar : '💬';
-  var displayName = contactId === 'you' ? nickname : ((contact && contact.name) || nickname);
+  var nickname = contact.nickname || contact.name;
+  var avatar = contact.avatar || '💬';
+  var displayName = contactId === 'you' ? nickname : (contact.name || nickname);
 
   var msgs = [];
   if (contactId === 'you') {
@@ -359,13 +389,7 @@ function showSecretConvo(contactId) {
   } else if (data && data.conversations && data.conversations[contactId]) {
     msgs = data.conversations[contactId];
   } else {
-    var staticConvos = {
-      '1': [{ from:'them', text:'您好，蛋糕做好了，明天来取～' },{ from:'me', text:'好，她喜欢芋泥，别太甜' },{ from:'them', text:'糖减半了，用的动物奶油，配丝带😄' }],
-      '2': [{ from:'them', text:'您包裹已放保安室，请及时取件' },{ from:'me', text:'嗯' }],
-      '3': [{ from:'them', text:'帅哥今天美式还是拿铁？' },{ from:'me', text:'拿铁，多加份浓缩' },{ from:'them', text:'好嘞老样子' }],
-      '4': [{ from:'them', text:'快递在我这放三天了😏' },{ from:'me', text:'……忘了' },{ from:'them', text:'再不来我拆开看了啊' },{ from:'me', text:'你敢' }],
-    };
-    msgs = staticConvos[contactId] || [];
+    msgs = getPersonalityConvo(contactId, isT, isG) || [];
   }
 
   if (msgs.length === 0) {
@@ -380,12 +404,10 @@ function showSecretConvo(contactId) {
 
   msgs.forEach(function(m) {
     var isMe = m.from === 'me' || m.role === 'ai';
-    var isSystem = m.role === 'system';
-    if (isSystem) {
-      h += '<div style="text-align:center;font-size:11px;color:#999;padding:8px 0;">' + escHtml(m.text) + '</div>';
+    if (isMe) {
+      h += '<div class="convo-bubble me"><div class="convo-text">' + escHtml(m.text) + '</div></div>';
     } else {
-      h += '<div class="convo-bubble ' + (isMe ? 'me' : 'them') + '">' +
-        '<div class="convo-text">' + escHtml(m.text) + '</div></div>';
+      h += '<div class="convo-bubble them"><div class="convo-text">' + escHtml(m.text) + '</div></div>';
     }
   });
 
