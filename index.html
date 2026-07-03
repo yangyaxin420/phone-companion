@@ -658,7 +658,9 @@ ul{list-style:none;}
     <div class="sub-page-header" style="display:flex;justify-content:space-between;align-items:center;position:relative;z-index:2;background:rgba(255,255,255,.72);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);">
       <button onclick="showConvList()" style="font-size:18px;font-weight:400;background:none;border:none;">‹ 返回</button>
       <span id="chatTitle">聊天</span>
-      <button onclick="toggleSpConfig()" style="font-size:18px;font-weight:400;">⚙</button>
+      <div style="display:flex;gap:6px;">
+        <button onclick="startVoiceCall()" style="font-size:16px;background:none;border:none;cursor:pointer;" title="语音通话">📞</button>
+        <button onclick="toggleSpConfig()" style="font-size:18px;font-weight:400;">⚙</button>
     </div>
     <div class="chat-page">
       <div class="chat-messages" id="chatMessages"></div>
@@ -676,7 +678,6 @@ ul{list-style:none;}
           <button onclick="sendLottery()">🎯 抽签</button>
         </div>
         <textarea id="chatInput" rows="1" placeholder="说点什么..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}"></textarea>
-        <button class="chat-send-btn" id="chatMicBtn" onclick="startVoiceInput()" title="语音输入">🎤</button>
         <button class="chat-send-btn" onclick="sendChat()">↑</button>
         <div class="emoji-panel" id="emojiPanel">
           <div class="emoji-panel-tabs">
@@ -698,17 +699,23 @@ ul{list-style:none;}
     </div>
   </div>
 
-  <!-- ===== 语音输入弹窗 ===== -->
-  <div id="voiceOverlay" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,.5);z-index:100;flex-direction:column;align-items:center;justify-content:center;">
-    <div style="background:#fff;border-radius:24px;padding:32px;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.2);width:280px;">
-      <div id="voiceIcon" style="font-size:56px;margin-bottom:12px;transition:all .3s;">🎤</div>
-      <div id="voiceStatus" style="font-size:14px;color:#888;margin-bottom:16px;">点击开始录音</div>
-      <div id="voiceResult" style="font-size:16px;color:#333;min-height:40px;padding:8px 12px;background:#f5f5f5;border-radius:12px;margin-bottom:16px;display:none;line-height:1.5;"></div>
-      <div style="display:flex;gap:8px;justify-content:center;">
-        <button id="voiceCancelBtn" onclick="stopVoiceInput()" style="padding:10px 20px;border-radius:12px;background:#f0f0f0;color:#666;font-size:14px;font-weight:600;cursor:pointer;border:none;flex:1;">取消</button>
-        <button id="voiceSendBtn" onclick="confirmVoiceInput()" style="padding:10px 20px;border-radius:12px;background:#1e1e1e;color:#fff;font-size:14px;font-weight:600;cursor:pointer;border:none;flex:1;display:none;">发送</button>
-      </div>
+  <!-- ===== 语音通话界面 ===== -->
+  <div id="voiceCallOverlay" style="display:none;position:absolute;inset:0;background:linear-gradient(160deg,#1a1a2e,#16213e,#0f3460);z-index:100;flex-direction:column;align-items:center;padding:60px 20px 40px;">
+    <!-- 头像和名字 -->
+    <div style="text-align:center;margin-bottom:20px;">
+      <div id="callAvatar" style="font-size:72px;margin-bottom:8px;">💬</div>
+      <div id="callName" style="font-size:22px;font-weight:700;color:#fff;">连接中...</div>
+      <div id="callStatus" style="font-size:13px;color:rgba(255,255,255,.5);margin-top:4px;">📞 呼叫中...</div>
+      <div id="callTimer" style="font-size:15px;color:rgba(255,255,255,.6);margin-top:6px;font-variant-numeric:tabular-nums;">00:00</div>
     </div>
+    <!-- 扬声器图标动态 -->
+    <div id="callSpeaker" style="font-size:48px;margin:10px 0 16px;color:rgba(255,255,255,.3);transition:all .3s;">🔊</div>
+    <!-- 通话字幕 -->
+    <div id="callTranscript" style="flex:1;width:100%;overflow-y:auto;padding:8px 12px;background:rgba(0,0,0,.3);border-radius:16px;margin:8px 0;">
+      <div style="text-align:center;color:rgba(255,255,255,.3);font-size:12px;padding:30px 0;">说点什么开始通话吧...</div>
+    </div>
+    <!-- 挂断按钮 -->
+    <button onclick="endVoiceCall()" style="width:64px;height:64px;border-radius:50%;background:#ff4444;color:#fff;font-size:28px;border:none;cursor:pointer;box-shadow:0 4px 20px rgba(255,68,68,.4);margin-top:8px;transition:transform .1s;" onmouseover="this.style.transform='scale(1.08)'" onmouseout="this.style.transform='scale(1)'">📞</button>
   </div>
 
   <!-- ===== 朋友圈 ===== -->

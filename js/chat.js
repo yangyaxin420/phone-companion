@@ -1164,116 +1164,152 @@ function sendProactiveMessage(text, char) {
   }
 }
 
-/* ==================== 语音输入 ==================== */
-var voiceRecognition = null;
-var voiceFinalText = '';
-var voiceStopped = false;
+/* ==================== 语音通话 ==================== */
+var voiceCallActive = false;
+var voiceCallRecognition = null;
+var voiceCallTimer = null;
+var voiceCallSeconds = 0;
 
-function startVoiceInput() {
-  var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) {
-    alert('您的浏览器不支持语音输入，请使用 Chrome 或 Edge');
-    return;
+function startVoiceCall() {
+  var sr = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!sr) { alert("请使用 Chrome 或 Edge 浏览器"); return; }
+  var pName = document.getElementById("chatTitle").textContent || "AI";
+  var char = getCharById(currentCharId);
+  var avatar = (char && char.avatar) ? char.avatar : "💬";
+  document.getElementById("voiceCallOverlay").style.display = "flex";
+  document.getElementById("callAvatar").textContent = avatar;
+  document.getElementById("callName").textContent = pName;
+  document.getElementById("callStatus").textContent = "📞 呼叫中...";
+  document.getElementById("callTimer").textContent = "00:00";
+  document.getElementById("callSpeaker").style.color = "rgba(255,255,255,.3)";
+  var tdiv = document.getElementById("callTranscript");
+  tdiv.innerHTML = "<div style='text-align:center;color:rgba(255,255,255,.3);font-size:12px;padding:30px 0;'>正在连接...</div>";
+  voiceCallActive = true;
+  voiceCallSeconds = 0;
+  setTimeout(function() {
+    if (!voiceCallActive) return;
+    document.getElementById("callStatus").textContent = "🔊 通话中";
+    document.getElementById("callSpeaker").style.color = "rgba(255,255,255,.6)";
+    tdiv.innerHTML = "";
+    voiceCallTimer = setInterval(function() {
+      voiceCallSeconds++;
+      var m = String(Math.floor(voiceCallSeconds / 60)).padStart(2, "0");
+      var s = String(voiceCallSeconds % 60).padStart(2, "0");
+      document.getElementById("callTimer").textContent = m + ":" + s;
+    }, 1000);
+    startVoiceCallRecognition();
+  }, 1200);
+}
+
+function startVoiceCallRecognition() {
+  if (!voiceCallActive) return;
+  var sr = window.SpeechRecognition || window.webkitSpeechRecognition;
+  voiceCallRecognition = new sr();
+  voiceCallRecognition.lang = "zh-CN";
+  voiceCallRecognition.continuous = true;
+  voiceCallRecognition.interimResults = true;
+  voiceCallRecognition.maxAlternatives = 1;
+  var finalText = "";
+  voiceCallRecognition.onresult = function(e) {
+    var interim = "";
+    for (var i = e.resultIndex; i < e.results.length; i++) {
+      var t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) { finalText += t; }
+      else { interim += t; }
+    }
+    if (finalText) {
+      var txt = finalText; finalText = "";
+      addCallTranscript("user", txt);
+      generateCallReply(txt);
+    }
+  };
+  voiceCallRecognition.onerror = function(e) {
+    if (e.error === "no-speech" || e.error === "aborted") return;
+    addCallTranscript("system", "[识别出错]");
+  };
+  voiceCallRecognition.onend = function() {
+    if (!voiceCallActive) return;
+    try { voiceCallRecognition.start(); } catch(ex) {}
+  };
+  try { voiceCallRecognition.start(); }
+  catch(ex) { addCallTranscript("system", "[语音启动失败]"); }
+}
+
+function addCallTranscript(role, text) {
+  var tdiv = document.getElementById("callTranscript");
+  if (!tdiv) return;
+  if (role === "user") {
+    var d = document.createElement("div");
+    d.style.cssText = "text-align:right;margin:6px 0;";
+    d.innerHTML = "<div style='display:inline-block;background:rgba(102,126,234,.5);color:#fff;padding:8px 14px;border-radius:16px 16px 4px 16px;font-size:14px;line-height:1.5;max-width:80%;text-align:left;'>" + escHtml(text) + "</div>";
+    tdiv.appendChild(d);
+    document.getElementById("callSpeaker").style.color = "#667eea";
+    setTimeout(function() { if (voiceCallActive) document.getElementById("callSpeaker").style.color = "rgba(255,255,255,.6)"; }, 500);
+  } else if (role === "ai") {
+    var d2 = document.createElement("div");
+    d2.style.cssText = "text-align:left;margin:6px 0;";
+    d2.innerHTML = "<div style='display:inline-block;background:rgba(255,255,255,.12);color:rgba(255,255,255,.9);padding:8px 14px;border-radius:16px 16px 16px 4px;font-size:14px;line-height:1.5;max-width:80%;'>" + escHtml(text) + "</div>";
+    tdiv.appendChild(d2);
+    try { if (window.speechSynthesis) { window.speechSynthesis.cancel(); var u = new SpeechSynthesisUtterance(text); u.lang = "zh-CN"; u.rate = 1.0; window.speechSynthesis.speak(u); } } catch(ex) {}
+  } else {
+    var d3 = document.createElement("div");
+    d3.style.cssText = "text-align:center;margin:4px 0;";
+    d3.innerHTML = "<span style='font-size:11px;color:rgba(255,255,255,.3);'>" + escHtml(text) + "</span>";
+    tdiv.appendChild(d3);
   }
+  tdiv.scrollTop = tdiv.scrollHeight;
+}
 
-  var overlay = document.getElementById('voiceOverlay');
-  var icon = document.getElementById('voiceIcon');
-  var status = document.getElementById('voiceStatus');
-  var result = document.getElementById('voiceResult');
-  var sendBtn = document.getElementById('voiceSendBtn');
-
-  overlay.style.display = 'flex';
-  icon.textContent = '🎤';
-  status.textContent = '正在听…';
-  result.style.display = 'none';
-  result.textContent = '';
-  sendBtn.style.display = 'none';
-  document.getElementById('voiceCancelBtn').textContent = '取消';
-  voiceFinalText = '';
-  voiceStopped = false;
-
-  voiceRecognition = new SpeechRecognition();
-  voiceRecognition.lang = 'zh-CN';
-  voiceRecognition.continuous = true;
-  voiceRecognition.interimResults = true;
-  voiceRecognition.maxAlternatives = 1;
-
-  voiceRecognition.onresult = function(event) {
-    var interim = '';
-    var final = '';
-    for (var i = event.resultIndex; i < event.results.length; i++) {
-      var transcript = event.results[i][0].transcript;
-      if (event.results[i].isFinal) {
-        final += transcript;
-      } else {
-        interim += transcript;
+function generateCallReply(userText) {
+  var char = getCharById(currentCharId);
+  if (!char) return;
+  var story = (char.story || "").toLowerCase();
+  var isT = /傲娇|毒舌|暴躁|刻薄|冷淡/.test(story);
+  var isG = /温柔|温暖|亲切|可爱|软/.test(story);
+  if (apiConfig && apiConfig.apiKey) {
+    var prompt = "你是" + char.name + "。" + (char.story ? "性格背景：" + char.story : "") + "\n这是语音通话，用户说：" + userText + "\n请你用一句话简短回复（10-20字），像在打电话一样自然。不要加任何动作描写或表情符号。";
+    callLLMApi(prompt).then(function(text) {
+      if (text && voiceCallActive) {
+        addCallTranscript("ai", text);
+        chatMessages.push({ role:"ai", text: text, time: Date.now() });
+        saveChatData();
+        if (currentPage === "page-chat") renderChat();
       }
-    }
-    if (final) {
-      voiceFinalText += final;
-      result.style.display = 'block';
-      result.textContent = voiceFinalText + (interim ? '…' : '');
-      sendBtn.style.display = 'inline-block';
-      document.getElementById('voiceCancelBtn').textContent = '重新录';
-    } else if (interim) {
-      result.style.display = 'block';
-      result.textContent = interim + '…';
-    }
-    icon.style.transform = 'scale(1.1)';
-    setTimeout(function() { icon.style.transform = 'scale(1)'; }, 200);
-  };
+    }).catch(function() { fallbackCallReply(userText, isT, isG); });
+  } else { fallbackCallReply(userText, isT, isG); }
+}
 
-  voiceRecognition.onerror = function(event) {
-    if (event.error === 'no-speech') {
-      status.textContent = '没有听到声音，再试一次';
-      return;
-    }
-    if (event.error === 'aborted') return;
-    status.textContent = '出错：' + event.error;
-    icon.textContent = '❌';
-  };
-
-  voiceRecognition.onend = function() {
-    if (voiceStopped) return;
-    if (voiceFinalText) {
-      status.textContent = '已识别';
-      icon.textContent = '✅';
-    } else {
-      status.textContent = '没有识别到内容，再试一次';
-      icon.textContent = '🎤';
-      try { voiceRecognition.start(); } catch(e) {}
-    }
-  };
-
-  try {
-    voiceRecognition.start();
-  } catch(e) {
-    status.textContent = '启动失败：' + e.message;
+function fallbackCallReply(userText, isT, isG) {
+  var templates = [];
+  if (/累|烦|难过|不开心/.test(userText)) {
+    templates = isT ? ["累了就歇着。"] : isG ? ["辛苦了，好好休息呀"] : ["注意休息。"];
+  } else if (/吃|饭|饿/.test(userText)) {
+    templates = isT ? ["又吃，胖死你。"] : isG ? ["要好好吃饭哦"] : ["嗯。"];
+  } else if (/睡|觉|困/.test(userText)) {
+    templates = isT ? ["那还不去睡。"] : isG ? ["晚安，好梦~"] : ["睡吧。"];
+  } else if (/想|爱|喜欢/.test(userText)) {
+    templates = isT ? ["\u2026\u2026嗯。"] : isG ? ["我也想你呀"] : ["知道了。"];
+  } else { templates = isT ? ["然后呢。"] : isG ? ["这样啊，然后呢？"] : ["接着说。"]; }
+  var reply = templates[Math.floor(Math.random() * templates.length)];
+  if (voiceCallActive) {
+    addCallTranscript("ai", reply);
+    chatMessages.push({ role:"ai", text: reply, time: Date.now() });
+    saveChatData();
+    if (currentPage === "page-chat") renderChat();
   }
 }
 
-function stopVoiceInput() {
-  voiceStopped = true;
-  if (voiceRecognition) {
-    try { voiceRecognition.stop(); } catch(e) {}
-    voiceRecognition = null;
+function endVoiceCall() {
+  voiceCallActive = false;
+  if (voiceCallRecognition) { try { voiceCallRecognition.stop(); } catch(ex) {} voiceCallRecognition = null; }
+  if (voiceCallTimer) { clearInterval(voiceCallTimer); voiceCallTimer = null; }
+  try { window.speechSynthesis.cancel(); } catch(ex) {}
+  document.getElementById("voiceCallOverlay").style.display = "none";
+  if (voiceCallSeconds > 3) {
+    var m = Math.floor(voiceCallSeconds / 60);
+    var s = voiceCallSeconds % 60;
+    var dur = (m > 0 ? m + "分" : "") + s + "秒";
+    var name = document.getElementById("chatTitle").textContent || "AI";
+    addChatSystem("📞 与 " + name + " 的通话结束（" + dur + "）");
   }
-  document.getElementById('voiceOverlay').style.display = 'none';
-}
-
-function confirmVoiceInput() {
-  voiceStopped = true;
-  if (voiceRecognition) {
-    try { voiceRecognition.stop(); } catch(e) {}
-    voiceRecognition = null;
-  }
-  document.getElementById('voiceOverlay').style.display = 'none';
-  if (voiceFinalText) {
-    var input = document.getElementById('chatInput');
-    if (input) {
-      input.value = voiceFinalText;
-      sendChat();
-    }
-  }
-  voiceFinalText = '';
 }
