@@ -573,3 +573,11 @@ ul{list-style:none;}
 #page-chat .chat-context-bar{background:rgba(240,240,240,.82);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}
 /* 聊天页进入动画气泡适配 */
 #page-chat .chat-typing{background:rgba(255,255,255,.8);backdrop-filter:blur(4px);}
+
+/* ==================== 25. 设置页 ==================== */
+.settings-card{background:#fff;border-radius:14px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.04);}
+.settings-row{display:flex;justify-content:space-between;align-items:center;gap:12px;}
+.settings-row-left{flex:1;min-width:0;}
+.settings-row-title{font-size:14px;font-weight:600;color:#1e1e1e;}
+.settings-row-desc{font-size:11px;color:#999;margin-top:3px;line-height:1.4;}
+.settings-section-title{font-size:13px;font-weight:700;color:#1e1e1e;margin-bottom:10px;}

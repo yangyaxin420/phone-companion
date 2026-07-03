@@ -488,7 +488,7 @@ ul{list-style:none;}
       <!-- 问候 -->
       <div class="greeting">
         <div class="date" id="homeDate">2026年6月30日</div>
-        <div class="hello">你好，晞晞<span> · 今天想做点什么？</span></div>
+        <div class="hello">你好<span id="homeGreetingName"></span><span> · 今天想做点什么？</span></div>
       </div>
 
       <!-- 天气卡片 -->
@@ -575,9 +575,6 @@ ul{list-style:none;}
           <label>日期</label>
           <input type="date" id="expDate">
         </div>
-        <div class="expense-form-row" style="display:none;">
-          <select id="expDetailType"><option value="expense">支出</option><option value="income">收入</option></select>
-        </div>
         <button class="persona-save" onclick="addExpense()">✓ 记录</button>
       </div>
       <!-- 列表 -->
@@ -621,6 +618,18 @@ ul{list-style:none;}
         <div class="secret-icon" onclick="showSecretAlbum()">
           <div class="si-symbol">🖼</div>
           <div class="si-name">他的相册</div>
+        </div>
+        <div class="secret-icon" onclick="showSecretFoodDelivery()">
+          <div class="si-symbol">🍔</div>
+          <div class="si-name">外卖订单</div>
+        </div>
+        <div class="secret-icon" onclick="showSecretBrowser()">
+          <div class="si-symbol">🌐</div>
+          <div class="si-name">浏览记录</div>
+        </div>
+        <div class="secret-icon" onclick="showSecretMailbox()">
+          <div class="si-symbol">✉️</div>
+          <div class="si-name">匿名信箱</div>
         </div>
       </div>
       <div style="font-size:10px;color:#ccc;margin-top:12px;text-align:center;">💡 内容由AI生成，可接入API更丰富</div>
@@ -799,7 +808,7 @@ ul{list-style:none;}
 
       <div class="persona-field">
         <label>我的名字</label>
-        <input type="text" id="userName" placeholder="晞晞">
+        <input type="text" id="userName" placeholder="你的名字">
       </div>
       <div class="persona-field">
         <label>性别</label>
@@ -811,42 +820,24 @@ ul{list-style:none;}
       </div>
       <div class="persona-field">
         <label>年龄 / 身份</label>
-        <input type="text" id="userAge" placeholder="大一，社会工作专业">
+        <input type="text" id="userAge" placeholder="例如：20岁，学生">
       </div>
       <div class="persona-field">
         <label>性格标签</label>
-        <input type="text" id="userTraits" placeholder="敏感、爱写东西、嘴硬心软">
+        <input type="text" id="userTraits" placeholder="例如：开朗、爱笑">
       </div>
       <div class="persona-field">
         <label>兴趣爱好</label>
-        <input type="text" id="userHobbies" placeholder="写作、听歌、骆云影">
+        <input type="text" id="userHobbies" placeholder="例如：看书、画画">
       </div>
       <div class="persona-field">
         <label>重要背景</label>
-        <input type="text" id="userBackground" placeholder="在杭州读书">
+        <input type="text" id="userBackground" placeholder="出生地 / 生活城市等">
       </div>
       <button class="persona-save" onclick="saveUserPersona()">💾 保存</button>
 
-      <div class="persona-section">
-        <div class="persona-section-title" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'" style="cursor:pointer;">⚙️ API 配置 <span style="font-size:10px;color:#aaa;">▶ 展开</span></div>
-        <div style="display:none;">
-          <div class="persona-field">
-            <label>API Key</label>
-            <input type="password" id="apiKey" placeholder="sk-xxxxxxxx">
-            <div class="persona-hint">Key 只保存在本地，不会上传</div>
-          </div>
-          <button class="persona-save" onclick="saveApiConfig()">保存</button>
-          <button class="persona-save" style="background:#e0e0e0;color:#1e1e1e;margin-top:4px;" onclick="testApiConnection()">测试连接</button>
-        </div>
-      </div>
-
-      <div class="persona-section">
-        <div class="persona-section-title">💾 数据管理</div>
-        <div style="display:flex;flex-direction:column;gap:8px;">
-          <button class="persona-save" onclick="exportData()">📤 导出所有数据</button>
-          <button class="persona-save" style="background:#e0e0e0;color:#1e1e1e;" onclick="document.getElementById('importFileInput').click()">📥 导入数据</button>
-          <input type="file" id="importFileInput" accept=".json" style="display:none;" onchange="importData(event)">
-        </div>
+      <div style="font-size:10px;color:#aaa;text-align:center;padding:16px 0;">
+        ⚙️ API 配置和 💾 数据管理已移到 <a href="javascript:navigateTo('page-settings')" style="color:#667eea;text-decoration:underline;">⚙设置页</a>
       </div>
     </div>
   </div>
@@ -895,6 +886,92 @@ ul{list-style:none;}
 
   <!-- ===== 每日心情（已合并到经期） ===== -->
   <div class="page" id="page-mood"><div style="padding:20px;text-align:center;color:#999;font-size:13px;">点击潮汐日历中的日期即可记录心情 📅</div></div>
+
+  <!-- ===== 设置 ===== -->
+  <div class="page" id="page-settings">
+    <div class="sub-page-header">⚙️ 设置</div>
+    <div class="sub-page-body" style="padding:14px;display:flex;flex-direction:column;gap:12px;overflow-y:auto;">
+
+      <!-- AI主动消息 -->
+      <div class="settings-card">
+        <div class="settings-row">
+          <div class="settings-row-left">
+            <div class="settings-row-title">🤖 AI主动消息</div>
+            <div class="settings-row-desc">AI会在早晨、下雨、久未联系时主动发消息</div>
+          </div>
+          <div class="ios-toggle" id="settingProactiveMsg" onclick="toggleSetting(this,'proactiveMsg')">
+            <div class="ios-toggle-slider"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI自动发朋友圈 -->
+      <div class="settings-card">
+        <div class="settings-row">
+          <div class="settings-row-left">
+            <div class="settings-row-title">🌄 AI自动发朋友圈</div>
+            <div class="settings-row-desc">AI会根据时间和天气自动发朋友圈（每天最多3条）</div>
+          </div>
+          <div class="ios-toggle" id="settingAutoMoments" onclick="toggleSetting(this,'autoMoments')">
+            <div class="ios-toggle-slider"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 通知 -->
+      <div class="settings-card">
+        <div class="settings-row">
+          <div class="settings-row-left">
+            <div class="settings-row-title">🔔 通知</div>
+            <div class="settings-row-desc">后台新消息以系统通知形式推送</div>
+          </div>
+          <div class="ios-toggle" id="settingNotifications" onclick="toggleSetting(this,'notifications')">
+            <div class="ios-toggle-slider"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 角色隐私 -->
+      <div class="settings-card">
+        <div class="settings-row">
+          <div class="settings-row-left">
+            <div class="settings-row-title">🔒 角色隐私 <span style="font-size:10px;color:#ccc;">即将推出</span></div>
+            <div class="settings-row-desc">角色间信息互通控制</div>
+          </div>
+          <div class="ios-toggle" id="settingCharPrivacy" onclick="toggleSetting(this,'charPrivacy')">
+            <div class="ios-toggle-slider"></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="height:1px;background:#eee;margin:4px 0;"></div>
+
+      <!-- API配置 -->
+      <div class="settings-card">
+        <div class="settings-section-title">⚙️ API 配置</div>
+        <div class="persona-field" style="margin-bottom:8px;">
+          <label>API Key</label>
+          <input type="password" id="settingsApiKey" placeholder="sk-xxxxxxxx">
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="persona-save" onclick="saveSettingsApiConfig()" style="flex:1;">💾 保存</button>
+          <button class="persona-save" onclick="testSettingsApiConnection()" style="flex:1;background:#e0e0e0;color:#1e1e1e;">🔌 测试</button>
+        </div>
+      </div>
+
+      <!-- 数据管理 -->
+      <div class="settings-card">
+        <div class="settings-section-title">💾 数据管理</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <button class="persona-save" onclick="exportData()">📤 导出所有数据</button>
+          <button class="persona-save" onclick="document.getElementById('settingsImportInput').click()" style="background:#e0e0e0;color:#1e1e1e;">📥 导入数据</button>
+          <input type="file" id="settingsImportInput" accept=".json" style="display:none;" onchange="importData(event)">
+        </div>
+      </div>
+
+      <div style="font-size:10px;color:#ccc;text-align:center;padding:12px 0;">Phone Companion v3 · 数据仅存储在本地</div>
+    </div>
+  </div>
 
   <!-- ===== 全屏计时器（专注伴伴风格） ===== -->
   <div class="timer-screen" id="timerFullscreen" style="display:none;">
@@ -1007,6 +1084,11 @@ function init() {
   renderConvList();
   renderChat();
   renderIcons();
+  // 首页问候：读取用户本地人设名字，不写死在代码里
+  var greetNameEl = document.getElementById('homeGreetingName');
+  if (greetNameEl && typeof userPersona !== 'undefined' && userPersona && userPersona.name) {
+    greetNameEl.textContent = '，' + userPersona.name;
+  }
   renderSecretCharSwitcher();
   updateCountdown();
   renderSchedule();
@@ -1017,11 +1099,16 @@ function init() {
   renderExpense();
   initRingtone();
   renderCompRecords();
+  // 设置
+  loadSettings();
   // 闹钟检查
   alarmCheckInterval = setInterval(checkAlarms, 30000);
   // 更新上下文
   setInterval(updateChatContext, 30000);
   updateChatContext();
+  // 主动消息 + 自动朋友圈轮询（5分钟）
+  setInterval(checkProactiveConditions, 300000);
+  setTimeout(checkProactiveConditions, 60000);
   // 预加载表情
   preloadEmojiImages();
   // 天气

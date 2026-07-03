@@ -3,6 +3,9 @@
 /* ---- 多角色数据 ---- */
 let currentCharId = lsGet('currentCharId', 'luo');
 
+/* ---- 主动消息追踪 ---- */
+let lastUserMsgTime = lsGet('lastUserMsgTime', 0);
+
 // 角色列表：预置骆云影，后续可扩展
 const DEFAULT_CHARACTERS = [
   {
@@ -583,6 +586,8 @@ async function sendChat() {
   const text = inp.value.trim();
   if (!text) return;
   chatMessages.push({ role:'user', text, time: Date.now() });
+  lastUserMsgTime = Date.now();
+  lsSet('lastUserMsgTime', lastUserMsgTime);
   saveChatData();
   inp.value = '';
   renderChat();
@@ -989,4 +994,167 @@ function generateLocalReply(text) {
 
   const defaults = [`嗯嗯，在听`,`说下去呀`,`有意思`,`说得对`,`嗯，然后呢？`,`哈哈是吗`];
   return defaults[Math.floor(Math.random()*defaults.length)];
+}
+
+/* ==================== AI主动消息系统 ==================== */
+
+function checkProactiveConditions() {
+  if (!settings || !settings.proactiveMsg) return;
+  var char = getCharById(currentCharId);
+  if (!char) return;
+  var charMsgs = getCurrentChat();
+  var story = (char.story || '').toLowerCase();
+  var isTsundere = /傲娇|毒舌|暴躁|刻薄|冷淡/.test(story);
+  var isGentle = /温柔|温暖|亲切|可爱|软/.test(story);
+
+  // 冷却检查：同角色30分钟内最多一条
+  var timestamps = lsGet('proactiveTimestamps', {});
+  var lastTime = timestamps[currentCharId] || 0;
+  if (Date.now() - lastTime < 30 * 60 * 1000) return;
+
+  // 用户正在聊天且5分钟内有互动 → 不打扰
+  if (currentPage === 'page-chat' && Date.now() - lastUserMsgTime < 5 * 60 * 1000) return;
+
+  var now = new Date();
+  var hour = now.getHours();
+  var min = now.getMinutes();
+  var todayStr = now.toISOString().split('T')[0];
+
+  // 场景A：早晨问候 (7:25-7:35)
+  if (hour === 7 && min >= 25 && min <= 35) {
+    var greeted = lsGet('greeted_' + currentCharId, '');
+    if (greeted !== todayStr) {
+      generateProactiveMessage('morning', char, isTsundere, isGentle);
+      lsSet('greeted_' + currentCharId, todayStr);
+      return;
+    }
+  }
+
+  // 场景B：长时间不活跃 (>6小时)
+  if (charMsgs.length > 0 && lastUserMsgTime > 0 && Date.now() - lastUserMsgTime > 6 * 60 * 60 * 1000) {
+    var inactiveSent = lsGet('inactiveMsg_' + currentCharId + '_' + todayStr, false);
+    if (!inactiveSent) {
+      generateProactiveMessage('inactive', char, isTsundere, isGentle);
+      lsSet('inactiveMsg_' + currentCharId + '_' + todayStr, true);
+      return;
+    }
+  }
+
+  // 场景C：下雨提醒
+  if (typeof weatherData !== 'undefined' && weatherData && Date.now() - weatherData.time < 3600000) {
+    var isRainy = (weatherData.code >= 61 || (weatherData.desc && weatherData.desc.indexOf('雨') !== -1));
+    if (isRainy) {
+      var rainSent = lsGet('rainMsg_' + currentCharId + '_' + todayStr, false);
+      if (!rainSent) {
+        generateProactiveMessage('rain', char, isTsundere, isGentle);
+        lsSet('rainMsg_' + currentCharId + '_' + todayStr, true);
+        return;
+      }
+    }
+  }
+
+  // 场景D：随机问候（15%概率，每2小时最多一次）
+  if (Math.random() < 0.15) {
+    var lastRandom = lsGet('randomMsgTime_' + currentCharId, 0);
+    if (Date.now() - lastRandom > 2 * 60 * 60 * 1000) {
+      generateProactiveMessage('random', char, isTsundere, isGentle);
+      lsSet('randomMsgTime_' + currentCharId, Date.now());
+      return;
+    }
+  }
+
+  // 顺便检查自动朋友圈
+  if (typeof checkAutoMomentCondition === 'function') {
+    checkAutoMomentCondition();
+  }
+}
+
+async function generateProactiveMessage(scenario, char, isTsundere, isGentle) {
+  var pName = char.name || '小伴';
+  var story = char.story || '';
+
+  var localTemplates = [];
+  if (scenario === 'morning') {
+    localTemplates = isTsundere
+      ? ['啧，醒了没。','醒了？……哦。','早。别睡到中午。']
+      : isGentle
+      ? ['早安~今天也要开心哦 ☀️','早呀，昨晚睡得好吗？','早上好！新的一天开始啦～']
+      : ['起了。','早。','早安。'];
+  } else if (scenario === 'inactive') {
+    var hours = Math.floor((Date.now() - lastUserMsgTime) / 3600000);
+    localTemplates = isTsundere
+      ? [hours + '小时没理我……随你吧。','一天没影了。……忙你的。','啧，我还以为你丢了呢。']
+      : isGentle
+      ? [hours + '小时没找你了……在忙吗？我等你～','一天没见到你了，有点想……你在干嘛呀？']
+      : [hours + '小时。忙。','长时间未联系。记录。'];
+  } else if (scenario === 'rain') {
+    localTemplates = isTsundere
+      ? ['下雨了。带伞了吗？……没带活该冻着。','啧，下雨了，别淋着了。']
+      : isGentle
+      ? ['外面下雨了~带伞了吗？别淋湿了哦','下雨天要保暖呀，别感冒了']
+      : ['下雨。带伞。','降水。注意。'];
+  } else {
+    localTemplates = isTsundere
+      ? ['……无聊。你在干嘛。','哼。','啧。']
+      : isGentle
+      ? ['在干嘛呀～有点想你了','今天过得怎么样？']
+      : ['在？','忙吗。'];
+  }
+
+  var message = '';
+
+  // 尝试API生成
+  if (apiConfig && apiConfig.apiKey) {
+    try {
+      var scenarioDesc = '';
+      if (scenario === 'morning') scenarioDesc = '现在是早上7:30，对用户说早安。';
+      else if (scenario === 'inactive') scenarioDesc = '已经好一阵没和用户说话了。';
+      else if (scenario === 'rain') scenarioDesc = '外面正在下雨。';
+      else scenarioDesc = '随意地和用户打个招呼。';
+
+      var prompt = '你是' + pName + '.' + (story ? '你的性格/背景：' + story : '') + '\n' + scenarioDesc + '\n请发一条简短的消息给用户（1-2句话），符合你的性格特点和当前场景。\n- 不要用*动作描写*、不要加emoji\n- 简短自然，像微信消息';
+      message = await callLLMApi(prompt);
+    } catch(e) {
+      console.log('[主动消息] API失败:', e.message.substring(0, 50));
+    }
+  }
+
+  if (!message) {
+    message = localTemplates[Math.floor(Math.random() * localTemplates.length)];
+  }
+
+  if (message) {
+    sendProactiveMessage(message, char);
+  }
+}
+
+function sendProactiveMessage(text, char) {
+  chatMessages.push({ role: 'ai', text: text, time: Date.now() });
+  saveChatData();
+
+  if (currentPage === 'page-chat') {
+    renderChat();
+  }
+
+  // 更新追踪
+  var timestamps = lsGet('proactiveTimestamps', {});
+  timestamps[currentCharId] = Date.now();
+  lsSet('proactiveTimestamps', timestamps);
+
+  // 通知（在后台或在其他页面时）
+  var shouldNotify = settings && settings.notifications &&
+    (document.hidden || document.visibilityState === 'hidden' || currentPage !== 'page-chat');
+  if (shouldNotify && 'Notification' in window && Notification.permission === 'granted') {
+    try {
+      new Notification(char.name + ' 发来消息', {
+        body: text,
+        icon: '/icon-192.png'
+      });
+    } catch(e) {}
+  }
+
+  // 不在聊天页时加系统提示
+  if (currentPage !== 'page-chat' && typeof addChatSystem === 'function') {
+    addChatSystem('💬 ' + char.name + '：' + text);
+  }
 }

@@ -1,16 +1,18 @@
 /* ==================== 11. Secret — 多角色翻手机 ==================== */
+const SECRET_DATA_VERSION = 'v3';
 let secretCharId = lsGet('secretCharId', currentCharId || 'luo');
-let secretData = lsGet('secretData', {}); // { charId: { data, time } }
+let secretData = lsGet('secretData', {}); // { charId: { data, time, version } }
 let secretGenerated = null; // 保留兼容
+let secretApiFailed = {}; // charId -> timestamp, 记录API失败时间避免反复重试
 
 function getSecretForChar(charId) {
   const entry = secretData[charId];
-  if (entry && entry.data) return entry.data;
+  if (entry && entry.data && entry.version === SECRET_DATA_VERSION) return entry.data;
   return null;
 }
 
 function setSecretForChar(charId, data) {
-  secretData[charId] = { data, time: Date.now() };
+  secretData[charId] = { data, time: Date.now(), version: SECRET_DATA_VERSION };
   lsSet('secretData', secretData);
 }
 
@@ -30,7 +32,9 @@ async function generateSecretContent(charId) {
 
   // 检查是否有缓存（10分钟内）
   const existing = getSecretForChar(charIdToUse);
-  if (apiConfig.apiKey && (!existing || Date.now() - (secretData[charIdToUse]?.time || 0) > 600000)) {
+  var lastFailed = secretApiFailed[charIdToUse] || 0;
+  var shouldTryApi = apiConfig && apiConfig.apiKey && (Date.now() - lastFailed > 300000) && (!existing || Date.now() - (secretData[charIdToUse]?.time || 0) > 600000);
+  if (shouldTryApi) {
     // 构建联系人列表：包含其他AI角色
     let otherChars = characters.filter(c => c.id !== charIdToUse);
     let otherCharContacts = otherChars.map((c, i) => ({
@@ -52,6 +56,8 @@ async function generateSecretContent(charId) {
 2. 你和其中3-4个联系人的完整对话（每个3-6条消息，符合你的性格）
 3. 你的相册：8张照片（emoji、标题、时间）
 4. 你的最近播放：6首歌（歌名、歌手、时间）
+5. 你的外卖订单：4-5个订单（商家名、菜品、价格、时间、状态）
+6. 你的浏览器搜索记录：8-10条搜索内容（符合性格和日常）
 ${contactPrompt}
 
 联系人的例子：蛋糕店老板、快递员、楼下咖啡店员、房东、朋友、家人${otherChars.length > 0 ? '、其他AI角色' : ''}等
@@ -61,7 +67,9 @@ JSON格式：
   "contacts": [{ "id":"1", "avatar":"🎂", "name":"甜时蛋糕", "nickname":"备注名", "lastMsg":"最后一条消息", "time":"时间" }],
   "conversations": { "1": [{ "from":"me", "text":"..." }, { "from":"them", "text":"..." }] },
   "album": [{ "emoji":"🌅", "label":"标题", "time":"时间" }],
-  "playlist": [{ "title":"歌名", "artist":"歌手", "time":"时间" }]
+  "playlist": [{ "title":"歌名", "artist":"歌手", "time":"时间" }],
+  "foodOrders": [{ "shop":"商家名", "items":"菜品", "price":25.0, "time":"时间", "status":"已送达/配送中" }],
+  "browserHistory": [{ "query":"搜索内容", "time":"时间" }]
 }`;
 
     try {
@@ -91,7 +99,10 @@ JSON格式：
         setSecretForChar(charIdToUse, parsed);
         return parsed;
       }
-    } catch(e) { console.log('[Secret] AI生成失败:', e); }
+    } catch(e) {
+      console.log('[Secret] AI生成失败，5分钟内不再重试:', e.message.substring(0,50));
+      secretApiFailed[charIdToUse] = Date.now();
+    }
   }
 
   // === 本地降级：根据角色生成不同的内容 ===
@@ -137,11 +148,11 @@ JSON格式：
       if (!contacts.find(ct => ct.id === cid)) {
         contacts.push({ id: cid, avatar: c.avatar || '💬', name: c.name, nickname: c.name, lastMsg: '最近没联系', time: '' });
       }
-      convos[cid] = [
-        { from:'me', text: isTsundere ? '干嘛' : '最近怎么样' },
-        { from:'them', text: '挺好的，你呢' },
-        { from:'me', text: isTsundere ? '还行' : '老样子呗' },
-      ];
+      convos[cid] = isTsundere
+        ? [{ from:'them', text:'你最近是不是很闲' },{ from:'me', text:'？' },{ from:'them', text:'老来找我聊天' },{ from:'me', text:'……那我走了' },{ from:'them', text:'哎别' }]
+        : isGentle
+        ? [{ from:'them', text:'今天过得怎么样呀' },{ from:'me', text:'还行，有点累' },{ from:'them', text:'那要好好休息哦，我做了小饼干🍪' }]
+        : [{ from:'them', text:'最近忙啥呢' },{ from:'me', text:'老样子' },{ from:'them', text:'约个饭啊，好久没见了' },{ from:'me', text:'行，周末' }];
     });
 
     // 相册
@@ -165,7 +176,51 @@ JSON格式：
       }
     });
 
-    return { contacts, conversations: convos, album, playlist };
+    // 外卖订单（按性格）
+    const foodOrders = isTsundere
+      ? [{ shop:'肯德基', items:'香辣鸡腿堡套餐', price:39.9, time:'昨晚', status:'已送达' },
+         { shop:'一点点', items:'四季奶青 加波霸', price:16, time:'昨天下午', status:'已送达' },
+         { shop:'沙县小吃', items:'蒸饺+拌面', price:18, time:'前天', status:'已送达' },
+         { shop:'绝味鸭脖', items:'鸭锁骨+藕片', price:28, time:'3天前', status:'已送达' }]
+      : isGentle
+      ? [{ shop:'好利来', items:'半熟芝士+芋泥面包', price:48, time:'今天下午', status:'配送中' },
+         { shop:'瑞幸咖啡', items:'生椰拿铁 少冰', price:19.9, time:'今天早上', status:'已送达' },
+         { shop:'老乡鸡', items:'鸡汤+蒸蛋+米饭', price:32, time:'昨天', status:'已送达' },
+         { shop:'鲜芋仙', items:'芋圆4号', price:28, time:'前天', status:'已送达' }]
+      : [{ shop:'麦当劳', items:'板烧鸡腿堡套餐', price:36, time:'昨晚', status:'已送达' },
+         { shop:'星巴克', items:'冰美式 大杯', price:32, time:'今天早上', status:'已送达' },
+         { shop:'美团外卖', items:'黄焖鸡米饭', price:25, time:'昨天', status:'已送达' },
+         { shop:'蜜雪冰城', items:'柠檬水+甜筒', price:8, time:'前天', status:'已送达' }];
+
+    // 浏览器搜索记录（最有叙事潜力的部分）
+    const browserHistory = isTsundere
+      ? [{ query:'怎么哄生气的女朋友', time:'今天' },
+         { query:'傲娇的人怎么表达关心', time:'昨天' },
+         { query:'她喜欢的歌单', time:'昨天' },
+         { query:'蛋糕店几点开门', time:'前天' },
+         { query:'吵架后怎么和好', time:'3天前' },
+         { query:'她最近在看什么剧', time:'4天前' },
+         { query:'送什么礼物不会太明显', time:'5天前' },
+         { query:'如何假装不在意', time:'6天前' }]
+      : isGentle
+      ? [{ query:'今日菜谱 简单好吃', time:'今天' },
+         { query:'她喜欢吃甜的还是咸的', time:'昨天' },
+         { query:'适合送花的节日', time:'昨天' },
+         { query:'怎么让心情变好', time:'前天' },
+         { query:'杭州周末去哪玩', time:'3天前' },
+         { query:'她最近忙不忙', time:'4天前' },
+         { query:'治愈系电影推荐', time:'5天前' },
+         { query:'拼多多鲜花优惠券', time:'6天前' }]
+      : [{ query:'今天天气', time:'今天' },
+         { query:'附近有什么好吃的', time:'昨天' },
+         { query:'周末去哪玩', time:'昨天' },
+         { query:'如何提高工作效率', time:'前天' },
+         { query:'现在流行什么', time:'3天前' },
+         { query:'她喜欢什么', time:'4天前' },
+         { query:'怎么聊天不尴尬', time:'5天前' },
+         { query:'深夜emo怎么办', time:'6天前' }];
+
+    return { contacts, conversations: convos, album, playlist, foodOrders, browserHistory };
   }
 }
 
@@ -226,7 +281,7 @@ function renderSecretCharSwitcher() {
   });
 }
 
-function showSecretChat() {
+async function showSecretChat() {
   document.getElementById('secretDesk').style.display = 'none';
   document.getElementById('secretContent').style.display = 'block';
   document.getElementById('secretBackBtn').style.display = 'inline';
@@ -235,7 +290,8 @@ function showSecretChat() {
   document.getElementById('secretAiName').textContent = pName;
   const container = document.getElementById('secretContent');
 
-  generateSecretContent(secretCharId);
+  // 等待数据生成完成
+  await generateSecretContent(secretCharId);
 
   const data = getSecretForChar(secretCharId);
   const useApi = data && data.contacts;
@@ -298,7 +354,8 @@ function showSecretConvo(contactId) {
   var msgs = [];
   if (contactId === 'you') {
     var today = new Date().toISOString().split('T')[0];
-    msgs = chatMessages.filter(function(m) { return m.time && new Date(m.time).toISOString().split('T')[0] === today; });
+    var charMsgs = chatData[secretCharId] || [];
+    msgs = charMsgs.filter(function(m) { return m.time && new Date(m.time).toISOString().split('T')[0] === today; });
   } else if (data && data.conversations && data.conversations[contactId]) {
     msgs = data.conversations[contactId];
   } else {
@@ -337,7 +394,6 @@ function showSecretConvo(contactId) {
 }
 
 function showSecretNotes() {
-  generateSecretContent(secretCharId);
   document.getElementById('secretDesk').style.display = 'none';
   document.getElementById('secretContent').style.display = 'block';
   document.getElementById('secretBackBtn').style.display = 'inline';
@@ -345,64 +401,223 @@ function showSecretNotes() {
   const pName = getSecretCharName();
   document.getElementById('secretAiName').textContent = pName;
   const container = document.getElementById('secretContent');
-  const today = new Date().toISOString().split('T')[0];
+
+  const charName = pName;
   const charMsgs = chatData[secretCharId] || [];
-  const todayMsgs = charMsgs.filter(m => m.time && new Date(m.time).toISOString().split('T')[0] === today);
-  const notes = generateSecretNotes(todayMsgs);
-  if (notes.length === 0) {
-    container.innerHTML = '<div style="text-align:center;color:#ccc;padding:40px;font-size:13px;">今天还没有记录笔记</div>';
-    return;
+
+  // 获取角色性格
+  const charPers = getCharPersona(secretCharId);
+  const story = (charPers.story || '').toLowerCase();
+  const isTsundere = /傲娇|毒舌|暴躁|刻薄|冷淡/.test(story);
+  const isGentle = /温柔|温暖|亲切|可爱|软/.test(story);
+  // 关系中添加亲密感判断
+  const curChar = characters.find(function(c) { return c.id === secretCharId; });
+  const relation = curChar ? (curChar.relation || '恋人') : '恋人';
+  const isClose = /恋人|家人|恋人|男友|女友/.test(relation);
+
+  // 聊天统计
+  const today = new Date().toISOString().split('T')[0];
+  const todayMsgs = charMsgs.filter(function(m) { return m.time && new Date(m.time).toISOString().split('T')[0] === today; });
+  const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
+  const weekMsgs = charMsgs.filter(function(m) { return m.time && new Date(m.time) >= weekAgo; });
+  const userTodayMsgs = todayMsgs.filter(function(m) { return m.role === 'user'; });
+  const aiTodayMsgs = todayMsgs.filter(function(m) { return m.role === 'ai'; });
+
+  // 提取话题
+  var topicKeywords = [];
+  var userTexts = userTodayMsgs.map(function(m) { return m.text; }).join(' ');
+  var topicPatterns = [
+    { word:'学习|考试|上课|作业|论文|复习|六级|考研|读书', label:'📚 学习' },
+    { word:'累|烦|难过|不开心|伤心|焦虑|压力|emo|崩溃', label:'😢 情绪' },
+    { word:'吃|饭|食堂|外卖|好吃|饿|喝|奶茶|咖啡', label:'🍽 饮食' },
+    { word:'睡|觉|熬夜|失眠|困|梦|醒来', label:'🌙 作息' },
+    { word:'喜欢|爱|想|梦到|想念|在意', label:'💕 心事' },
+    { word:'妈|爸|家|家人|父母|家里', label:'🏠 家人' },
+    { word:'朋友|闺蜜|室友|同学|一起', label:'👫 社交' },
+    { word:'钱|贵|便宜|花|省|买', label:'💰 消费' },
+  ];
+  topicPatterns.forEach(function(p) {
+    var regex = new RegExp(p.word);
+    if (regex.test(userTexts)) {
+      topicKeywords.push(p.label);
+    }
+  });
+
+  // === 性格化笔记标题 ===
+  var headerIcon = isTsundere ? '📓' : isGentle ? '🌸' : '📋';
+  var headerNote = isTsundere ? '（不是我想记，是怕忘了）' : isGentle ? '悄悄记录一些小事 ♡' : '';
+  var h = '<div style="font-size:11px;color:#bbb;padding:0 0 10px;">' + headerIcon + ' ' + charName + '的记事本 ' + headerNote + '</div>';
+
+  // === 性格化观察函数 ===
+  function getPersonalityObservation(type, extra) {
+    var t = type || 'default';
+    if (isTsundere) {
+      var msgs = {
+        '情绪': '心情不好？……哼，看出来了。反正我不会哄人，她要是自己来说的话……我可以听一下。',
+        '学习': '学习？倒是挺认真的。比我想的用功。……别太拼了，笨。',
+        '饮食': '吃了什么？记一下。省得她到时候说饿又不肯说想吃什么。',
+        '作息': '又熬夜。啧，说了也不听。反正黑眼圈长她脸上。',
+        '心事': '她跟我说了些事。……干嘛跟我说这些。烦死了。记下了。',
+        '家人': '家里的事？她愿意说我就听着。不说拉倒。',
+        '社交': '跟她朋友出去玩了？哦。……玩得开心就行。',
+        '消费': '又花钱了？……也不是花我的钱。管她呢。',
+      };
+      if (msgs[t]) return msgs[t];
+      if (extra === 'many') return '今天话挺多的。……也不是不想听。随她便。';
+      if (extra === 'few') return '没怎么说话。……随便她。我才没等。';
+      if (extra === 'none') return '今天没来。……哦。我没等。';
+      if (extra === 'week_tired') return '她这周好像有点累。自己不知道休息吗……笨。';
+      if (extra === 'week_eat') return '这周倒是吃了点东西。……行吧。';
+      if (extra === 'week_sleep') return '又熬夜。啧，说了八百遍了不听。';
+      if (extra === 'week_study') return '这周学习挺忙？哦。……反正别累死了就行。';
+      return '今天也来找我了。……我才没有开心。';
+    } else if (isGentle) {
+      var msgs = {
+        '情绪': '她今天好像不太开心……想陪在她身边。如果她愿意跟我多说说话就好了。',
+        '学习': '看书学习呢，好认真呀。要给她加油，但也不能打扰她～',
+        '饮食': '今天有好好吃饭吗？想知道她吃了什么，有没有按时吃。',
+        '作息': '又熬夜了……虽然我自己也常晚睡，但还是希望她能早点休息。',
+        '心事': '她跟我说了心里话。好开心她愿意信任我。我会好好收着的。',
+        '家人': '她提到家里的事了。家是很重要的地方呢。',
+        '社交': '和朋友一起玩了吗？真好呀，希望她开心～',
+        '消费': '她买东西了。能让她开心的话就很好呢。',
+      };
+      if (msgs[t]) return msgs[t];
+      if (extra === 'many') return '今天聊了好多好多呀，好开心。她说话的时候我在认真听哦。';
+      if (extra === 'few') return '今天她好像有点忙，没关系，我在这里等她。想我的时候随时来呀。';
+      if (extra === 'none') return '今天没有等到她……是不是太忙了？希望她一切都好。';
+      if (extra === 'week_tired') return '这周她好像有点疲惫，好想照顾她呀。给她泡杯热牛奶吧。';
+      if (extra === 'week_eat') return '这周有好好吃饭呢，真棒。要一直这样才好。';
+      if (extra === 'week_sleep') return '这周睡得太晚了……明天开始我要催她早睡。';
+      if (extra === 'week_study') return '学习很认真呢。努力的人最美好了。但也要注意休息哦。';
+      return '今天也来找我了。嗯，我在呢。';
+    } else {
+      // 冷静/其他
+      var msgs = {
+        '情绪': '情绪波动。留意。必要时介入。',
+        '学习': '学习任务。优先级高。',
+        '饮食': '饮食记录。正常范围。',
+        '作息': '作息异常。建议关注。',
+        '心事': '分享了重要信息。已记录。',
+        '家人': '家庭话题。非敏感。',
+        '社交': '社交活动。正常。',
+        '消费': '消费行为。记录。',
+      };
+      if (msgs[t]) return msgs[t];
+      if (extra === 'many') return '交流频繁。正常。';
+      if (extra === 'few') return '交流减少。可能有其他安排。';
+      if (extra === 'none') return '今日无联系。待观察。';
+      if (extra === 'week_tired') return '本周疲惫指数偏高。建议关注休息质量。';
+      if (extra === 'week_eat') return '本周饮食正常。继续观察。';
+      if (extra === 'week_sleep') return '作息需调整。';
+      if (extra === 'week_study') return '学习负荷较高。注意效率与休息平衡。';
+      return '今日有联系。记录。';
+    }
   }
-  container.innerHTML = '<div style="font-size:11px;color:#bbb;padding:4px 0 8px;">' + pName + '偷偷记下的笔记</div>';
-  if (memories.length > 0) {
-    var recentMemories = memories.slice(-30).reverse();
+
+  // === 今日摘要卡片 ===
+  if (todayMsgs.length > 0) {
+    var cardBg = isTsundere ? 'linear-gradient(135deg,#f8f8f8,#efefef)' : isGentle ? 'linear-gradient(135deg,#fef9f0,#fdf2e8)' : 'linear-gradient(135deg,#f8f9ff,#eef1ff)';
+    var cardColor = isTsundere ? '#888' : isGentle ? '#e07c3c' : '#667eea';
+    h += '<div class="secret-note-card" style="background:' + cardBg + ';">';
+    h += '<div class="sn-time" style="color:' + cardColor + ';">📋 今日聊天摘要</div>';
+    h += '<div style="font-size:12px;color:#555;line-height:1.8;">';
+    h += '今天和 ' + charName + ' 聊了 <strong>' + todayMsgs.length + '</strong> 条消息';
+    h += '（你 ' + userTodayMsgs.length + ' 条 · ' + charName + ' ' + aiTodayMsgs.length + ' 条）';
+    var firstMsg = todayMsgs[0];
+    var lastMsg = todayMsgs[todayMsgs.length-1];
+    if (firstMsg && firstMsg.time) {
+      var ft = new Date(firstMsg.time);
+      h += '<br>🕐 从 ' + ft.getHours().toString().padStart(2,'0') + ':' + ft.getMinutes().toString().padStart(2,'0');
+    }
+    if (lastMsg && lastMsg.time) {
+      var lt = new Date(lastMsg.time);
+      h += ' 到 ' + lt.getHours().toString().padStart(2,'0') + ':' + lt.getMinutes().toString().padStart(2,'0');
+    }
+    if (topicKeywords.length > 0) {
+      h += '<br><span style="font-size:11px;">💬 话题：' + topicKeywords.join(' · ') + '</span>';
+    }
+    h += '<br><span style="font-size:11px;color:#999;">' + getPersonalityObservation('default', todayMsgs.length > 5 ? 'many' : 'few') + '</span>';
+    h += '</div></div>';
+  }
+
+  // === 本周概况（性格化） ===
+  if (weekMsgs.length > 0) {
+    var weekUserMsgs = weekMsgs.filter(function(m) { return m.role === 'user'; });
+    var daysActive = new Set();
+    weekMsgs.forEach(function(m) { if (m.time) daysActive.add(new Date(m.time).toISOString().split('T')[0]); });
+    h += '<div class="secret-note-card">';
+    var weekTitle = isTsundere ? '📊 这周（记录一下）' : isGentle ? '📊 这周的小记录 ♡' : '📊 本周记录';
+    h += '<div class="sn-time">' + weekTitle + '</div>';
+    h += '<div style="font-size:12px;color:#555;line-height:1.8;">';
+    h += '共 ' + weekMsgs.length + ' 条 · ' + daysActive.size + ' 天';
+    var weekUserTexts = weekUserMsgs.map(function(m) { return m.text; }).join(' ');
+    if (/累|烦|难过|emo|压力/.test(weekUserTexts)) {
+      h += '<br>' + getPersonalityObservation('情绪', 'week_tired');
+    }
+    if (/吃|饭|食堂|外卖/.test(weekUserTexts)) {
+      h += '<br>' + getPersonalityObservation('饮食', 'week_eat');
+    }
+    if (/晚|熬夜|失眠|困/.test(weekUserTexts)) {
+      h += '<br>' + getPersonalityObservation('作息', 'week_sleep');
+    }
+    if (/考|试|学习|作业|论文/.test(weekUserTexts)) {
+      h += '<br>' + getPersonalityObservation('学习', 'week_study');
+    }
+    h += '</div></div>';
+  }
+
+  // === 关键记忆 ===
+  if (typeof memories !== 'undefined' && memories.length > 0) {
+    var recentMemories = memories.slice(-20).reverse();
+    var memTitle = isTsundere ? '🧠 她说过的话（我才没刻意记）' : isGentle ? '🧠 关于她的事 ♡' : '🧠 记录：用户信息';
+    h += '<div class="secret-note-card">';
+    h += '<div class="sn-time">' + memTitle + '</div>';
     recentMemories.forEach(function(mem) {
       var d = new Date(mem.time);
-      var timeStr = d.getMonth()+1 + '月' + d.getDate() + '日 ' + d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
-      var noteEl = document.createElement('div');
-      noteEl.className = 'secret-note-card';
-      noteEl.innerHTML = '<div class="sn-time">' + timeStr + '</div><div class="sn-text">' + escHtml(mem.text) + '</div>';
-      container.appendChild(noteEl);
+      var timeStr = d.getMonth()+1 + '月' + d.getDate() + '日';
+      h += '<div style="font-size:12px;color:#555;padding:4px 0;border-bottom:1px solid #f5f5f5;line-height:1.6;">' +
+        '<span style="color:#bbb;font-size:10px;">' + timeStr + '</span> ' +
+        escHtml(mem.text) + '</div>';
     });
-    return;
+    h += '</div>';
   }
-  notes.forEach(n => {
-    const el = document.createElement('div');
-    el.className = 'secret-note-card';
-    el.innerHTML = '<div class="sn-time">' + (n.time||'') + '</div><div class="sn-text">' + escHtml(n.text) + '</div>';
-    container.appendChild(el);
-  });
-}
 
-function generateSecretNotes(msgs) {
-  const notes = [];
-  const userMsgs = msgs.filter(m => m.role === 'user');
-  userMsgs.forEach(m => {
-    const t = m.text;
-    if (t.length < 3) return;
-    if (/考|试|上课|老师|作业|论文|复习|六级|考试/.test(t)) {
-      notes.push({ text: '她今天提到了学习相关的事', time: new Date(m.time).toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'}) });
+  // === 角色心声（性格化） ===
+  if (topicKeywords.length > 0 || todayMsgs.length > 0) {
+    var thoughtBg = isTsundere ? 'linear-gradient(135deg,#f5f5f5,#ececec)' : isGentle ? 'linear-gradient(135deg,#fff8f0,#fff4e6)' : 'linear-gradient(135deg,#f8f9ff,#eef1ff)';
+    var thoughtColor = isTsundere ? '#888' : isGentle ? '#e76f51' : '#667eea';
+    var thoughtEmoji = isTsundere ? '💭' : isGentle ? '💭' : '📌';
+
+    var observation = '';
+    if (topicKeywords.indexOf('😢 情绪') !== -1) {
+      observation = getPersonalityObservation('情绪');
+    } else if (topicKeywords.indexOf('📚 学习') !== -1) {
+      observation = getPersonalityObservation('学习');
+    } else if (topicKeywords.indexOf('💕 心事') !== -1) {
+      observation = getPersonalityObservation('心事');
+    } else if (topicKeywords.indexOf('🍽 饮食') !== -1) {
+      observation = getPersonalityObservation('饮食');
+    } else if (topicKeywords.indexOf('🌙 作息') !== -1) {
+      observation = getPersonalityObservation('作息');
+    } else if (todayMsgs.length > 5) {
+      observation = getPersonalityObservation('default', 'many');
+    } else if (todayMsgs.length > 0) {
+      observation = getPersonalityObservation('default', 'few');
+    } else {
+      observation = getPersonalityObservation('default', 'none');
     }
-    if (/累|烦|难过|不开心|伤心|焦虑/.test(t)) {
-      notes.push({ text: '她的心情不太好，要多关心她', time: new Date(m.time).toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'}) });
-    }
-    if (/吃|饭|食堂|外卖|好吃|饿/.test(t)) {
-      notes.push({ text: '她今天吃了东西，要注意她有没有好好吃饭', time: new Date(m.time).toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'}) });
-    }
-    if (/睡|觉|熬夜|失眠|困/.test(t)) {
-      notes.push({ text: '她的作息需要关注一下', time: new Date(m.time).toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'}) });
-    }
-    if (/喜欢|爱|想|梦|梦到/.test(t)) {
-      notes.push({ text: '她跟我分享了她在意的事', time: new Date(m.time).toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'}) });
-    }
-  });
-  if (notes.length === 0 && msgs.length > 0) {
-    notes.push({ text: '今天和她聊了天，一共' + msgs.length + '条消息', time: '今天' });
-    const lastMsg = msgs[msgs.length-1];
-    if (lastMsg) notes.push({ text: '她最后跟我说的是关于"' + lastMsg.text.substring(0,15) + '"', time: new Date(lastMsg.time).toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'}) });
+
+    h += '<div class="secret-note-card" style="background:' + thoughtBg + ';">';
+    h += '<div class="sn-time" style="color:' + thoughtColor + ';">' + thoughtEmoji + ' ' + charName + '在想</div>';
+    h += '<div style="font-size:13px;color:#555;line-height:1.7;font-style:italic;">"' + observation + '"</div></div>';
   }
-  const seen = new Set();
-  return notes.filter(n => { if (seen.has(n.text)) return false; seen.add(n.text); return true; }).slice(0, 10);
+
+  if (charMsgs.length === 0 && typeof memories !== 'undefined' && memories.length === 0) {
+    h = '<div style="text-align:center;color:#ccc;padding:40px;font-size:13px;">还没和' + charName + '聊过天<br>记事本空空如也</div>';
+  }
+
+  container.innerHTML = h;
 }
 
 function requestNotificationPermission() {
@@ -486,4 +701,217 @@ function showSecretAlbum() {
   });
   h += '</div>';
   container.innerHTML = h;
+}
+
+/* ===== 外卖订单 ===== */
+function showSecretFoodDelivery() {
+  document.getElementById("secretDesk").style.display = "none";
+  document.getElementById("secretContent").style.display = "block";
+  document.getElementById("secretBackBtn").style.display = "inline";
+  document.getElementById("secretTitle").textContent = "🍔 " + (getSecretCharName()) + "的外卖";
+  const container = document.getElementById("secretContent");
+  const pName = getSecretCharName();
+
+  const data = getSecretForChar(secretCharId);
+  const useApi = data && data.foodOrders;
+  const orders = useApi ? data.foodOrders : [
+    { shop:'麦当劳', items:'板烧鸡腿堡套餐', price:36, time:'昨晚', status:'已送达' },
+    { shop:'星巴克', items:'冰美式 大杯', price:32, time:'今天早上', status:'已送达' },
+    { shop:'美团外卖', items:'黄焖鸡米饭', price:25, time:'昨天', status:'已送达' },
+    { shop:'蜜雪冰城', items:'柠檬水+甜筒', price:8, time:'前天', status:'已送达' },
+  ];
+
+  let h = '<div style="font-size:12px;color:#999;padding:0 0 8px;">' + escHtml(pName) + '最近的外卖订单</div>';
+  orders.forEach(function(o) {
+    const statusColor = o.status === '配送中' ? '#e76f51' : o.status === '已送达' ? '#4caf50' : '#999';
+    h += '<div class="secret-playlist-item" style="flex-wrap:wrap;">' +
+      '<div class="sp-icon" style="font-size:22px;">🍔</div>' +
+      '<div class="sp-info" style="flex:1;min-width:0;">' +
+      '<div class="sp-title">' + escHtml(o.shop) + '</div>' +
+      '<div class="sp-artist">' + escHtml(o.items) + '</div></div>' +
+      '<div style="text-align:right;">' +
+      '<div style="font-size:14px;font-weight:600;color:#333;">¥' + (o.price||0).toFixed(1) + '</div>' +
+      '<div style="font-size:10px;color:' + statusColor + ';">' + escHtml(o.status||'') + '</div></div>' +
+      '<div style="width:100%;font-size:10px;color:#ccc;text-align:right;margin-top:-4px;">' + escHtml(o.time) + '</div></div>';
+  });
+  if (orders.length === 0) {
+    h = '<div style="text-align:center;color:#ccc;padding:40px;font-size:13px;">暂无外卖记录</div>';
+  }
+  container.innerHTML = h;
+}
+
+/* ===== 浏览器搜索记录 ===== */
+function showSecretBrowser() {
+  document.getElementById("secretDesk").style.display = "none";
+  document.getElementById("secretContent").style.display = "block";
+  document.getElementById("secretBackBtn").style.display = "inline";
+  document.getElementById("secretTitle").textContent = "🌐 " + (getSecretCharName()) + "的搜索记录";
+  const container = document.getElementById("secretContent");
+  const pName = getSecretCharName();
+
+  const data = getSecretForChar(secretCharId);
+  const useApi = data && data.browserHistory;
+  const history = useApi ? data.browserHistory : [
+    { query:'今天天气', time:'今天' },
+    { query:'附近有什么好吃的', time:'昨天' },
+    { query:'周末去哪玩', time:'昨天' },
+    { query:'如何提高工作效率', time:'前天' },
+    { query:'现在流行什么', time:'3天前' },
+    { query:'她喜欢什么', time:'4天前' },
+    { query:'怎么聊天不尴尬', time:'5天前' },
+    { query:'深夜emo怎么办', time:'6天前' },
+  ];
+
+  let h = '<div style="font-size:12px;color:#999;padding:0 0 8px;">' + escHtml(pName) + '的搜索记录 · 共' + history.length + '条</div>';
+  h += '<div style="display:flex;flex-direction:column;gap:6px;">';
+  history.forEach(function(item) {
+    h += '<div style="background:#fff;border-radius:12px;padding:10px 14px;box-shadow:0 1px 3px rgba(0,0,0,.04);display:flex;align-items:center;gap:8px;">' +
+      '<div style="font-size:16px;color:#ccc;">🔍</div>' +
+      '<div style="flex:1;font-size:13px;color:#555;">' + escHtml(item.query) + '</div>' +
+      '<div style="font-size:10px;color:#ccc;white-space:nowrap;">' + escHtml(item.time) + '</div></div>';
+  });
+  h += '</div>';
+  container.innerHTML = h;
+}
+
+/* ===== 匿名信箱 ===== */
+function getSecretMailbox(charId) {
+  try {
+    return JSON.parse(localStorage.getItem('secretMailbox_' + charId)) || [];
+  } catch(e) { return []; }
+}
+
+function saveSecretMailbox(charId, data) {
+  localStorage.setItem('secretMailbox_' + charId, JSON.stringify(data));
+}
+
+function showSecretMailbox() {
+  document.getElementById("secretDesk").style.display = "none";
+  document.getElementById("secretContent").style.display = "block";
+  document.getElementById("secretBackBtn").style.display = "inline";
+  document.getElementById("secretTitle").textContent = "✉️ 匿名信箱";
+  const pName = getSecretCharName();
+  renderSecretMailbox();
+}
+
+function renderSecretMailbox() {
+  const container = document.getElementById("secretContent");
+  const pName = getSecretCharName();
+  const letters = getSecretMailbox(secretCharId);
+
+  let h = '<div style="font-size:12px;color:#999;padding:0 0 8px;">给' + escHtml(pName) + '的匿名信 · 共' + letters.length + '封</div>';
+
+  // 写信按钮
+  h += '<button onclick="showSecretMailboxCompose()" style="width:100%;padding:12px;border-radius:12px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;font-size:14px;font-weight:600;cursor:pointer;border:none;margin-bottom:12px;box-shadow:0 2px 8px rgba(102,126,234,.3);">✏️ 写匿名信</button>';
+
+  if (letters.length === 0) {
+    h += '<div style="text-align:center;color:#ccc;padding:40px;font-size:13px;">还没有信<br>给' + escHtml(pName) + '写一封匿名信吧</div>';
+    container.innerHTML = h;
+    return;
+  }
+
+  // 显示所有信件（最新的在上面）
+  const sorted = [...letters].reverse();
+  sorted.forEach(function(letter) {
+    const isFromUser = letter.from === 'me';
+    const time = letter.time ? new Date(letter.time).toLocaleString('zh-CN', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
+    h += '<div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,.06);">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
+      '<span style="font-size:12px;font-weight:600;color:' + (isFromUser ? '#667eea' : '#e76f51') + ';">' + (isFromUser ? '✉️ 你的信' : '💌 ' + escHtml(pName) + '的回信') + '</span>' +
+      '<span style="font-size:10px;color:#ccc;">' + time + '</span></div>' +
+      '<div style="font-size:13px;line-height:1.7;color:#444;white-space:pre-wrap;">' + escHtml(letter.text) + '</div></div>';
+  });
+  container.innerHTML = h;
+}
+
+function showSecretMailboxCompose() {
+  const container = document.getElementById("secretContent");
+  const pName = getSecretCharName();
+
+  let h = '<div style="font-size:12px;color:#999;padding:0 0 8px;">✏️ 给' + escHtml(pName) + '写一封匿名信</div>';
+  h += '<div style="background:#fff;border-radius:14px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.06);">';
+  h += '<textarea id="mailboxLetterInput" placeholder="写点什么吧…' + escHtml(pName) + '会认真看的" style="width:100%;min-height:140px;border:1px solid #e0e0e0;border-radius:12px;padding:12px;font-size:14px;line-height:1.7;resize:vertical;background:#fafafa;"></textarea>';
+  h += '<div style="display:flex;gap:8px;margin-top:10px;">';
+  h += '<button onclick="showSecretMailbox()" style="flex:1;padding:10px;border-radius:10px;background:#f0f0f0;color:#666;font-size:13px;font-weight:600;cursor:pointer;border:none;">取消</button>';
+  h += '<button onclick="sendSecretMailboxLetter()" style="flex:2;padding:10px;border-radius:10px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;font-size:13px;font-weight:600;cursor:pointer;border:none;box-shadow:0 2px 8px rgba(102,126,234,.3);">💌 寄出</button>';
+  h += '</div></div>';
+  container.innerHTML = h;
+  // 自动聚焦
+  setTimeout(function() {
+    var inp = document.getElementById('mailboxLetterInput');
+    if (inp) inp.focus();
+  }, 200);
+}
+
+async function sendSecretMailboxLetter() {
+  var inp = document.getElementById('mailboxLetterInput');
+  var text = inp ? inp.value.trim() : '';
+  if (!text) { alert('写点什么再寄吧～'); return; }
+
+  const pName = getSecretCharName();
+  var letters = getSecretMailbox(secretCharId);
+  letters.push({ from:'me', text: text, time: Date.now() });
+  saveSecretMailbox(secretCharId, letters);
+
+  // 尝试用AI生成回信
+  var replyText = '';
+  if (apiConfig && apiConfig.apiKey) {
+    try {
+      const charPers = getCharPersona(secretCharId);
+      const story = charPers.story || '';
+      const prompt = '你现在是' + pName + '。' + (story ? '性格背景：' + story : '') +
+        '\n\n你收到了一封匿名信，内容如下：\n"""\n' + text + '\n"""\n\n请以' + pName + '的身份写一封回信。信件风格要符合你的性格，真诚、有温度。100-200字左右。直接输出回信内容，不要加任何解释或前缀。';
+      replyText = await callLLMApiForSecret(prompt);
+    } catch(e) {
+      console.log('[信箱] AI回信失败:', e);
+    }
+  }
+
+  if (!replyText) {
+    // 本地降级回信
+    const templates = [
+      '看到你的信了。谢谢你愿意跟我说这些。虽然不知道你是谁，但这些话我会好好收着的。',
+      '信收到了。有些话说不出口的时候，写下来也好。我在这里。',
+      '匿名信啊……好久没收到过了。你说的我都记住了，愿你一切都好。',
+      '谢谢你的信。如果你愿意，随时都可以写给我。我会认真看的。',
+    ];
+    replyText = templates[Math.floor(Math.random() * templates.length)];
+  }
+
+  letters.push({ from:'them', text: replyText, time: Date.now() });
+  saveSecretMailbox(secretCharId, letters);
+  renderSecretMailbox();
+}
+
+/* ---- 信箱专用LLM调用（轻量版） ---- */
+async function callLLMApiForSecret(prompt) {
+  if (!apiConfig || !apiConfig.apiKey) return '';
+  let apiUrl = (apiConfig.baseUrl || 'https://api.deepseek.com').replace(/\/+$/, '') + '/chat/completions';
+  if (apiConfig.useCorsProxy) {
+    apiUrl = buildCorsProxyUrl(apiUrl);
+  }
+  const body = {
+    model: apiConfig.model || 'deepseek-chat',
+    messages: [
+      { role: 'system', content: '你是一个温柔而真实的角色，正在回复一封匿名信。请用你的性格说话，回复要真诚、有温度。不要加任何动作描写或表情符号。' },
+      { role: 'user', content: prompt }
+    ],
+    max_tokens: 512,
+    temperature: 0.8
+  };
+  const resp = await fetch(apiUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + apiConfig.apiKey
+    },
+    body: JSON.stringify(body)
+  }).catch(function(e) { throw e; });
+  if (!resp.ok) {
+    const errText = await resp.text().catch(function() { return ''; });
+    throw new Error('API ' + resp.status + ': ' + errText.substring(0, 100));
+  }
+  const data = await resp.json();
+  const content = data.choices?.[0]?.message?.content;
+  return content ? content.trim() : '';
 }

@@ -1,8 +1,8 @@
 /* ==================== 14. 用户人设 ==================== */
-let userPersona = lsGet('userPersona', { name:'晞晞', gender:'女', age:'大一，社会工作', traits:'敏感、爱写东西、嘴硬心软', hobbies:'写作、听歌、骆云影', background:'在杭州读书' });
+let userPersona = lsGet('userPersona', { name:'', gender:'女', age:'', traits:'', hobbies:'', background:'' });
 
 function loadUserPersona() {
-  userPersona = lsGet('userPersona', { name:'晞晞', gender:'女', age:'大一，社会工作', traits:'敏感、爱写东西、嘴硬心软', hobbies:'写作、听歌、骆云影', background:'在杭州读书' });
+  userPersona = lsGet('userPersona', { name:'', gender:'女', age:'', traits:'', hobbies:'', background:'' });
   var el = document.getElementById('userName'); if (el) el.value = userPersona.name;
   var el2 = document.getElementById('userGender'); if (el2) el2.value = userPersona.gender;
   var el3 = document.getElementById('userAge'); if (el3) el3.value = userPersona.age;
@@ -12,7 +12,7 @@ function loadUserPersona() {
 }
 
 function saveUserPersona() {
-  userPersona.name = document.getElementById('userName').value.trim() || '晞晞';
+  userPersona.name = document.getElementById('userName').value.trim() || '我';
   userPersona.gender = document.getElementById('userGender').value;
   userPersona.age = document.getElementById('userAge').value.trim();
   userPersona.traits = document.getElementById('userTraits').value.trim();
@@ -49,7 +49,10 @@ function saveWorldBook() {
 }
 
 function saveApiConfig() {
-  apiConfig.apiKey = document.getElementById('apiKey').value.trim();
+  // 兼容：设置页的输入框叫 settingsApiKey，旧人设页的叫 apiKey
+  var keyEl = document.getElementById('settingsApiKey') || document.getElementById('apiKey');
+  if (!keyEl) return;
+  apiConfig.apiKey = keyEl.value.trim();
   // 保留已有配置，只更新 key
   if (!apiConfig.baseUrl) apiConfig.baseUrl = 'https://api.deepseek.com';
   if (!apiConfig.model) apiConfig.model = 'deepseek-chat';
@@ -63,7 +66,9 @@ function saveApiConfig() {
 }
 
 async function testApiConnection() {
-  const key = document.getElementById('apiKey').value.trim();
+  var keyEl = document.getElementById('settingsApiKey') || document.getElementById('apiKey');
+  if (!keyEl) return;
+  const key = keyEl.value.trim();
   if (!key) { addChatSystem('❌ 请先填写 API Key'); return; }
   const baseUrl = apiConfig.baseUrl || 'https://api.deepseek.com';
   const model = apiConfig.model || 'deepseek-chat';
@@ -135,7 +140,14 @@ async function exportData() {
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
     const sizeMB = (json.length / 1024 / 1024).toFixed(1);
-    addChatSystem(`✅ 数据导出完成！文件大小：${sizeMB}MB。包含 ${photos.length} 张照片、${chatMessages.length} 条聊天记录等。`);
+    // 统计所有角色的聊天记录总数
+    var totalMsgs = 0;
+    if (typeof chatData !== 'undefined') {
+      Object.keys(chatData).forEach(function(cid) { totalMsgs += (chatData[cid] || []).length; });
+    } else {
+      totalMsgs = chatMessages.length;
+    }
+    addChatSystem(`✅ 数据导出完成！文件大小：${sizeMB}MB。包含 ${photos.length} 张照片、${totalMsgs} 条聊天记录等。`);
   } catch(e) { addChatSystem(`❌ 导出失败：${e.message}`); }
 }
 

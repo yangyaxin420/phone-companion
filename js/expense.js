@@ -128,6 +128,8 @@ function switchExpenseTab(tab) {
   } else {
     document.getElementById('expenseListArea').style.display = 'block';
     document.getElementById('expenseStatsArea').style.display = 'none';
+    // 切换类型时也更新表单的分类按钮
+    expSetType(tab);
     renderExpenseList(tab);
   }
 }
@@ -248,8 +250,7 @@ function addExpense() {
   const amount = parseFloat(document.getElementById('expAmount').value);
   if (!amount || amount <= 0) { alert('请输入有效金额'); return; }
   const date = document.getElementById('expDate').value || new Date().toISOString().split('T')[0];
-  const typeSel = document.getElementById('expDetailType');
-  const recordType = typeSel ? typeSel.value : expType;
+  const recordType = expType; // 直接用当前选中的类型
   const selectedCat = document.getElementById('expCatGrid').querySelector('.expense-cat-btn.selected');
   const category = selectedCat ? selectedCat.textContent : '其他';
   const note = document.getElementById('expNote').value.trim();
@@ -259,7 +260,7 @@ function addExpense() {
   document.getElementById('expAmount').value = '';
   document.getElementById('expNote').value = '';
   renderExpense();
-  addChatSystem('💰 已记录' + (expType==='expense'?'支出':'收入') + '：' + category + ' ' + amount.toFixed(2) + '元' + (note?' ('+note+')':''));
+  addChatSystem('💰 已记录' + (recordType==='expense'?'支出':'收入') + '：' + category + ' ' + amount.toFixed(2) + '元' + (note?' ('+note+')':''));
 }
 
 function getExpRecords() { try { var r = JSON.parse(localStorage.getItem('expense_records')) || []; var changed = false; r.forEach(function(rec, i) { if (!rec.id) { rec.id = Date.now() + '_' + Math.random().toString(36).slice(2,8); changed = true; } }); if (changed) localStorage.setItem('expense_records', JSON.stringify(r)); return r; } catch(e) { return []; } }

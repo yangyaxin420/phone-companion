@@ -6,7 +6,8 @@ const ICONS = [
   { id:'secret',   symbol:'◎', name:'Secret',page:'page-secret' },
   { id:'expense',  symbol:'￥', name:'记账',  page:'page-expense' },
   { id:'tide',     symbol:'☽', name:'潮汐',  page:'page-tide' },
-  { id:'persona',  symbol:'≡', name:'人设',  page:'page-persona' }
+  { id:'persona',  symbol:'≡', name:'人设',  page:'page-persona' },
+  { id:'settings', symbol:'⚙', name:'设置',  page:'page-settings' }
 ];
 
 const COMPANION_ACTIVITIES = [
@@ -62,6 +63,7 @@ function navigateTo(pageId, skipAnim) {
   if (pageId === 'page-secret') showSecretDesk();
   if (pageId === 'page-expense') renderExpenseCats();
   if (pageId === 'page-persona') loadUserPersona();
+  if (pageId === 'page-settings') loadSettings();
   const emojiPanel = document.getElementById('emojiPanel');
   if (emojiPanel) emojiPanel.classList.remove('show');
   updateNav();

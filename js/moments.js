@@ -190,7 +190,114 @@ async function addAiMoment() {
   renderMoments();
 }
 
-/* ---- 音效工具（闹钟用） ---- */
+/* ---- AI自动发朋友圈（由主动消息轮询触发） ---- */
+function checkAutoMomentCondition() {
+  if (!settings || !settings.autoMoments) return;
+  var todayStr = new Date().toISOString().split('T')[0];
+  var dailyCount = lsGet('autoMomentDailyCount', {});
+  if (!dailyCount[todayStr]) dailyCount[todayStr] = {};
+
+  characters.forEach(function(char) {
+    var charDaily = dailyCount[todayStr][char.id] || 0;
+    if (charDaily >= 3) return;
+
+    var timestamps = lsGet('autoMomentTimestamps', {});
+    var lastTime = timestamps[char.id] || 0;
+    if (Date.now() - lastTime < 4 * 60 * 60 * 1000) return;
+
+    var charMsgs = chatData[char.id] || [];
+    if (charMsgs.length === 0 && Math.random() > 0.1) return;
+
+    generateAutoMoment(char, todayStr, dailyCount);
+  });
+}
+
+async function generateAutoMoment(char, todayStr, dailyCount) {
+  var pName = char.name || '小伴';
+  var story = char.story || '';
+
+  if (apiConfig && apiConfig.apiKey) {
+    try {
+      var contextInfo = '当前时间：' + new Date().toLocaleString('zh-CN');
+      if (weatherData && Date.now() - weatherData.time < 3600000) {
+        contextInfo += '\n天气：' + weatherData.desc + '，' + weatherData.temp + '°C';
+      }
+      var sysPrompt = '你是' + pName + '，要发一条朋友圈。' + (story ? '你的性格/背景：' + story + '。用你自己的风格来写。' : '') + '根据当前环境信息写一条简短有趣的动态（1-2句话），可以关心用户、分享心情、提建议等。不要用引号，不要加emoji。';
+      var resp = await fetch(apiConfig.baseUrl.replace(/\/+$/, '') + '/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiConfig.apiKey },
+        body: JSON.stringify({ model: apiConfig.model || 'deepseek-chat', messages: [
+          { role: 'system', content: sysPrompt },
+          { role: 'user', content: contextInfo }
+        ], max_tokens: 64, temperature: 0.9 })
+      });
+      if (resp.ok) {
+        var data = await resp.json();
+        var content = data.choices?.[0]?.message?.content?.trim();
+        if (content) {
+          var photo = null;
+          if (typeof customImgEmojis !== 'undefined' && customImgEmojis.length > 0 && Math.random() < 0.3) {
+            var pick = customImgEmojis[Math.floor(Math.random() * customImgEmojis.length)];
+            if (typeof getEmojiImgURL === 'function') {
+              var url = await getEmojiImgURL(pick.id);
+              if (url) photo = url;
+            }
+          }
+          moments.unshift({ user: pName, content: content, time: Date.now(), likes: 0, liked: false, comments: [], photo: photo });
+          lsSet('moments', moments);
+          renderMoments();
+          updateAutoMomentCount(todayStr, char.id, dailyCount);
+          return;
+        }
+      }
+    } catch(e) {
+      console.log('[自动朋友圈] API失败:', e.message.substring(0, 50));
+    }
+  }
+
+  // 本地降级
+  var storyLower = (story || '').toLowerCase();
+  var isTsundere = /傲娇|毒舌|暴躁|刻薄|冷淡/.test(storyLower);
+  var isGentle = /温柔|温暖|亲切|可爱|软/.test(storyLower);
+  var hour = new Date().getHours();
+  var templates = [];
+
+  if (isTsundere) {
+    if (hour < 9) templates.push('……早。');
+    else if (hour >= 22) templates.push('今天要结束了。啧，还行吧。');
+    else templates.push('哼，今天也平平无奇。','没什么好说的。','。');
+  } else if (isGentle) {
+    if (hour < 9) templates.push('早安呀~今天也是美好的一天 ☀️');
+    else if (hour >= 22) templates.push('夜深了，大家晚安好梦 🌙');
+    else templates.push('今天心情很好，希望你也一样 ♡','想分享今日份的温柔给你','悄悄许个愿，希望你开心');
+  } else {
+    if (hour < 9) templates.push('早。');
+    else if (hour >= 22) templates.push('夜。');
+    else templates.push('今日。','记录。','嗯。');
+  }
+
+  if (hour >= 12 && hour <= 14) templates.push('午饭时间到～');
+  if (weatherData && Date.now() - weatherData.time < 3600000) {
+    if (weatherData.code >= 61) templates.push('下雨了，记得带伞。');
+    else templates.push('今天天气不错。');
+  }
+
+  var content = templates[Math.floor(Math.random() * templates.length)];
+  moments.unshift({ user: pName, content: content, time: Date.now(), likes: 0, liked: false, comments: [], photo: null });
+  lsSet('moments', moments);
+  renderMoments();
+  updateAutoMomentCount(todayStr, char.id, dailyCount);
+}
+
+function updateAutoMomentCount(todayStr, charId, dailyCount) {
+  if (!dailyCount[todayStr]) dailyCount[todayStr] = {};
+  dailyCount[todayStr][charId] = (dailyCount[todayStr][charId] || 0) + 1;
+  lsSet('autoMomentDailyCount', dailyCount);
+
+  var timestamps = lsGet('autoMomentTimestamps', {});
+  timestamps[charId] = Date.now();
+  lsSet('autoMomentTimestamps', timestamps);
+}
 function playAlarmSound() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
