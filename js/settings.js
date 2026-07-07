@@ -65,3 +65,18 @@ function testSettingsApiConnection() {
     addChatSystem('⚠️ 请先保存 API Key');
   }
 }
+
+function restoreFromAutoBackup() {
+  var backupData = lsGet('backup_chatData', null);
+  var backupMemories = lsGet('backup_memories', null);
+  var backupTime = lsGet('backup_time', 0);
+  if (!backupData) {
+    addChatSystem('❌ 没有找到自动备份数据');
+    return;
+  }
+  if (!confirm('确定要从自动备份恢复所有聊天记录吗？\n当前数据将被覆盖。\n\n备份时间：' + new Date(backupTime).toLocaleString('zh-CN'))) return;
+  lsSet('chatData', backupData);
+  if (backupMemories) lsSet('memories', backupMemories);
+  addChatSystem('✅ 已从自动备份恢复。正在刷新页面...');
+  setTimeout(function() { location.reload(); }, 1500);
+}

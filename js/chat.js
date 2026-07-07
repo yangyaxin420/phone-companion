@@ -174,6 +174,10 @@ function syncChatMessages() {
 function saveChatData() {
   chatData[currentCharId] = chatMessages;
   lsSet('chatData', chatData);
+  // 自动备份到备用 key（防意外覆盖）
+  lsSet('backup_chatData', chatData);
+  lsSet('backup_memories', memories);
+  lsSet('backup_time', Date.now());
 }
 
 function addChatSystem(text) {

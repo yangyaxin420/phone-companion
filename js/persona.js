@@ -134,19 +134,33 @@ async function exportData() {
     allData['_exportTime'] = new Date().toISOString();
     const json = JSON.stringify(allData, null, 2);
     const blob = new Blob([json], { type: 'application/json' });
+    const filename = `phone_backup_${new Date().toISOString().slice(0,10)}.json`;
+    const sizeMB = (json.length / 1024 / 1024).toFixed(1);
+
+    // 手机端优先用 Share API（可以保存到文件/隔空投送等）
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [new File([blob], filename, { type: 'application/json' })] })) {
+      try {
+        await navigator.share({ files: [new File([blob], filename, { type: 'application/json' })] });
+        var totalMsgs = 0;
+        if (typeof chatData !== 'undefined') {
+          Object.keys(chatData).forEach(function(cid) { totalMsgs += (chatData[cid] || []).length; });
+        }
+        addChatSystem(`✅ 数据导出完成！文件大小：${sizeMB}MB。包含 ${photos.length} 张照片、${totalMsgs} 条聊天记录等。`);
+        return;
+      } catch(e) { /* fallback 到下载 */ }
+    }
+
+    // PC 或 Share 不可用时：下载链接
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `phone_backup_${new Date().toISOString().slice(0,10)}.json`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    const sizeMB = (json.length / 1024 / 1024).toFixed(1);
-    // 统计所有角色的聊天记录总数
-    var totalMsgs = 0;
-    if (typeof chatData !== 'undefined') {
-      Object.keys(chatData).forEach(function(cid) { totalMsgs += (chatData[cid] || []).length; });
-    } else {
-      totalMsgs = chatMessages.length;
-    }
+    a.href = url; a.download = filename;
+    a.style.display = 'none';
+    document.body.appendChild(a); a.click();
+    // 手机浏览器下载慢，等一会儿再销毁链接
+    setTimeout(function() {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 10000);
     addChatSystem(`✅ 数据导出完成！文件大小：${sizeMB}MB。包含 ${photos.length} 张照片、${totalMsgs} 条聊天记录等。`);
   } catch(e) { addChatSystem(`❌ 导出失败：${e.message}`); }
 }

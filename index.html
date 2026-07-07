@@ -993,6 +993,8 @@ ul{list-style:none;}
           <button class="persona-save" onclick="exportData()">📤 导出所有数据</button>
           <button class="persona-save" onclick="document.getElementById('settingsImportInput').click()" style="background:#e0e0e0;color:#1e1e1e;">📥 导入数据</button>
           <input type="file" id="settingsImportInput" accept=".json" style="display:none;" onchange="importData(event)">
+          <button class="persona-save" onclick="restoreFromAutoBackup()" style="background:#fef3c7;color:#92400e;">♻️ 从自动备份恢复</button>
+          <div style="font-size:10px;color:#ccc;text-align:center;">💡 每次发消息自动备份，清缓存后可用此功能恢复</div>
         </div>
       </div>
 
