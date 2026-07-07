@@ -118,59 +118,27 @@ async function exportData() {
         try { const val = localStorage.getItem(key); allData[key] = JSON.parse(val); } catch(e) { allData[key] = localStorage.getItem(key); }
       }
     }
-    const photoBlobs = [];
-    if (typeof photos !== 'undefined' && photoBlobs.length > 0) {
-      for (const id of photos) {
-        const blob = await getPhotoFromDB(id);
-        if (blob) { const base64 = await blobToBase64(blob); photoBlobs.push({ id, data: base64, type: blob.type }); }
-      }
-    }
-    allData['_exportPhotos'] = photoBlobs;
-    const emojiBlobs = [];
-    for (const ei of customImgEmojis) {
-      const blob = await getEmojiImage(ei.id);
-      if (blob) { const base64 = await blobToBase64(blob); emojiBlobs.push({ id: ei.id, data: base64, type: blob.type, thumb: ei.thumb }); }
-    }
-    allData['_exportEmojis'] = emojiBlobs;
-    allData['_exportVersion'] = 1;
-    allData['_exportTime'] = new Date().toISOString();
-    const json = JSON.stringify(allData, null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
-    const filename = `phone_backup_${new Date().toISOString().slice(0,10)}.json`;
-    const sizeMB = (json.length / 1024 / 1024).toFixed(1);
-
-    // 手机端优先用 Share API（可以保存到文件/隔空投送等）
-    if (navigator.share && navigator.canShare && navigator.canShare({ files: [new File([blob], filename, { type: 'application/json' })] })) {
-      try {
-        await navigator.share({ files: [new File([blob], filename, { type: 'application/json' })] });
-        var totalMsgs = 0;
-        if (typeof chatData !== 'undefined') {
-          Object.keys(chatData).forEach(function(cid) { totalMsgs += (chatData[cid] || []).length; });
-        }
-        addChatSystem(`✅ 数据导出完成！文件大小：${sizeMB}MB。包含 ${photoBlobs.length} 张照片、${totalMsgs} 条聊天记录等。`);
-        return;
-      } catch(e) { /* fallback 到下载 */ }
-    }
-
-    // PC 或 Share 不可用时：下载链接
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = filename;
-    a.style.display = 'none';
-    document.body.appendChild(a); a.click();
-    // 手机浏览器下载慢，等一会儿再销毁链接
-    setTimeout(function() {
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }, 10000);
     var totalMsgs = 0;
     if (typeof chatData !== 'undefined') {
       Object.keys(chatData).forEach(function(cid) { totalMsgs += (chatData[cid] || []).length; });
     }
-    addChatSystem(`✅ 数据导出完成！文件大小：${sizeMB}MB。包含 ${photoBlobs.length} 张照片、${totalMsgs} 条聊天记录等。`);
+    const json = JSON.stringify(allData, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const filename = `phone_backup_${new Date().toISOString().slice(0,10)}.json`;
+    const sizeMB = (json.length / 1024 / 1024).toFixed(1);
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const link = document.createElement('a');
+      link.href = e.target.result;
+      link.download = filename;
+      link.textContent = '📥 点击下载备份文件 (' + sizeMB + 'MB)';
+      link.style.cssText = 'display:block;text-align:center;padding:16px;margin:20px auto;background:#667eea;color:#fff;border-radius:12px;font-size:15px;font-weight:600;text-decoration:none;max-width:260px;';
+      document.body.appendChild(link);
+      addChatSystem(`✅ 数据导出完成！文件大小：${sizeMB}MB。包含 ${totalMsgs} 条聊天记录等。`);
+    };
+    reader.readAsDataURL(blob);
   } catch(e) { addChatSystem(`❌ 导出失败：${e.message}`); }
 }
-
 async function importData(event) {
   const file = event.target.files[0];
   if (!file) return;
