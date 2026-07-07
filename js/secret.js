@@ -298,20 +298,21 @@ async function showSecretChat() {
   const data = getSecretForChar(secretCharId);
   var contacts = (data && data.contacts) ? data.contacts : generateLocalContacts();
 
-  var today = new Date().toISOString().split('T')[0];
+  // ✅ 从实时聊天数据取最新消息（不限今天）
   var charMsgs = chatData[secretCharId] || [];
-  var todayMsgs = charMsgs.filter(function(m) { return m.time && new Date(m.time).toISOString().split('T')[0] === today; });
-  var yourLastMsg = todayMsgs.length > 0 ? todayMsgs[todayMsgs.length-1].text.substring(0,20) : '';
+  var allMsgs = charMsgs.filter(function(m) { return m.text; });
+  var yourLastMsg = allMsgs.length > 0 ? allMsgs[allMsgs.length-1].text.substring(0,20) : '暂无消息';
+  var yourMsgTime = allMsgs.length > 0 && allMsgs[allMsgs.length-1].time
+    ? getTimeLabel(allMsgs[allMsgs.length-1].time) : '';
 
   let h = '<div style="font-size:12px;color:#999;padding:0 0 8px;">微信</div>';
 
-  if (yourLastMsg) {
-    h += '<div class="secret-contact-item" onclick="showSecretConvo(\'you\')">' +
-      '<div class="sci-avatar">💬</div>' +
-      '<div class="sci-info"><div class="sci-name-row"><span class="sci-nickname">她</span></div>' +
-      '<div class="sci-lastmsg">' + escHtml(yourLastMsg) + '</div></div>' +
-      '<div class="sci-time">现在</div></div>';
-  }
+  // ✅ "她" 永远显示，哪怕没聊过天
+  h += '<div class="secret-contact-item" onclick="showSecretConvo(\'you\')">' +
+    '<div class="sci-avatar">💬</div>' +
+    '<div class="sci-info"><div class="sci-name-row"><span class="sci-nickname">她</span></div>' +
+    '<div class="sci-lastmsg">' + escHtml(yourLastMsg) + '</div></div>' +
+    '<div class="sci-time">' + escHtml(yourMsgTime) + '</div></div>';
 
   contacts.forEach(function(c) {
     if (c.id === 'you') return;
@@ -387,14 +388,16 @@ function showSecretConvo(contactId) {
 
   var msgs = [];
   if (contactId === 'you') {
-    var today = new Date().toISOString().split('T')[0];
-    var charMsgs = chatData[secretCharId] || [];
-    msgs = charMsgs.filter(function(m) { return m.time && new Date(m.time).toISOString().split('T')[0] === today; });
+    // ✅ 显示所有聊天记录，不限今天
+    msgs = chatData[secretCharId] || [];
   } else if (data && data.conversations && data.conversations[contactId]) {
     msgs = data.conversations[contactId];
   } else {
     msgs = getPersonalityConvo(contactId, isT, isG) || [];
   }
+
+  // ✅ 过滤掉没有文本的 system 消息
+  msgs = msgs.filter(function(m) { return m.text; });
 
   if (msgs.length === 0) {
     container.innerHTML = '<div style="text-align:center;color:#ccc;padding:40px;font-size:13px;">暂无消息</div>';
@@ -406,7 +409,17 @@ function showSecretConvo(contactId) {
     '<div><div style="font-size:15px;font-weight:600;">' + escHtml(displayName) + '</div>' +
     '<div style="font-size:11px;color:#999;">' + (nickname !== displayName ? '备注：' + escHtml(nickname) : '') + '</div></div></div>';
 
+  // ✅ 按日期分组，显示日期分隔线
+  var lastDate = '';
   msgs.forEach(function(m) {
+    if (m.time) {
+      var d = new Date(m.time);
+      var dateStr = d.getFullYear() + '年' + (d.getMonth()+1) + '月' + d.getDate() + '日';
+      if (dateStr !== lastDate) {
+        h += '<div style="font-size:10px;color:#ccc;text-align:center;padding:8px 0 4px;">—— ' + dateStr + ' ——</div>';
+        lastDate = dateStr;
+      }
+    }
     var isMe = m.from === 'me' || m.role === 'ai';
     if (isMe) {
       h += '<div class="convo-bubble me"><div class="convo-text">' + escHtml(m.text) + '</div></div>';
@@ -595,7 +608,14 @@ function showSecretNotes() {
 
   // === 关键记忆（只显示与当前角色有关的） ===
   if (typeof memories !== 'undefined' && memories.length > 0) {
-    var charMemories = memories.filter(function(m) { return !m.charId || m.charId === secretCharId; });
+    // 迁移旧记忆（没有 charId 的 → 归到默认角色 luo）
+    var needsSave = false;
+    memories.forEach(function(m) {
+      if (!m.charId) { m.charId = 'luo'; needsSave = true; }
+    });
+    if (needsSave) lsSet('memories', memories);
+
+    var charMemories = memories.filter(function(m) { return m.charId === secretCharId; });
     if (charMemories.length > 0) {
       var recentMemories = charMemories.slice(-20).reverse();
       var memTitle = isTsundere ? '🧠 她说过的话（我才没刻意记）' : isGentle ? '🧠 关于她的事 ♡' : '🧠 记录：用户信息';
@@ -835,6 +855,51 @@ function detectSongFromChat(text, charId) {
   return false;
 }
 
+/* ---- 工具函数：把时间戳转成"上午/下午 xx:xx" ---- */
+function getTimeLabel(timestamp) {
+  if (!timestamp) return '';
+  var d = new Date(timestamp);
+  var h = d.getHours();
+  var m = d.getMinutes().toString().padStart(2, '0');
+  var period = h < 6 ? '凌晨' : h < 12 ? '上午' : h < 14 ? '午后' : h < 18 ? '下午' : '晚上';
+  return period + ' ' + h.toString().padStart(2,'0') + ':' + m;
+}
+
+/* ---- 动态生成外卖数据（每次重新生成，不用缓存） ---- */
+function getPersonalityFoodOrders(charId) {
+  var charPers = getCharPersona(charId);
+  var story = (charPers.story || '').toLowerCase();
+  var isTsundere = /傲娇|毒舌|暴躁|刻薄|冷淡/.test(story);
+  var isGentle = /温柔|温暖|亲切|可爱|软/.test(story);
+
+  // 融合聊天记录里的饮食关键词
+  var charMsgs = chatData[charId] || [];
+  var userTexts = charMsgs.filter(function(m) { return m.role === 'user'; }).map(function(m) { return m.text; }).join(' ');
+  var hasSweet = /奶茶|蛋糕|甜|糖|面包/.test(userTexts);
+  var hasSpicy = /辣|火锅|烧烤|烤/.test(userTexts);
+
+  var base = isTsundere
+    ? [{ shop:'肯德基', items:'香辣鸡腿堡套餐', price:39.9, time:'昨晚', status:'已送达' },
+       { shop:'一点点', items:'四季奶青 加波霸', price:16, time:'昨天下午', status:'已送达' },
+       { shop:'沙县小吃', items:'蒸饺+拌面', price:18, time:'前天', status:'已送达' },
+       { shop:'绝味鸭脖', items:'鸭锁骨+藕片', price:28, time:'3天前', status:'已送达' }]
+    : isGentle
+    ? [{ shop:'好利来', items:'半熟芝士+芋泥面包', price:48, time:'今天下午', status:'配送中' },
+       { shop:'瑞幸咖啡', items:'生椰拿铁 少冰', price:19.9, time:'今天早上', status:'已送达' },
+       { shop:'老乡鸡', items:'鸡汤+蒸蛋+米饭', price:32, time:'昨天', status:'已送达' },
+       { shop:'鲜芋仙', items:'芋圆4号', price:28, time:'前天', status:'已送达' }]
+    : [{ shop:'麦当劳', items:'板烧鸡腿堡套餐', price:36, time:'昨晚', status:'已送达' },
+       { shop:'星巴克', items:'冰美式 大杯', price:32, time:'今天早上', status:'已送达' },
+       { shop:'美团外卖', items:'黄焖鸡米饭', price:25, time:'昨天', status:'已送达' },
+       { shop:'蜜雪冰城', items:'柠檬水+甜筒', price:8, time:'前天', status:'已送达' }];
+
+  // 根据聊天内容追加
+  if (hasSweet) base.push({ shop:'幸福侯彩擂', items:'波霸奶茶 微糖', price:18, time:'今天', status:'已送达' });
+  if (hasSpicy) base.push({ shop:'海底捞外送', items:'番茄锅底+虾滑+肥牛', price:128, time:'昨天', status:'已送达' });
+
+  return base;
+}
+
 function showSecretPlaylist() {
   document.getElementById("secretDesk").style.display = "none";
   document.getElementById("secretContent").style.display = "block";
@@ -845,8 +910,8 @@ function showSecretPlaylist() {
   const now = new Date();
   const hr = now.getHours();
 
-  const data = getSecretForChar(secretCharId);
-  const recentlyPlayed = (data && data.playlist) ? data.playlist : getPersonalityPlaylist(pName, secretCharId);
+  // ✅ 每次都重新生成歌单，不从缓存读
+  const recentlyPlayed = getPersonalityPlaylist(pName, secretCharId);
 
   const timeGreeting = hr < 6 ? '深夜' : hr < 9 ? '清晨' : hr < 12 ? '上午' : hr < 14 ? '午后' : hr < 18 ? '下午' : hr < 21 ? '傍晚' : '夜晚';
   if (recentlyPlayed.length > 0 && recentlyPlayed[0].time === '刚刚') {
@@ -902,14 +967,8 @@ function showSecretFoodDelivery() {
   const container = document.getElementById("secretContent");
   const pName = getSecretCharName();
 
-  const data = getSecretForChar(secretCharId);
-  const useApi = data && data.foodOrders;
-  const orders = useApi ? data.foodOrders : [
-    { shop:'麦当劳', items:'板烧鸡腿堡套餐', price:36, time:'昨晚', status:'已送达' },
-    { shop:'星巴克', items:'冰美式 大杯', price:32, time:'今天早上', status:'已送达' },
-    { shop:'美团外卖', items:'黄焖鸡米饭', price:25, time:'昨天', status:'已送达' },
-    { shop:'蜜雪冰城', items:'柠檬水+甜筒', price:8, time:'前天', status:'已送达' },
-  ];
+  // ✅ 每次都重新生成外卖数据，不从缓存读
+  const orders = getPersonalityFoodOrders(secretCharId);
 
   let h = '<div style="font-size:12px;color:#999;padding:0 0 8px;">' + escHtml(pName) + '最近的外卖订单</div>';
   orders.forEach(function(o) {
