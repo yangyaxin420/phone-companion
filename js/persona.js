@@ -119,9 +119,11 @@ async function exportData() {
       }
     }
     const photoBlobs = [];
-    for (const id of photos) {
-      const blob = await getPhotoFromDB(id);
-      if (blob) { const base64 = await blobToBase64(blob); photoBlobs.push({ id, data: base64, type: blob.type }); }
+    if (typeof photos !== 'undefined' && photoBlobs.length > 0) {
+      for (const id of photos) {
+        const blob = await getPhotoFromDB(id);
+        if (blob) { const base64 = await blobToBase64(blob); photoBlobs.push({ id, data: base64, type: blob.type }); }
+      }
     }
     allData['_exportPhotos'] = photoBlobs;
     const emojiBlobs = [];
@@ -145,7 +147,7 @@ async function exportData() {
         if (typeof chatData !== 'undefined') {
           Object.keys(chatData).forEach(function(cid) { totalMsgs += (chatData[cid] || []).length; });
         }
-        addChatSystem(`✅ 数据导出完成！文件大小：${sizeMB}MB。包含 ${photos.length} 张照片、${totalMsgs} 条聊天记录等。`);
+        addChatSystem(`✅ 数据导出完成！文件大小：${sizeMB}MB。包含 ${photoBlobs.length} 张照片、${totalMsgs} 条聊天记录等。`);
         return;
       } catch(e) { /* fallback 到下载 */ }
     }
@@ -161,7 +163,11 @@ async function exportData() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     }, 10000);
-    addChatSystem(`✅ 数据导出完成！文件大小：${sizeMB}MB。包含 ${photos.length} 张照片、${totalMsgs} 条聊天记录等。`);
+    var totalMsgs = 0;
+    if (typeof chatData !== 'undefined') {
+      Object.keys(chatData).forEach(function(cid) { totalMsgs += (chatData[cid] || []).length; });
+    }
+    addChatSystem(`✅ 数据导出完成！文件大小：${sizeMB}MB。包含 ${photoBlobs.length} 张照片、${totalMsgs} 条聊天记录等。`);
   } catch(e) { addChatSystem(`❌ 导出失败：${e.message}`); }
 }
 
