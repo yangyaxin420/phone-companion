@@ -147,7 +147,7 @@ async function importData(event) {
     addChatSystem('🔄 正在导入数据，请稍候...');
     const text = await file.text();
     const data = JSON.parse(text);
-    if (!data._exportVersion) { addChatSystem('❌ 文件格式不对'); return; }
+    if (!data._exportVersion) { addChatSystem('ℹ️ 旧格式备份，兼容导入中...'); }
     let importCount = 0;
     for (const [key, val] of Object.entries(data)) {
       if (key.startsWith('_export')) continue;
