@@ -111,7 +111,7 @@ function updateApiStatusBadge() {
 async function exportData() {
   try {
     addChatSystem('🔄 正在导出数据...');
-    const allData = {};
+    const allData = { _exportVersion: 1 };
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
       if (key && key.startsWith('phone_')) {
