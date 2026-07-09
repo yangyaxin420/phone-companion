@@ -1,8 +1,14 @@
-const CACHE = 'phone-v4';
-const SW_VERSION = 4;
+const CACHE = 'phone-v5';
+const SW_VERSION = 5;
 
 self.addEventListener('install', e => {
   console.log('[SW] Install v' + SW_VERSION);
+  // 删除所有旧缓存
+  e.waitUntil(
+    caches.keys().then(keys => Promise.all(keys.map(k => {
+      if (k !== CACHE) return caches.delete(k);
+    })))
+  );
   self.skipWaiting();
 });
 
@@ -12,8 +18,13 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
+  // 网络优先，缓存兜底（不再只从缓存读）
   e.respondWith(
-    caches.match(e.request).then(r => r || fetch(e.request))
+    fetch(e.request).then(r => {
+      const clone = r.clone();
+      caches.open(CACHE).then(c => c.put(e.request, clone));
+      return r;
+    }).catch(() => caches.match(e.request))
   );
 });
 
