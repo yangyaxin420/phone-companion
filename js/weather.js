@@ -216,6 +216,12 @@ function updateWeatherUI(tempEl, descEl, detailEl, iconEl, temp, humidity, windS
 /* ==================== 5. 图标网格 & 拖拽 ==================== */
 let savedOrder = lsGet('iconOrder', null);
 const allIds = ICONS.map(i=>i.id);
+// 合并新图标（用户可能保存了旧顺序）
+if (savedOrder) {
+  allIds.forEach(id => { if (!savedOrder.includes(id)) savedOrder.push(id); });
+  // 移除不存在的图标
+  savedOrder = savedOrder.filter(id => allIds.includes(id));
+}
 let iconOrder = savedOrder || [...allIds];
 
 function renderIcons() {

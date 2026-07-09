@@ -1,6 +1,7 @@
 /* ==================== 0. 常量 & 图标定义 ==================== */
 const ICONS = [
   { id:'chat',     symbol:'▷', name:'聊天',  page:'page-conv-list' },
+  { id:'daily',    symbol:'📋', name:'日报',  page:'page-daily' },
   { id:'companion',symbol:'⟳', name:'专注',  page:'page-companion' },
   { id:'moments',  symbol:'○', name:'朋友圈',page:'page-moments' },
   { id:'secret',   symbol:'◎', name:'Secret',page:'page-secret' },
@@ -61,6 +62,7 @@ function navigateTo(pageId, skipAnim) {
   if (pageId === 'page-companion') renderCompanionActs();
   if (pageId === 'page-conv-list') renderConvList();
   if (pageId === 'page-secret') showSecretDesk();
+  if (pageId === 'page-daily') showDaily();
   if (pageId === 'page-expense') renderExpenseCats();
   if (pageId === 'page-persona') loadUserPersona();
   if (pageId === 'page-settings') loadSettings();
