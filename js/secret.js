@@ -958,13 +958,13 @@ function addManualSong() {
 }
 
 /* ---- 删除手动添加的歌曲 ---- */
-function deleteManualSong(index) {
+function deleteManualSong(index, stayInManage) {
   var songs = getRecommendedSongs(secretCharId);
   if (!songs[index]) return;
-  var name = songs[index].title;
   songs.splice(index, 1);
   saveRecommendedSongs(secretCharId, songs);
-  showSecretPlaylist();
+  if (stayInManage) showManageRecSongs();
+  else showSecretPlaylist();
 }
 
 function detectSongFromChat(text, charId) {
@@ -1195,16 +1195,11 @@ function showSecretPlaylist() {
     '<button onclick="addManualSong()" style="flex:1;padding:8px;border-radius:10px;background:#f0f0f0;border:none;font-size:13px;font-weight:600;cursor:pointer;color:#555;">➕ 添加歌曲</button>' +
     '<button onclick="showSecretPlaylist()" style="padding:8px 12px;border-radius:10px;background:none;border:1px solid #e0e0e0;font-size:12px;cursor:pointer;color:#999;">🔄 刷新歌单</button></div>';
 
-  // 来自你推荐的歌（如果有）
+  // 来自你推荐的歌（如果有）——混进最近播放里
   var recSongs = getRecommendedSongs(secretCharId);
   if (recSongs.length > 0) {
-    h += '<div class="playlist-header" style="color:#667eea;">💝 来自你的推荐</div>';
-    recSongs.forEach(function(s, i) {
-      h += '<div class="secret-playlist-item" style="border-left:3px solid #667eea;position:relative;">' +
-        '<div class="sp-icon">🎁</div>' +
-        '<div class="sp-info"><div class="sp-title">' + escHtml(s.title) + '</div><div class="sp-artist">' + (s.artist ? escHtml(s.artist) : '你推荐的') + '</div></div>' +
-        '<div class="sp-time">' + escHtml(s.time) + '</div>' +
-        '<button onclick="deleteManualSong(' + i + ')" style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:#e55;color:#fff;font-size:10px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;">×</button></div>';
+    recSongs.forEach(function(s) {
+      recentlyPlayed.unshift({ title: s.title, artist: s.artist || '你推荐的', time: '刚刚 · 推荐' });
     });
   }
 
@@ -1216,6 +1211,35 @@ function showSecretPlaylist() {
   playlists.forEach(function(p) {
     h += '<div class="secret-note-card"><div class="sn-text" style="font-weight:600;">' + escHtml(p.name) + '</div><div style="font-size:12px;color:#888;margin-top:4px;">' + escHtml(p.songs.join(' · ')) + '</div></div>';
   });
+  // 管理已添加的推荐歌曲
+  if (recSongs.length > 0) {
+    h += '<div style="margin-top:12px;text-align:center;">' +
+      '<button onclick="showManageRecSongs()" style="font-size:12px;color:#999;background:none;border:none;cursor:pointer;text-decoration:underline;">📝 管理我推荐的 ' + recSongs.length + ' 首歌</button></div>';
+  }
+  container.innerHTML = h;
+}
+
+/* ---- 管理我推荐的歌曲 ---- */
+function showManageRecSongs() {
+  var container = document.getElementById("secretContent");
+  var pName = getSecretCharName();
+  var recSongs = getRecommendedSongs(secretCharId);
+  var h = '<div style="font-size:12px;color:#999;padding:0 0 8px;">📝 我推荐的歌曲</div>';
+  h += '<button onclick="showSecretPlaylist()" style="padding:8px 14px;border-radius:10px;background:#f0f0f0;border:none;font-size:13px;cursor:pointer;color:#555;margin-bottom:10px;">← 返回歌单</button>';
+  if (recSongs.length === 0) {
+    h += '<div style="text-align:center;color:#ccc;padding:40px;font-size:13px;">还没有推荐过歌曲</div>';
+  } else {
+    // 反序显示（最新的在上面）
+    var reversed = recSongs.slice().reverse();
+    reversed.forEach(function(s, ri) {
+      var i = recSongs.length - 1 - ri;
+      h += '<div class="secret-playlist-item" style="border-left:3px solid #667eea;">' +
+        '<div class="sp-icon">🎁</div>' +
+        '<div class="sp-info"><div class="sp-title">' + escHtml(s.title) + '</div><div class="sp-artist">' + (s.artist ? escHtml(s.artist) : '你推荐的') + '</div></div>' +
+        '<div class="sp-time">' + escHtml(s.time) + '</div>' +
+        '<button onclick="deleteManualSong(' + i + ',true)" style="font-size:16px;color:#e55;background:none;border:none;cursor:pointer;padding:4px;">✕</button></div>';
+    });
+  }
   container.innerHTML = h;
 }
 
