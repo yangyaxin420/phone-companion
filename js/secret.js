@@ -777,6 +777,7 @@ function getPersonalityAlbum(pName, charId) {
   }
 
   // 根据聊天内容动态追加照片
+  var chatTopics2 = _getChatTopics(charId);
   if (hasFood && !pool.find(function(p) { return p.label.indexOf('吃') !== -1 || p.label.indexOf('饭') !== -1; })) {
     pool.push({ emoji:"🍽", label:"今天吃了好吃的", time:"今天" });
   }
@@ -784,6 +785,13 @@ function getPersonalityAlbum(pName, charId) {
   if (hasMood) pool.push({ emoji:"💭", label:"今天心情不太好", time:"今天" });
   if (hasPet) pool.push({ emoji:"🐾", label:"可爱的小动物", time:"昨天" });
   if (hasNature) pool.push({ emoji:"🌳", label:"窗外的景色", time:"今天" });
+  // 更多话题注入
+  if (chatTopics2.indexOf('喝东西') !== -1) pool.push({ emoji:"☕", label:"今天的咖啡/奶茶", time:"今天" });
+  if (chatTopics2.indexOf('游戏') !== -1) pool.push({ emoji:"🎮", label:"打游戏", time:"昨天" });
+  if (chatTopics2.indexOf('购物') !== -1) pool.push({ emoji:"🛍", label:"买到了好东西", time:"今天" });
+  if (chatTopics2.indexOf('作息') !== -1) pool.push({ emoji:"🌙", label:"又熬夜了", time:"昨天" });
+  if (chatTopics2.indexOf('娱乐') !== -1) pool.push({ emoji:"🎬", label:"看了个好看的", time:"昨天" });
+  if (chatTopics2.indexOf('想念') !== -1) pool.push({ emoji:"💕", label:"想她", time:"今天" });
 
   // 随机打乱并选取8-12张
   var shuffled = pool.sort(function() { return Math.random() - 0.5; });
@@ -1020,6 +1028,27 @@ function _isWeekend() {
   return d === 0 || d === 6;
 }
 
+/* ---- 从聊天记录提取话题标签 ---- */
+function _getChatTopics(charId) {
+  var charMsgs = chatData[charId] || [];
+  var userTexts = charMsgs.filter(function(m) { return m.role === 'user'; }).map(function(m) { return m.text; }).join(' ');
+  var topics = [];
+  if (/六级|考试|期末|复习|论文|作业|上课|学习|考研/.test(userTexts)) topics.push('学习');
+  if (/吃|饭|食堂|外卖|好吃|饿|点餐/.test(userTexts)) topics.push('吃饭');
+  if (/奶茶|咖啡|牛奶|茶|喝/.test(userTexts)) topics.push('喝东西');
+  if (/甜|蛋糕|面包|糖|冰淇淋|甜品/.test(userTexts)) topics.push('甜的');
+  if (/辣|火锅|麻辣|烧烤|烤|串/.test(userTexts)) topics.push('辣的');
+  if (/猫|狗|宠物/.test(userTexts)) topics.push('宠物');
+  if (/累|困|熬夜|失眠|睡/.test(userTexts)) topics.push('作息');
+  if (/电影|剧|综艺|动漫|视频/.test(userTexts)) topics.push('娱乐');
+  if (/游戏|打|玩/.test(userTexts)) topics.push('游戏');
+  if (/买|购物|淘宝|快递|钱|花/.test(userTexts)) topics.push('购物');
+  if (/下雨|天气|雨|雪|冷|热/.test(userTexts)) topics.push('天气');
+  if (/难过|伤心|哭|不开心|焦虑|压力|emo/.test(userTexts)) topics.push('情绪');
+  if (/想|喜欢|爱|梦到/.test(userTexts)) topics.push('想念');
+  return topics;
+}
+
 /* ---- 动态生成外卖数据（每次重新生成，不用缓存） ---- */
 function getPersonalityFoodOrders(charId) {
   var charPers = getCharPersona(charId);
@@ -1146,6 +1175,75 @@ function getPersonalityFoodOrders(charId) {
   }
   if (weekend) {
     pool.push({ shop:'早午餐外送', items:'班尼迪克蛋+咖啡', price:58, time:'今天', status:'配送中' });
+  }
+
+  // ★ 根据聊天话题注入个性化外卖
+  var chatTopics = _getChatTopics(charId);
+  if (chatTopics.indexOf('喝东西') !== -1) {
+    pool = pool.concat([
+      { shop:'瑞幸', items:'生椰拿铁', price:19.9, time:'今天', status:'已送达' },
+      { shop:'茶百道', items:'豆乳玉麒麟', price:16, time:'昨天', status:'已送达' },
+      { shop:'喜茶', items:'多肉葡萄 少糖', price:28, time:'今天下午', status:'配送中' },
+      { shop:'一点点', items:'四季奶青 加波霸', price:15, time:'昨天', status:'已送达' },
+    ]);
+  }
+  if (chatTopics.indexOf('辣的') !== -1) {
+    pool = pool.concat([
+      { shop:'火锅外卖', items:'番茄/麻辣双拼锅底+肥牛+虾滑', price:138, time:'昨天', status:'已送达' },
+      { shop:'烤串店', items:'羊肉串15串+烤鸡翅', price:45, time:'前天', status:'已送达' },
+      { shop:'麻辣香锅', items:'微辣套餐+米饭', price:38, time:'昨天', status:'已送达' },
+      { shop:'重庆小面', items:'肥肠面 重辣', price:22, time:'3天前', status:'已送达' },
+      { shop:'螺蛳粉', items:'招牌螺蛳粉+炸蛋+豆泡', price:24, time:'前天', status:'已送达' },
+    ]);
+  }
+  if (chatTopics.indexOf('甜的') !== -1) {
+    pool = pool.concat([
+      { shop:'鲜芋仙', items:'芋圆4号+豆花', price:32, time:'今天', status:'配送中' },
+      { shop:'好利来', items:'半熟芝士+芋泥面包', price:48, time:'昨天', status:'已送达' },
+      { shop:'满记甜品', items:'杨枝甘露+芒果班戟', price:42, time:'前天', status:'已送达' },
+      { shop:'DQ', items:'抹茶暴风雪', price:28, time:'3天前', status:'已送达' },
+    ]);
+  }
+  if (chatTopics.indexOf('吃饭') !== -1 && chatTopics.indexOf('辣的') === -1 && chatTopics.indexOf('甜的') === -1) {
+    pool = pool.concat([
+      { shop:'沙县小吃', items:'鸭腿饭+炖罐', price:22, time:'今天中午', status:'已送达' },
+      { shop:'老乡鸡', items:'青椒炒蛋+蒸蛋+米饭', price:28, time:'昨天', status:'已送达' },
+      { shop:'兰州拉面', items:'牛肉拉面+小菜', price:25, time:'前天', status:'已送达' },
+    ]);
+  }
+  if (chatTopics.indexOf('作息') !== -1) {
+    pool = pool.concat([
+      { shop:'深夜粥铺', items:'皮蛋瘦肉粥+煎饺', price:26, time:'凌晨', status:'已送达' },
+      { shop:'烧烤外卖', items:'深夜串串+啤酒', price:45, time:'昨晚', status:'已送达' },
+      { shop:'全家', items:'宵夜套餐：关东煮+饭团', price:18, time:'凌晨', status:'已送达' },
+    ]);
+  }
+  if (chatTopics.indexOf('购物') !== -1) {
+    pool.push({ shop:'美团外卖', items:'超市配送：零食大礼包', price:68, time:'昨天', status:'已送达' });
+    pool.push({ shop:'饿了么', items:'便利店：饮料+薯片+泡面', price:35, time:'前天', status:'已送达' });
+  }
+  if (chatTopics.indexOf('情绪') !== -1) {
+    pool = pool.concat([
+      { shop:'奶茶店', items:'超大杯波霸奶茶（加料）', price:22, time:'今天', status:'配送中' },
+      { shop:'冰淇淋店', items:'双球甜筒+华夫', price:25, time:'昨天', status:'已送达' },
+      { shop:'蛋糕店', items:'切片蛋糕+热可可', price:38, time:'前天', status:'已送达' },
+    ]);
+  }
+  if (chatTopics.indexOf('想念') !== -1) {
+    pool.push({ shop:'花店外卖', items:'混搭花束+小卡片', price:68, time:'昨天', status:'已送达' });
+    pool.push({ shop:'甜品店', items:'定制曲奇礼盒', price:58, time:'前天', status:'已送达' });
+  }
+  if (chatTopics.indexOf('游戏') !== -1) {
+    pool.push({ shop:'麦当劳', items:'游戏套餐：汉堡+可乐+鸡翅', price:45, time:'昨天', status:'已送达' });
+    pool.push({ shop:'零食店', items:'薯片+可乐+辣条 游戏必备', price:32, time:'前天', status:'已送达' });
+  }
+  if (chatTopics.indexOf('学习') !== -1) {
+    pool.push({ shop:'瑞幸', items:'学习套餐：美式+可颂', price:28, time:'今天', status:'已送达' });
+    pool.push({ shop:'便利店', items:'咖啡+面包 复习必备', price:18, time:'昨天', status:'已送达' });
+  }
+  if (chatTopics.indexOf('天气') !== -1) {
+    pool.push({ shop:'奶茶店', items:'热奶茶（天冷来一杯）', price:18, time:'今天', status:'配送中' });
+    pool.push({ shop:'药店外卖', items:'感冒灵+VC泡腾片', price:35, time:'昨天', status:'已送达' });
   }
 
   var count = 4 + Math.floor(Math.random() * 3); // 4-6条
@@ -1352,6 +1450,45 @@ function getPersonalityBrowserHistory(charId) {
   ];
 
   var pool = isTsundere ? tsundereQueries : isGentle ? gentleQueries : coolQueries;
+
+  // ★ 根据聊天话题注入个性化搜索
+  var chatTopics = _getChatTopics(charId);
+  var topicQueries = [];
+  if (chatTopics.indexOf('学习') !== -1) {
+    topicQueries.push({ query:'六级成绩什么时候出', time:'今天' },{ query:'杭州社工实习机会', time:'昨天' },{ query:'论文怎么写又快又好', time:'前天' },{ query:'社会工作专业就业方向', time:'4天前' },{ query:'期末考试怎么复习', time:'今天' },{ query:'大一想找实习怎么办', time:'昨天' });
+  }
+  if (chatTopics.indexOf('吃饭') !== -1 || chatTopics.indexOf('辣的') !== -1) {
+    topicQueries.push({ query:'附近好吃的火锅店推荐', time:'今天' },{ query:'一个人吃饭不尴尬的地方', time:'昨天' },{ query:'杭州最好吃的10家店', time:'3天前' });
+  }
+  if (chatTopics.indexOf('喝东西') !== -1 || chatTopics.indexOf('甜的') !== -1) {
+    topicQueries.push({ query:'瑞幸9.9优惠还有吗', time:'今天' },{ query:'最好喝的奶茶排名', time:'昨天' },{ query:'自制芋圆做法', time:'前天' });
+  }
+  if (chatTopics.indexOf('娱乐') !== -1) {
+    topicQueries.push({ query:'最近值得看的电影', time:'今天' },{ query:'好看的动漫推荐2026', time:'昨天' },{ query:'豆瓣高分电影清单', time:'3天前' },{ query:'周末宅家看什么', time:'前天' });
+  }
+  if (chatTopics.indexOf('游戏') !== -1) {
+    topicQueries.push({ query:'适合一个人玩的游戏', time:'昨天' },{ query:'switch值得买吗', time:'3天前' },{ query:'steam夏促推荐', time:'4天前' });
+  }
+  if (chatTopics.indexOf('宠物') !== -1) {
+    topicQueries.push({ query:'新手养猫攻略', time:'今天' },{ query:'猫粮推荐 平价', time:'昨天' },{ query:'猫窝DIY', time:'前天' });
+  }
+  if (chatTopics.indexOf('天气') !== -1) {
+    topicQueries.push({ query:'杭州一周天气预报', time:'今天' },{ query:'潮湿天气怎么除湿', time:'昨天' });
+  }
+  if (chatTopics.indexOf('购物') !== -1) {
+    topicQueries.push({ query:'淘宝618活动时间', time:'昨天' },{ query:'女生必买好物推荐', time:'前天' },{ query:'平价穿搭分享', time:'4天前' },{ query:'宿舍好物推荐', time:'5天前' });
+  }
+  if (chatTopics.indexOf('作息') !== -1) {
+    topicQueries.push({ query:'怎么才能不熬夜', time:'今天' },{ query:'熬夜后怎么恢复', time:'昨天' },{ query:'早睡打卡方法', time:'前天' });
+  }
+  if (chatTopics.indexOf('情绪') !== -1) {
+    topicQueries.push({ query:'心情不好怎么办', time:'今天' },{ query:'治愈系电影推荐', time:'昨天' },{ query:'一个人怎么缓解焦虑', time:'3天前' });
+  }
+  if (chatTopics.indexOf('想念') !== -1) {
+    topicQueries.push({ query:'怎么告诉一个人我想她', time:'今天' },{ query:'异地恋怎么维持', time:'昨天' },{ query:'手写信的格式', time:'前天' },{ query:'送什么礼物最有心意', time:'4天前' });
+  }
+  pool = pool.concat(topicQueries);
+
   var count = 8 + Math.floor(Math.random() * 5); // 8-12条
   return _pickFromPool(pool, count);
 }
