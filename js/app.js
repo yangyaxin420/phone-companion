@@ -2,6 +2,7 @@
 const ICONS = [
   { id:'chat',     symbol:'▷', name:'聊天',  page:'page-conv-list' },
   { id:'daily',    symbol:'📋', name:'日报',  page:'page-daily' },
+  { id:'tasks',    symbol:'☑', name:'任务',  page:'page-tasks' },
   { id:'companion',symbol:'⟳', name:'专注',  page:'page-companion' },
   { id:'moments',  symbol:'○', name:'朋友圈',page:'page-moments' },
   { id:'secret',   symbol:'◎', name:'Secret',page:'page-secret' },

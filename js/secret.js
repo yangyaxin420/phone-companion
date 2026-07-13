@@ -323,6 +323,15 @@ async function showSecretChat() {
       var last = conv[conv.length - 1];
       if (last && last.text) lastMsg = last.text.substring(0, 20);
     }
+    // 如果没有消息，从备选池随机取一条
+    if (!lastMsg || lastMsg === '') {
+      var fillers = {
+        '1': ['明天来取蛋糕～','刚做好的新品','要预订吗'],
+        '2': ['包裹已放保安室','您有一个快递','放在了门口'],
+        '3': ['今天也是老样子吗☺️','新进了关东煮哦','下午有空来坐坐'],
+      };
+      lastMsg = (fillers[c.id] || ['最近没联系'])[Math.floor(Math.random() * 3)];
+    }
     h += '<div class="secret-contact-item" onclick="showSecretConvo(\'' + c.id + '\')">' +
       '<div class="sci-avatar">' + c.avatar + '</div>' +
       '<div class="sci-info"><div class="sci-name-row"><span class="sci-nickname">' + escHtml(nickname) + '</span></div>' +
@@ -691,7 +700,7 @@ function getPersonalityAlbum(pName, charId) {
   var hasPet = /猫|狗|宠物/.test(userTexts);
   var hasNature = /花|树|天空|海|雨|雪/.test(userTexts);
 
-  // 性格基础照片池
+  // 性格基础照片池（扩到 20+ 张）
   var pool = [];
   if (isTsundere) {
     pool = [
@@ -707,6 +716,15 @@ function getPersonalityAlbum(pName, charId) {
       { emoji:"☁️", label:"今天的云", time:"今天" },
       { emoji:"🌃", label:"夜景", time:"2天前" },
       { emoji:"🍜", label:"深夜食堂", time:"4天前" },
+      { emoji:"🖤", label:"一张很暗的照片", time:"今天" },
+      { emoji:"🚬", label:"阳台上", time:"昨天" },
+      { emoji:"🥃", label:"一个人的酒", time:"3天前" },
+      { emoji:"📸", label:"偷拍的", time:"昨天" },
+      { emoji:"🎞", label:"旧照片", time:"上周" },
+      { emoji:"💔", label:"截图", time:"4天前" },
+      { emoji:"🎲", label:"无聊拍的", time:"昨天" },
+      { emoji:"🌪", label:"心情不好拍的", time:"前天" },
+      { emoji:"👟", label:"走路的时候", time:"今天" },
     ];
   } else if (isGentle) {
     pool = [
@@ -722,6 +740,16 @@ function getPersonalityAlbum(pName, charId) {
       { emoji:"🕯", label:"香薰蜡烛", time:"昨天" },
       { emoji:"🌿", label:"阳台的植物", time:"3天前" },
       { emoji:"🧸", label:"她送的小礼物", time:"上周" },
+      { emoji:"🎀", label:"逛街看到的", time:"今天" },
+      { emoji:"🧶", label:"织围巾进度", time:"昨天" },
+      { emoji:"🥐", label:"早上的面包", time:"今天早上" },
+      { emoji:"🎬", label:"电影票", time:"3天前" },
+      { emoji:"🎄", label:"路边的装饰", time:"5天前" },
+      { emoji:"🍂", label:"捡的叶子", time:"上周" },
+      { emoji:"☔", label:"雨伞", time:"前天" },
+      { emoji:"🧣", label:"新围巾", time:"昨天" },
+      { emoji:"📝", label:"她写的小纸条", time:"今天" },
+      { emoji:"🐾", label:"楼下的小猫脚印", time:"昨天" },
     ];
   } else {
     pool = [
@@ -737,6 +765,14 @@ function getPersonalityAlbum(pName, charId) {
       { emoji:"📰", label:"新闻截图", time:"昨天" },
       { emoji:"🎬", label:"电影票根", time:"3天前" },
       { emoji:"🏪", label:"便利店", time:"4天前" },
+      { emoji:"🏗", label:"路过工地", time:"今天" },
+      { emoji:"🎯", label:"打靶结果", time:"昨天" },
+      { emoji:"🎲", label:"骰子", time:"前天" },
+      { emoji:"🥊", label:"拳击手套", time:"3天前" },
+      { emoji:"🏋️", label:"健身", time:"昨天" },
+      { emoji:"🏍", label:"路边的摩托", time:"5天前" },
+      { emoji:"🎸", label:"看到一把吉他", time:"上周" },
+      { emoji:"📊", label:"数据截图", time:"昨天" },
     ];
   }
 
@@ -781,49 +817,117 @@ function showSecretAlbum() {
   container.innerHTML = h;
 }
 
-/* ===== 歌单（按性格动态 + 聊天推荐收录） ===== */
+/* ===== 歌单（按性格动态 + 聊天推荐收录 + 大池轮换） ===== */
 function getPersonalityPlaylist(pName, charId) {
   var charPers = getCharPersona(charId);
   var story = (charPers.story || '').toLowerCase();
   var isTsundere = /傲娇|毒舌|暴躁|刻薄|冷淡/.test(story);
   var isGentle = /温柔|温暖|亲切|可爱|软/.test(story);
+  var tod = _timeOfDay();
 
-  // 性格基础歌单
-  var songs = isTsundere
-    ? [{ title:'路过人间', artist:'郁可唯', time:'刚刚' },
-       { title:'唯一', artist:'告五人', time:'昨天' },
-       { title:'起风了', artist:'买辣椒也用券', time:'昨天' },
-       { title:'小半', artist:'陈粒', time:'前天' },
-       { title:'喜欢你', artist:'陈洁仪', time:'4天前' },
-       { title:'南山南', artist:'马頔', time:'5天前' },
-       { title:'烟火里的尘埃', artist:'华晨宇', time:'上周' }]
-    : isGentle
-    ? [{ title:'小美满', artist:'周深', time:'刚刚' },
-       { title:'日常', artist:'田馥甄', time:'昨天' },
-       { title:'暖暖', artist:'梁静茹', time:'昨天' },
-       { title:'小手拉大手', artist:'梁静茹', time:'前天' },
-       { title:'陪你度过漫长岁月', artist:'陈奕迅', time:'3天前' },
-       { title:'遇见', artist:'孙燕姿', time:'5天前' },
-       { title:'日落', artist:'橘子海', time:'上周' }]
-    : [{ title:'空城', artist:'杨坤', time:'刚刚' },
-       { title:'演员', artist:'薛之谦', time:'昨天' },
-       { title:'丑八怪', artist:'薛之谦', time:'昨天' },
-       { title:'像我这样的人', artist:'毛不易', time:'前天' },
-       { title:'平凡之路', artist:'朴树', time:'4天前' },
-       { title:'理想三旬', artist:'陈鸿宇', time:'5天前' },
-       { title:'消愁', artist:'毛不易', time:'上周' }];
+  // === 傲娇歌单池（25首） ===
+  var tsundereSongs = [
+    { title:'路过人间', artist:'郁可唯', time:'刚刚' },
+    { title:'唯一', artist:'告五人', time:'昨天' },
+    { title:'起风了', artist:'买辣椒也用券', time:'昨天' },
+    { title:'小半', artist:'陈粒', time:'前天' },
+    { title:'喜欢你', artist:'陈洁仪', time:'4天前' },
+    { title:'南山南', artist:'马頔', time:'5天前' },
+    { title:'烟火里的尘埃', artist:'华晨宇', time:'上周' },
+    { title:'走马', artist:'陈粒', time:'昨天' },
+    { title:'光年之外', artist:'邓紫棋', time:'前天' },
+    { title:'说散就散', artist:'JC陈', time:'3天前' },
+    { title:'泡沫', artist:'邓紫棋', time:'4天前' },
+    { title:'不染', artist:'毛不易', time:'5天前' },
+    { title:'消愁', artist:'毛不易', time:'3天前' },
+    { title:'刚刚好', artist:'薛之谦', time:'昨天' },
+    { title:'我还想她', artist:'林俊杰', time:'前天' },
+    { title:'趁早', artist:'张宇', time:'5天前' },
+    { title:'夜曲', artist:'周杰伦', time:'上周' },
+    { title:'搁浅', artist:'周杰伦', time:'3天前' },
+    { title:'倒带', artist:'蔡依林', time:'4天前' },
+    { title:'爱了很久的朋友', artist:'田馥甄', time:'昨天' },
+    { title:'你就不要想起我', artist:'田馥甄', time:'前天' },
+    { title:'后来', artist:'刘若英', time:'5天前' },
+    { title:'好久不见', artist:'陈奕迅', time:'上周' },
+    { title:'红色高跟鞋', artist:'蔡健雅', time:'昨天' },
+    { title:'达尔文', artist:'蔡健雅', time:'3天前' },
+  ];
 
-  // 注入聊天推荐歌曲
-  var recommended = getRecommendedSongs(charId);
-  if (recommended.length > 0) {
-    recommended.forEach(function(song) {
-      if (!songs.find(function(s) { return s.title === song.title; })) {
-        songs.unshift({ title: song.title, artist: song.artist || '你推荐的', time: song.time || '最近' });
-      }
+  // === 温柔歌单池（25首） ===
+  var gentleSongs = [
+    { title:'小美满', artist:'周深', time:'刚刚' },
+    { title:'日常', artist:'田馥甄', time:'昨天' },
+    { title:'暖暖', artist:'梁静茹', time:'昨天' },
+    { title:'小手拉大手', artist:'梁静茹', time:'前天' },
+    { title:'陪你度过漫长岁月', artist:'陈奕迅', time:'3天前' },
+    { title:'遇见', artist:'孙燕姿', time:'5天前' },
+    { title:'日落', artist:'橘子海', time:'上周' },
+    { title:'爱你', artist:'王心凌', time:'昨天' },
+    { title:'夏天的风', artist:'温岚', time:'前天' },
+    { title:'简单爱', artist:'周杰伦', time:'3天前' },
+    { title:'七里香', artist:'周杰伦', time:'4天前' },
+    { title:'情书', artist:'张学友', time:'5天前' },
+    { title:'喜欢你', artist:'Beyond', time:'上周' },
+    { title:'小情歌', artist:'苏打绿', time:'昨天' },
+    { title:'无与伦比的美丽', artist:'苏打绿', time:'前天' },
+    { title:'你被写在我的歌里', artist:'苏打绿/陈嘉桦', time:'3天前' },
+    { title:'好好', artist:'五月天', time:'4天前' },
+    { title:'天使', artist:'五月天', time:'5天前' },
+    { title:'拥抱', artist:'五月天', time:'上周' },
+    { title:'少女', artist:'林宥嘉', time:'昨天' },
+    { title:'兜圈', artist:'林宥嘉', time:'前天' },
+    { title:'致姗姗来迟的你', artist:'阿肆/林宥嘉', time:'3天前' },
+    { title:'幸福了然后呢', artist:'A-Lin', time:'4天前' },
+    { title:'我好像在哪见过你', artist:'薛之谦', time:'5天前' },
+    { title:'飞鸟和蝉', artist:'任然', time:'上周' },
+  ];
+
+  // === 冷静歌单池（25首） ===
+  var coolSongs = [
+    { title:'空城', artist:'杨坤', time:'刚刚' },
+    { title:'演员', artist:'薛之谦', time:'昨天' },
+    { title:'丑八怪', artist:'薛之谦', time:'昨天' },
+    { title:'像我这样的人', artist:'毛不易', time:'前天' },
+    { title:'平凡之路', artist:'朴树', time:'4天前' },
+    { title:'理想三旬', artist:'陈鸿宇', time:'5天前' },
+    { title:'消愁', artist:'毛不易', time:'上周' },
+    { title:'Better Now', artist:'Post Malone', time:'昨天' },
+    { title:'River', artist:'Eminem', time:'前天' },
+    { title:'Counting Stars', artist:'OneRepublic', time:'3天前' },
+    { title:'异类', artist:'华晨宇', time:'4天前' },
+    { title:'我的滑板鞋', artist:'华晨宇', time:'5天前' },
+    { title:'齐天大圣', artist:'华晨宇', time:'上周' },
+    { title:'Sonnet', artist:'The Verve', time:'昨天' },
+    { title:'Last Dance', artist:'伍佰', time:'前天' },
+    { title:'挪威的森林', artist:'伍佰', time:'3天前' },
+    { title:'突然的自我', artist:'伍佰', time:'4天前' },
+    { title:'Fade', artist:'Alan Walker', time:'5天前' },
+    { title:'The Nights', artist:'Avicii', time:'上周' },
+    { title:'Wake Me Up', artist:'Avicii', time:'昨天' },
+    { title:'Hotel California', artist:'Eagles', time:'前天' },
+    { title:'Take Five', artist:'Dave Brubeck', time:'3天前' },
+    { title:'California Dreaming', artist:'The Mamas & Papas', time:'4天前' },
+    { title:'Knockin\' On Heaven\'s Door', artist:'Bob Dylan', time:'5天前' },
+    { title:'Where Did You Sleep Last Night', artist:'Nirvana', time:'上周' },
+  ];
+
+  var pool = isTsundere ? tsundereSongs : isGentle ? gentleSongs : coolSongs;
+
+  // 根据时间段把更相关的歌曲放在前面
+  if (tod === '凌晨' || tod === '晚上') {
+    var nightVibes = isTsundere ? ['夜曲','消愁','好久不见','倒带'] : isGentle ? ['晚安曲','日落','遇见','兜圈'] : ['Fade','Hotel California','理想三旬','Knockin\' On Heaven\'s Door'];
+    pool.forEach(function(s, i) {
+      if (nightVibes.indexOf(s.title) !== -1) { s.time = '刚刚'; }
+    });
+  } else if (tod === '早上' || tod === '上午') {
+    pool.forEach(function(s, i) {
+      if (s.time === '刚刚') s.time = '昨天';
     });
   }
 
-  return songs;
+  var count = 6 + Math.floor(Math.random() * 4); // 6-9首
+  return _pickFromPool(pool, count);
 }
 
 /* ---- 聊天推荐歌曲检测和存储 ---- */
@@ -833,6 +937,34 @@ function getRecommendedSongs(charId) {
 
 function saveRecommendedSongs(charId, songs) {
   localStorage.setItem('recSongs_' + charId, JSON.stringify(songs));
+}
+
+/* ---- 手动添加歌曲 ---- */
+function addManualSong() {
+  var name = prompt('🎵 歌名：');
+  if (!name || !name.trim()) return;
+  var artist = prompt('🎤 歌手（可以不填）：');
+  var songs = getRecommendedSongs(secretCharId);
+  var songName = name.trim();
+  if (songs.find(function(s) { return s.title === songName; })) {
+    alert('这首歌已经在列表里啦～');
+    return;
+  }
+  songs.push({ title: songName, artist: artist || '你添加的', time: new Date().toLocaleDateString('zh-CN') });
+  if (songs.length > 30) songs = songs.slice(-30);
+  saveRecommendedSongs(secretCharId, songs);
+  alert('✅ 已添加：' + songName + (artist ? ' - ' + artist : ''));
+  showSecretPlaylist(); // 刷新页面
+}
+
+/* ---- 删除手动添加的歌曲 ---- */
+function deleteManualSong(index) {
+  var songs = getRecommendedSongs(secretCharId);
+  if (!songs[index]) return;
+  var name = songs[index].title;
+  songs.splice(index, 1);
+  saveRecommendedSongs(secretCharId, songs);
+  showSecretPlaylist();
 }
 
 function detectSongFromChat(text, charId) {
@@ -865,6 +997,29 @@ function getTimeLabel(timestamp) {
   return period + ' ' + h.toString().padStart(2,'0') + ':' + m;
 }
 
+/* ---- 轮换种子（一天内不变，但每天/每次打开不同） ---- */
+function _pickFromPool(pool, count) {
+  // 打乱后用 slice
+  var shuffled = pool.slice().sort(function() { return Math.random() - 0.5; });
+  var pick = shuffled.slice(0, count);
+  // 按时间排序：今天的 > 近期的 > 更早的
+  pick.sort(function(a, b) {
+    var order = { '今天':0,'今天下午':0,'今天早上':0,'今晚':0,'刚刚':0,'1小时前':1,'2小时前':1,'昨天下午':2,'昨晚':2,'昨天':2,'前天':3,'3天前':4,'4天前':5,'5天前':6,'上周':7 };
+    return (order[a.time]||99) - (order[b.time]||99);
+  });
+  return pick;
+}
+
+function _timeOfDay() {
+  var h = new Date().getHours();
+  return h < 6 ? '凌晨' : h < 9 ? '早上' : h < 12 ? '上午' : h < 14 ? '中午' : h < 18 ? '下午' : h < 21 ? '傍晚' : '晚上';
+}
+
+function _isWeekend() {
+  var d = new Date().getDay();
+  return d === 0 || d === 6;
+}
+
 /* ---- 动态生成外卖数据（每次重新生成，不用缓存） ---- */
 function getPersonalityFoodOrders(charId) {
   var charPers = getCharPersona(charId);
@@ -877,27 +1032,124 @@ function getPersonalityFoodOrders(charId) {
   var userTexts = charMsgs.filter(function(m) { return m.role === 'user'; }).map(function(m) { return m.text; }).join(' ');
   var hasSweet = /奶茶|蛋糕|甜|糖|面包/.test(userTexts);
   var hasSpicy = /辣|火锅|烧烤|烤/.test(userTexts);
+  var hasFood = /吃|饭|食堂|外卖|好吃|饿/.test(userTexts);
+  var tod = _timeOfDay();
+  var weekend = _isWeekend();
 
-  var base = isTsundere
-    ? [{ shop:'肯德基', items:'香辣鸡腿堡套餐', price:39.9, time:'昨晚', status:'已送达' },
-       { shop:'一点点', items:'四季奶青 加波霸', price:16, time:'昨天下午', status:'已送达' },
-       { shop:'沙县小吃', items:'蒸饺+拌面', price:18, time:'前天', status:'已送达' },
-       { shop:'绝味鸭脖', items:'鸭锁骨+藕片', price:28, time:'3天前', status:'已送达' }]
-    : isGentle
-    ? [{ shop:'好利来', items:'半熟芝士+芋泥面包', price:48, time:'今天下午', status:'配送中' },
-       { shop:'瑞幸咖啡', items:'生椰拿铁 少冰', price:19.9, time:'今天早上', status:'已送达' },
-       { shop:'老乡鸡', items:'鸡汤+蒸蛋+米饭', price:32, time:'昨天', status:'已送达' },
-       { shop:'鲜芋仙', items:'芋圆4号', price:28, time:'前天', status:'已送达' }]
-    : [{ shop:'麦当劳', items:'板烧鸡腿堡套餐', price:36, time:'昨晚', status:'已送达' },
-       { shop:'星巴克', items:'冰美式 大杯', price:32, time:'今天早上', status:'已送达' },
-       { shop:'美团外卖', items:'黄焖鸡米饭', price:25, time:'昨天', status:'已送达' },
-       { shop:'蜜雪冰城', items:'柠檬水+甜筒', price:8, time:'前天', status:'已送达' }];
+  // === 傲娇池（20+条） ===
+  var tsunderePool = [
+    { shop:'肯德基', items:'香辣鸡腿堡套餐', price:39.9, time:'昨晚', status:'已送达' },
+    { shop:'一点点', items:'四季奶青 加波霸', price:16, time:'昨天下午', status:'已送达' },
+    { shop:'沙县小吃', items:'蒸饺+拌面', price:18, time:'前天', status:'已送达' },
+    { shop:'绝味鸭脖', items:'鸭锁骨+藕片', price:28, time:'3天前', status:'已送达' },
+    { shop:'蜜雪冰城', items:'柠檬水+甜筒', price:8, time:'前天', status:'已送达' },
+    { shop:'麦当劳', items:'双层吉士汉堡+薯条', price:34, time:'昨天', status:'已送达' },
+    { shop:'瑞幸', items:'生椰拿铁 少冰', price:19.9, time:'今天早上', status:'已送达' },
+    { shop:'兰州拉面', items:'牛肉拉面+煎蛋', price:22, time:'昨天中午', status:'已送达' },
+    { shop:'喜茶', items:'多肉葡萄 少糖', price:28, time:'昨天下午', status:'已送达' },
+    { shop:'烧烤摊', items:'羊肉串10串+鸡翅', price:55, time:'3天前', status:'已送达' },
+    { shop:'麻辣烫', items:'自选麻辣烫（微辣）', price:32, time:'前天', status:'已送达' },
+    { shop:'7-11', items:'关东煮+饭团', price:15.5, time:'昨天早上', status:'已送达' },
+    { shop:'华莱士', items:'炸鸡套餐', price:29.9, time:'4天前', status:'已送达' },
+    { shop:'杨国福', items:'麻辣拌', price:26, time:'2天前', status:'已送达' },
+    { shop:'周黑鸭', items:'鸭脖+鸭舌', price:38, time:'5天前', status:'已送达' },
+    { shop:'老乡鸡', items:'西红柿炒蛋+蒸蛋', price:28, time:'昨天', status:'已送达' },
+    { shop:'煲仔饭', items:'腊味煲仔饭+例汤', price:32, time:'前天', status:'已送达' },
+    { shop:'螺蛳粉外卖', items:'招牌螺蛳粉+炸蛋', price:21, time:'3天前', status:'已送达' },
+    { shop:'烤鱼店', items:'蒜香烤鱼（外卖版）', price:68, time:'上周', status:'已送达' },
+    { shop:'饺子馆', items:'韭菜鸡蛋饺15个', price:18, time:'4天前', status:'已送达' },
+  ];
+
+  // === 温柔池 ===
+  var gentlePool = [
+    { shop:'好利来', items:'半熟芝士+芋泥面包', price:48, time:'今天下午', status:'配送中' },
+    { shop:'瑞幸咖啡', items:'生椰拿铁 少冰', price:19.9, time:'今天早上', status:'已送达' },
+    { shop:'老乡鸡', items:'鸡汤+蒸蛋+米饭', price:32, time:'昨天', status:'已送达' },
+    { shop:'鲜芋仙', items:'芋圆4号', price:28, time:'前天', status:'已送达' },
+    { shop:'一点点', items:'四季奶青 三分糖', price:15, time:'昨天下午', status:'已送达' },
+    { shop:'泸溪河', items:'桃酥+绿豆糕', price:36, time:'3天前', status:'已送达' },
+    { shop:'奈雪的茶', items:'霸气草莓+软欧包', price:45, time:'昨天', status:'已送达' },
+    { shop:'全家', items:'三明治+牛奶', price:18, time:'今天早上', status:'已送达' },
+    { shop:'日料店', items:'三文鱼牛油果盖饭', price:58, time:'前天', status:'已送达' },
+    { shop:'西贝', items:'面筋+莜面', price:45, time:'4天前', status:'已送达' },
+    { shop:'和府捞面', items:'草本猪蹄面', price:39, time:'昨天', status:'已送达' },
+    { shop:'满记甜品', items:'杨枝甘露+芒果班戟', price:42, time:'前天', status:'已送达' },
+    { shop:'煲珠公', items:'珍珠奶茶 少糖', price:14, time:'今天下午', status:'配送中' },
+    { shop:'一鸣真鲜奶', items:'酸奶+三明治', price:16, time:'昨天早上', status:'已送达' },
+    { shop:'花店配送', items:'每周一花-混合花束', price:88, time:'3天前', status:'已送达' },
+    { shop:'海底捞外送', items:'番茄小锅+虾滑', price:108, time:'上周', status:'已送达' },
+    { shop:'鲍师傅', items:'肉松小贝+提子酥', price:32, time:'5天前', status:'已送达' },
+    { shop:'茶百道', items:'桂花酒酿奶茶', price:17, time:'昨天', status:'已送达' },
+    { shop:'必胜客', items:'超级至尊披萨', price:79, time:'4天前', status:'已送达' },
+    { shop:'塔斯汀', items:'板烧凤梨堡套餐', price:28, time:'昨天中午', status:'已送达' },
+  ];
+
+  // === 冷静/简约池 ===
+  var coolPool = [
+    { shop:'麦当劳', items:'板烧鸡腿堡套餐', price:36, time:'昨晚', status:'已送达' },
+    { shop:'星巴克', items:'冰美式 大杯', price:32, time:'今天早上', status:'已送达' },
+    { shop:'美团外卖', items:'黄焖鸡米饭', price:25, time:'昨天', status:'已送达' },
+    { shop:'蜜雪冰城', items:'柠檬水+甜筒', price:8, time:'前天', status:'已送达' },
+    { shop:'肯德基', items:'奥尔良烤鸡堡', price:33, time:'昨天', status:'已送达' },
+    { shop:'瑞幸', items:'冰美式 无糖', price:13.9, time:'今天', status:'已送达' },
+    { shop:'兰州拉面', items:'牛肉拉面', price:18, time:'前天', status:'已送达' },
+    { shop:'沙县小吃', items:'蛋炒饭+乌鸡汤', price:22, time:'3天前', status:'已送达' },
+    { shop:'全家', items:'便当+饮料', price:24, time:'昨天中午', status:'已送达' },
+    { shop:'汉堡王', items:'皇堡套餐', price:38, time:'4天前', status:'已送达' },
+    { shop:'煲仔饭', items:'香菇滑鸡煲仔饭', price:28, time:'昨天', status:'已送达' },
+    { shop:'正新鸡排', items:'鸡排+酸梅汁', price:16, time:'前天', status:'已送达' },
+    { shop:'肯德基', items:'原味鸡+蛋挞', price:22, time:'5天前', status:'已送达' },
+    { shop:'柳州螺蛳粉', items:'螺蛳粉+豆腐泡', price:20, time:'3天前', status:'已送达' },
+    { shop:'东北饺子', items:'猪肉白菜饺', price:16, time:'昨天', status:'已送达' },
+    { shop:'大米先生', items:'小炒肉套餐', price:26, time:'4天前', status:'已送达' },
+    { shop:'周黑鸭', items:'卤藕+鸭翅', price:24, time:'上周', status:'已送达' },
+    { shop:'纯K', items:'花生米+啤酒（KTV外卖）', price:48, time:'6天前', status:'已送达' },
+  ];
+
+  var pool = isTsundere ? tsunderePool : isGentle ? gentlePool : coolPool;
 
   // 根据聊天内容追加
-  if (hasSweet) base.push({ shop:'幸福侯彩擂', items:'波霸奶茶 微糖', price:18, time:'今天', status:'已送达' });
-  if (hasSpicy) base.push({ shop:'海底捞外送', items:'番茄锅底+虾滑+肥牛', price:128, time:'昨天', status:'已送达' });
+  if (hasSweet) {
+    var sweetExtras = [
+      { shop:'幸福侯彩擂', items:'波霸奶茶 微糖', price:18, time:'今天', status:'已送达' },
+      { shop:'糖水铺', items:'红豆沙+姜撞奶', price:22, time:'昨天', status:'已送达' },
+      { shop:'冰淇淋店', items:'抹茶甜筒', price:12, time:'前天', status:'已送达' },
+    ];
+    pool = pool.concat(sweetExtras);
+  }
+  if (hasSpicy) {
+    var spicyExtras = [
+      { shop:'海底捞外送', items:'番茄锅底+虾滑+肥牛', price:128, time:'昨天', status:'已送达' },
+      { shop:'麻辣香锅', items:'微辣套餐+米饭', price:42, time:'前天', status:'已送达' },
+      { shop:'重庆小面', items:'肥肠面 重辣', price:22, time:'3天前', status:'已送达' },
+    ];
+    pool = pool.concat(spicyExtras);
+  }
+  if (hasFood && !hasSweet && !hasSpicy) {
+    pool.push({ shop:'食堂', items:'两荤一素+米饭', price:15, time:'今天中午', status:'已送达' });
+  }
 
-  return base;
+  // 根据时间追加一条"正在订"的
+  if (tod === '中午' || tod === '下午') {
+    var lunchOptions = [
+      { shop:'美团外卖', items:'正在看…附近有什么吃的', price:0, time:'现在', status:'选餐中' },
+      { shop:'饿了么', items:'纠结中…', price:0, time:'现在', status:'选餐中' },
+    ];
+    pool = pool.concat(lunchOptions);
+  }
+  if (tod === '晚上' || tod === '凌晨') {
+    var nightOptions = [
+      { shop:'烧烤摊', items:'正在看夜宵菜单', price:0, time:'现在', status:'选餐中' },
+      { shop:'深夜外卖', items:'夜宵纠结中…', price:0, time:'现在', status:'选餐中' },
+    ];
+    pool = pool.concat(nightOptions);
+  }
+  if (weekend) {
+    pool.push({ shop:'早午餐外送', items:'班尼迪克蛋+咖啡', price:58, time:'今天', status:'配送中' });
+  }
+
+  var count = 4 + Math.floor(Math.random() * 3); // 4-6条
+  return _pickFromPool(pool, count);
 }
 
 function showSecretPlaylist() {
@@ -938,12 +1190,21 @@ function showSecretPlaylist() {
 
   let h = '<div style="font-size:12px;color:#999;padding:0 0 8px;">' + escHtml(pName) + '最近在听</div>';
 
+  // ➕ 手动添加歌曲按钮
+  h += '<div style="display:flex;gap:6px;margin-bottom:10px;">' +
+    '<button onclick="addManualSong()" style="flex:1;padding:8px;border-radius:10px;background:#f0f0f0;border:none;font-size:13px;font-weight:600;cursor:pointer;color:#555;">➕ 添加歌曲</button>' +
+    '<button onclick="showSecretPlaylist()" style="padding:8px 12px;border-radius:10px;background:none;border:1px solid #e0e0e0;font-size:12px;cursor:pointer;color:#999;">🔄 刷新歌单</button></div>';
+
   // 来自你推荐的歌（如果有）
   var recSongs = getRecommendedSongs(secretCharId);
   if (recSongs.length > 0) {
     h += '<div class="playlist-header" style="color:#667eea;">💝 来自你的推荐</div>';
-    recSongs.forEach(function(s) {
-      h += '<div class="secret-playlist-item" style="border-left:3px solid #667eea;"><div class="sp-icon">🎁</div><div class="sp-info"><div class="sp-title">' + escHtml(s.title) + '</div><div class="sp-artist">' + (s.artist ? escHtml(s.artist) : '你推荐的') + '</div></div><div class="sp-time">' + escHtml(s.time) + '</div></div>';
+    recSongs.forEach(function(s, i) {
+      h += '<div class="secret-playlist-item" style="border-left:3px solid #667eea;position:relative;">' +
+        '<div class="sp-icon">🎁</div>' +
+        '<div class="sp-info"><div class="sp-title">' + escHtml(s.title) + '</div><div class="sp-artist">' + (s.artist ? escHtml(s.artist) : '你推荐的') + '</div></div>' +
+        '<div class="sp-time">' + escHtml(s.time) + '</div>' +
+        '<button onclick="deleteManualSong(' + i + ')" style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:#e55;color:#fff;font-size:10px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;">×</button></div>';
     });
   }
 
@@ -989,6 +1250,88 @@ function showSecretFoodDelivery() {
   container.innerHTML = h;
 }
 
+/* ===== 浏览器搜索记录（大池轮换） ===== */
+function getPersonalityBrowserHistory(charId) {
+  var charPers = getCharPersona(charId);
+  var story = (charPers.story || '').toLowerCase();
+  var isTsundere = /傲娇|毒舌|暴躁|刻薄|冷淡/.test(story);
+  var isGentle = /温柔|温暖|亲切|可爱|软/.test(story);
+  var tod = _timeOfDay();
+
+  var tsundereQueries = [
+    { query:'怎么哄生气的女朋友', time:'今天' },
+    { query:'傲娇的人怎么表达关心', time:'昨天' },
+    { query:'她喜欢的歌单', time:'昨天' },
+    { query:'蛋糕店几点开门', time:'前天' },
+    { query:'吵架后怎么和好', time:'3天前' },
+    { query:'她最近在看什么剧', time:'4天前' },
+    { query:'送什么礼物不会太明显', time:'5天前' },
+    { query:'如何假装不在意', time:'6天前' },
+    { query:'她今天心情好吗', time:'今天' },
+    { query:'怎么才能不嘴硬', time:'昨天' },
+    { query:'她说没事是真的没事吗', time:'前天' },
+    { query:'最近好看的电影', time:'3天前' },
+    { query:'为什么总是我主动', time:'4天前' },
+    { query:'一个人吃火锅尴尬吗', time:'5天前' },
+    { query:'凌晨睡不着怎么办', time:'今天' },
+    { query:'她什么时候会想我', time:'昨天' },
+    { query:'淘宝 机械键盘', time:'3天前' },
+    { query:'附近最好吃的烤串', time:'4天前' },
+    { query:'养猫需要准备什么', time:'5天前' },
+    { query:'她的星座和什么最配', time:'上周' },
+  ];
+
+  var gentleQueries = [
+    { query:'今日菜谱 简单好吃', time:'今天' },
+    { query:'她喜欢吃甜的还是咸的', time:'昨天' },
+    { query:'适合送花的节日', time:'昨天' },
+    { query:'怎么让心情变好', time:'前天' },
+    { query:'杭州周末去哪玩', time:'3天前' },
+    { query:'她最近忙不忙', time:'4天前' },
+    { query:'治愈系电影推荐', time:'5天前' },
+    { query:'拼多多鲜花优惠券', time:'6天前' },
+    { query:'手写情书怎么写', time:'今天' },
+    { query:'秋天的毛衣穿搭', time:'昨天' },
+    { query:'她上次说想吃的那家店', time:'前天' },
+    { query:'手工礼物DIY教程', time:'3天前' },
+    { query:'给她的小惊喜', time:'4天前' },
+    { query:'女生喜欢什么样的陪伴', time:'5天前' },
+    { query:'圣诞节礼物推荐', time:'上周' },
+    { query:'怎么能让她开心', time:'今天' },
+    { query:'好看的电影截图', time:'昨天' },
+    { query:'附近新开的甜品店', time:'3天前' },
+    { query:'她的生日还差多久', time:'4天前' },
+    { query:'睡前故事短篇', time:'上周' },
+  ];
+
+  var coolQueries = [
+    { query:'今天天气', time:'今天' },
+    { query:'附近有什么好吃的', time:'昨天' },
+    { query:'周末去哪玩', time:'昨天' },
+    { query:'如何提高工作效率', time:'前天' },
+    { query:'现在流行什么', time:'3天前' },
+    { query:'她喜欢什么', time:'4天前' },
+    { query:'怎么聊天不尴尬', time:'5天前' },
+    { query:'深夜emo怎么办', time:'6天前' },
+    { query:'Python 教程', time:'今天' },
+    { query:'机械键盘 推荐', time:'昨天' },
+    { query:'杭州跑步路线', time:'前天' },
+    { query:'附近的自习室', time:'3天前' },
+    { query:'豆瓣高分电影', time:'4天前' },
+    { query:'NAS 搭建教程', time:'5天前' },
+    { query:'Spotify 歌单 推荐', time:'今天' },
+    { query:'怎么拒绝别人 又不伤感情', time:'昨天' },
+    { query:'一个人能做的事', time:'3天前' },
+    { query:'极简主义 生活方式', time:'4天前' },
+    { query:'最好的降噪耳机', time:'5天前' },
+    { query:'VSCode 插件推荐', time:'上周' },
+  ];
+
+  var pool = isTsundere ? tsundereQueries : isGentle ? gentleQueries : coolQueries;
+  var count = 8 + Math.floor(Math.random() * 5); // 8-12条
+  return _pickFromPool(pool, count);
+}
+
 /* ===== 浏览器搜索记录 ===== */
 function showSecretBrowser() {
   document.getElementById("secretDesk").style.display = "none";
@@ -1000,16 +1343,7 @@ function showSecretBrowser() {
 
   const data = getSecretForChar(secretCharId);
   const useApi = data && data.browserHistory;
-  const history = useApi ? data.browserHistory : [
-    { query:'今天天气', time:'今天' },
-    { query:'附近有什么好吃的', time:'昨天' },
-    { query:'周末去哪玩', time:'昨天' },
-    { query:'如何提高工作效率', time:'前天' },
-    { query:'现在流行什么', time:'3天前' },
-    { query:'她喜欢什么', time:'4天前' },
-    { query:'怎么聊天不尴尬', time:'5天前' },
-    { query:'深夜emo怎么办', time:'6天前' },
-  ];
+  const history = useApi ? data.browserHistory : getPersonalityBrowserHistory(secretCharId);
 
   let h = '<div style="font-size:12px;color:#999;padding:0 0 8px;">' + escHtml(pName) + '的搜索记录 · 共' + history.length + '条</div>';
   h += '<div style="display:flex;flex-direction:column;gap:6px;">';
