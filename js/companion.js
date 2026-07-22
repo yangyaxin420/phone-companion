@@ -1,10 +1,8 @@
 /* ==================== 15. 陪伴计时（增强版） ==================== */
 
 // ---- 专注记录存储 ----
-function getCompRecords() {
-  try { return JSON.parse(localStorage.getItem('phone_compRecords')) || []; } catch(e) { return []; }
-}
-function saveCompRecords(v) { localStorage.setItem('phone_compRecords', JSON.stringify(v)); }
+function getCompRecords() { return lsGet('compRecords', []); }
+function saveCompRecords(v) { lsSet('compRecords', v); }
 
 /* ---- 活动选择 ---- */
 function renderCompanionActs() {

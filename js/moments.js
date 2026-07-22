@@ -59,8 +59,11 @@ function renderMoments() {
     const isAi = m.user !== '我';
     let commentsHtml = '';
     if (m.comments && m.comments.length > 0) {
-      commentsHtml = '<div class="moment-comments">' + m.comments.map(c =>
-        `<div class="moment-comment-item"><b>${escHtml(c.user)}</b>：${escHtml(c.content)}</div>`
+      commentsHtml = '<div class="moment-comments">' + m.comments.map((c, ci) =>
+        `<div class="moment-comment-item">
+          <b>${escHtml(c.user)}</b>：${escHtml(c.content)}
+          <span class="moment-reply-btn" onclick="replyToComment(${i},${ci})">回复</span>
+        </div>`
       ).join('') + '</div>';
     }
     const photoHtml = m.photo ? `<div class="moment-photo"><img src="${m.photo}"></div>` : '';
@@ -96,6 +99,21 @@ function commentOnMoment(index) {
   }
 }
 
+function replyToComment(momentIdx, commentIdx) {
+  const m = moments[momentIdx];
+  if (!m || !m.comments || !m.comments[commentIdx]) return;
+  const target = m.comments[commentIdx];
+  const text = prompt('回复 ' + target.user + '：');
+  if (text && text.trim()) {
+    if (!moments[momentIdx].comments) moments[momentIdx].comments = [];
+    const replyText = '回复 @' + target.user + '：' + text.trim();
+    moments[momentIdx].comments.push({ user: '我', content: replyText, time: Date.now() });
+    lsSet('moments', moments);
+    renderMoments();
+    setTimeout(() => aiReplyComment(momentIdx), 1500);
+  }
+}
+
 async function aiReplyComment(index) {
   if (!apiConfig.apiKey || index >= moments.length) return;
   const m = moments[index];
@@ -104,14 +122,16 @@ async function aiReplyComment(index) {
   const lastComment = m.comments[m.comments.length - 1];
   if (!lastComment || lastComment.user === pName) return;
   try {
+    // 取最近4条评论作为上下文
+    var recentCtx = m.comments.slice(-4).map(c => c.user + '：' + c.content).join('\n');
     var ownerLabel = isMyMoment ? "你的" : "用户的";
-    const sysPrompt = `你是${pName}，有人在${ownerLabel}朋友圈评论了，请简短回复（1句话）。${personaData.story ? '你的性格：' + personaData.story + '。用你的风格回复。' : ''}不要用引号，不要加emoji。`;
+    const sysPrompt = `你是${pName}，有人在${ownerLabel}朋友圈评论区跟你聊天。请简短回复（1句话）。${personaData.story ? '你的性格：' + personaData.story + '。用你的风格回复。' : ''}不要用引号，不要加emoji。`;
     const resp = await fetch(apiConfig.baseUrl.replace(/\/+$/, '') + '/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiConfig.apiKey}` },
       body: JSON.stringify({ model: apiConfig.model || 'deepseek-chat', messages: [
         { role: 'system', content: sysPrompt },
-        { role: 'user', content: `原动态：「${m.content}」\n评论者说：「${lastComment.content}」` }
+        { role: 'user', content: `原动态：「${m.content}」\n评论区对话：\n${recentCtx}` }
       ], max_tokens: 48, temperature: 0.9 })
     });
     if (resp.ok) {

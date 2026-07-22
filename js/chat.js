@@ -543,7 +543,124 @@ function sendLottery() {
   document.getElementById('diceMenu').classList.remove('show');
 }
 
-/* ---- Chat functions ---- */
+/* ---- 多回复模式 ---- */
+let chatReplySettings = lsGet('chatReplySettings', { count:1, length:'short' });
+
+function toggleReplyMode() {
+  const popup = document.getElementById('replyModePopup');
+  const emojiPanel = document.getElementById('emojiPanel');
+  if (emojiPanel) emojiPanel.classList.remove('show');
+  popup.classList.toggle('show');
+  // 高亮toggle按钮
+  const btn = document.getElementById('replyModeToggle');
+  if (popup.classList.contains('show')) {
+    btn.style.color = '#5B7FFF';
+  } else if (chatReplySettings.count === 1) {
+    btn.style.color = '';
+  }
+}
+
+function setReplyCount(n) {
+  chatReplySettings.count = n;
+  lsSet('chatReplySettings', chatReplySettings);
+  document.querySelectorAll('#replyCountBtns .reply-cbtn').forEach(b => {
+    b.classList.toggle('active', parseInt(b.dataset.n) === n);
+  });
+  const btn = document.getElementById('replyModeToggle');
+  btn.style.color = n > 1 ? '#5B7FFF' : '';
+}
+
+function setReplyLength(l) {
+  chatReplySettings.length = l;
+  lsSet('chatReplySettings', chatReplySettings);
+  document.querySelectorAll('#replyLengthBtns .reply-lbtn').forEach(b => {
+    b.classList.toggle('active', b.dataset.l === l);
+  });
+}
+
+/* ---- 生成多条回复 ---- */
+async function generateMultiReplies(text, count, length) {
+  const replies = [];
+  const tokens = length === 'short' ? 256 : length === 'medium' ? 512 : 1024;
+  const lengthHint = length === 'short' ? '极简短' : length === 'medium' ? '中等长度' : '可以稍长一些';
+
+  for (let i = 0; i < count; i++) {
+    const prompt = `这是你的第${i+1}条回复（共${count}条），请回复${lengthHint}的内容。${i > 0 ? '上一条你已经说过了，这次说点不一样的，换个角度或补充新内容。' : ''}`;
+
+    // 复用 callLLMApi 但附加额外指令
+    let reply;
+    if (apiConfig.apiKey) {
+      // 构造临时请求
+      let apiUrl = apiConfig.baseUrl.replace(/\/+$/, '') + '/chat/completions';
+      const pName = personaData.name || '小伴';
+      const personaPart = personaData.story ? `\n\n你的人设背景：${personaData.story}` : '';
+      const worldBookPart = worldBook ? `\n\n【世界书】\n${worldBook}` : '';
+      const contextBlock = buildChatContext();
+      const fullPrompt = systemPrompt + personaPart + worldBookPart + contextBlock +
+        `\n\n你现在是${pName}。${lengthHint}，1-3句话。不要动作描写，不要emoji。\n\n` + prompt;
+
+      const contextMsgs = chatMessages.slice(-20).map(m => ({
+        role: m.role === 'ai' ? 'assistant' : m.role === 'user' ? 'user' : 'system',
+        content: m.text
+      }));
+
+      const body = {
+        model: apiConfig.model || 'deepseek-chat',
+        messages: [
+          { role: 'system', content: fullPrompt },
+          ...contextMsgs,
+          { role: 'user', content: text }
+        ],
+        max_tokens: tokens,
+        temperature: 0.85 + Math.random() * 0.15
+      };
+
+      const resp = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiConfig.apiKey },
+        body: JSON.stringify(body)
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        reply = data.choices?.[0]?.message?.content?.trim();
+      }
+    }
+
+    if (!reply) {
+      // 本地降级：换不同措辞
+      reply = generateLocalReply(text + '（第' + (i+1) + '次）');
+      if (i > 0) {
+        const alt = ['嗯。', '也是。', '就这样。', '你说呢。', '……', '行吧。', '知道了。'];
+        reply = alt[i % alt.length];
+      }
+    }
+
+    const parsed = parseAiActions(reply);
+    replies.push(parsed.display || reply);
+    if (parsed.actions) executeAiActions(parsed.actions);
+  }
+  return replies;
+}
+
+function buildChatContext() {
+  let block = '\n\n【当前环境】';
+  if (userPersona && userPersona.name) {
+    var charRelation = '恋人';
+    var currentChar = characters.find(c => c.id === currentCharId);
+    if (currentChar && currentChar.relation) charRelation = currentChar.relation;
+    block += `\n用户：${userPersona.name}，${userPersona.gender}，${userPersona.age}。关系：${charRelation}。`;
+  }
+  var mem = getRecentMemories(15);
+  if (mem) block += '\n记忆：' + mem;
+  const now = new Date();
+  block += '\n时间：' + now.getFullYear() + '年' + (now.getMonth()+1) + '月' + now.getDate() + '日 ' + now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+  if (weatherData && Date.now() - weatherData.time < 3600000) {
+    block += '\n天气：' + weatherData.desc + '，' + weatherData.temp + '°C';
+  }
+  return block;
+}
+
+/* ---- AI 人设配置弹窗 ---- */
 function toggleSpConfig() {
   document.getElementById('modalAiName').value = personaData.name || '';
   document.getElementById('modalAiStory').value = personaData.story || '';
@@ -618,20 +735,27 @@ async function sendChat() {
   typing.classList.add('show');
 
   try {
-    let reply;
-    if (apiConfig.apiKey) {
-      reply = await callLLMApi(text);
+    const count = chatReplySettings.count || 1;
+    let replies;
+    if (count > 1 && apiConfig.apiKey) {
+      replies = await generateMultiReplies(text, count, chatReplySettings.length);
+    } else if (apiConfig.apiKey) {
+      const reply = await callLLMApi(text);
+      const parsed = parseAiActions(reply);
+      replies = [parsed.display];
+      if (parsed.actions) executeAiActions(parsed.actions);
     } else {
       await new Promise(r => setTimeout(r, 500 + Math.random() * 800));
-      reply = generateLocalReply(text);
+      replies = [generateLocalReply(text)];
     }
     typing.classList.remove('show');
 
-    const parsed = parseAiActions(reply);
-    chatMessages.push({ role:'ai', text:parsed.display, time: Date.now() });
-    saveChatData();
-    renderChat();
-    executeAiActions(parsed.actions);
+    for (let i = 0; i < replies.length; i++) {
+      if (i > 0) await new Promise(r => setTimeout(r, 600 + Math.random() * 400));
+      chatMessages.push({ role:'ai', text: replies[i], time: Date.now() });
+      saveChatData();
+      renderChat();
+    }
   } catch(e) {
     typing.classList.remove('show');
     const fallback = generateLocalReply(text);

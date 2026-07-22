@@ -53,11 +53,10 @@ async function generateSecretContent(charId) {
     const prompt = `你现在是${pName}。${story ? '你的性格/背景：' + story : ''}请用JSON格式生成以下手机内容（不要额外文字，只输出JSON）：
 
 1. 微信聊天列表：6-8个联系人，包含emoji头像、名字、"nickname"（备注/外号）、最后一条消息预览、时间
-2. 你和其中3-4个联系人的完整对话（每个3-6条消息，符合你的性格）
-3. 你的相册：8张照片（emoji、标题、时间）
-4. 你的最近播放：6首歌（歌名、歌手、时间）
-5. 你的外卖订单：4-5个订单（商家名、菜品、价格、时间、状态）
-6. 你的浏览器搜索记录：8-10条搜索内容（符合性格和日常）
+2. 你的最近播放：6首歌（歌名、歌手、时间），根据当前时间段让音乐风格符合这个时间
+3. 你的外卖订单：4-5个订单（商家名、菜品、价格、时间、状态），一周内日常饮食
+4. 你的相册：8张照片（emoji、标题、时间），根据当前时间段让照片氛围符合这个时间
+5. 你的浏览器搜索记录：8-10条搜索内容（符合性格和日常），混入1-2条和你们最近聊天内容相关的话题
 ${contactPrompt}
 
 联系人的例子：蛋糕店老板、快递员、楼下咖啡店员、房东、朋友、家人${otherChars.length > 0 ? '、其他AI角色' : ''}等
@@ -65,10 +64,9 @@ ${contactPrompt}
 JSON格式：
 {
   "contacts": [{ "id":"1", "avatar":"🎂", "name":"甜时蛋糕", "nickname":"备注名", "lastMsg":"最后一条消息", "time":"时间" }],
-  "conversations": { "1": [{ "from":"me", "text":"..." }, { "from":"them", "text":"..." }] },
-  "album": [{ "emoji":"🌅", "label":"标题", "time":"时间" }],
   "playlist": [{ "title":"歌名", "artist":"歌手", "time":"时间" }],
   "foodOrders": [{ "shop":"商家名", "items":"菜品", "price":25.0, "time":"时间", "status":"已送达/配送中" }],
+  "album": [{ "emoji":"🌅", "label":"标题", "time":"时间" }],
   "browserHistory": [{ "query":"搜索内容", "time":"时间" }]
 }`;
 
@@ -133,98 +131,27 @@ JSON格式：
       { id:'3', avatar: isGentle ? '☕' : '🏪', name: isGentle ? '转角咖啡' : '楼下便利店', nickname: isGentle ? '咖啡小妹' : '老板', lastMsg: isGentle ? '今天也是老样子吗☺️' : (isTsundere ? '再不来我拆了😏' : '新进了关东煮'), time: isGentle ? '早上' : '昨天' },
     ];
 
-    // 不同角色的对话
-    const convos = {};
-    convos['1'] = isTsundere
-      ? [{ from:'them', text:'您好，蛋糕做好了' },{ from:'me', text:'嗯，糖减半了吧' },{ from:'them', text:'减了，动物奶油，放心' },{ from:'me', text:'行' }]
-      : isGentle
-      ? [{ from:'them', text:'今天有新的粉玫瑰哦' },{ from:'me', text:'好看，包一束吧' },{ from:'them', text:'好嘞，送给谁的呀☺️' }]
-      : [{ from:'them', text:'老板，这个月会员日有活动' },{ from:'me', text:'什么活动' },{ from:'them', text:'满100减15' },{ from:'me', text:'哦，那来一箱牛奶' }];
-
-    // 其他AI角色的对话
-    const otherAIs = characters.filter(c => c.id !== charId);
-    otherAIs.forEach(c => {
-      const cid = 'ai_' + c.id;
-      if (!contacts.find(ct => ct.id === cid)) {
-        contacts.push({ id: cid, avatar: c.avatar || '💬', name: c.name, nickname: c.name, lastMsg: '最近没联系', time: '' });
-      }
-      convos[cid] = isTsundere
-        ? [{ from:'them', text:'你最近是不是很闲' },{ from:'me', text:'？' },{ from:'them', text:'老来找我聊天' },{ from:'me', text:'……那我走了' },{ from:'them', text:'哎别' }]
-        : isGentle
-        ? [{ from:'them', text:'今天过得怎么样呀' },{ from:'me', text:'还行，有点累' },{ from:'them', text:'那要好好休息哦，我做了小饼干🍪' }]
-        : [{ from:'them', text:'最近忙啥呢' },{ from:'me', text:'老样子' },{ from:'them', text:'约个饭啊，好久没见了' },{ from:'me', text:'行，周末' }];
-    });
-
-    // 相册
-    const album = isTsundere
-      ? [{ emoji:"🌅", label:"今天的晚霞", time:"今天" },{ emoji:"☕", label:"她喝的咖啡", time:"今天" },{ emoji:"🐱", label:"楼下流浪猫", time:"昨天" },{ emoji:"🍰", label:"蛋糕店新品", time:"昨天" },{ emoji:"🌧", label:"下雨了", time:"前天" },{ emoji:"🌙", label:"今晚月亮", time:"3天前" },{ emoji:"📖", label:"她认真的时候", time:"3天前" },{ emoji:"🌸", label:"路边的花", time:"5天前" }]
-      : isGentle
-      ? [{ emoji:"🌸", label:"今天买的花", time:"今天" },{ emoji:"☀️", label:"好天气", time:"今天" },{ emoji:"🐱", label:"猫咖的小橘", time:"昨天" },{ emoji:"📚", label:"新买的书", time:"昨天" },{ emoji:"🎵", label:"听到一首好歌", time:"前天" },{ emoji:"🌧", label:"听雨", time:"3天前" },{ emoji:"🍰", label:"做了蛋糕", time:"4天前" },{ emoji:"🌙", label:"月色很美", time:"5天前" }]
-      : [{ emoji:"☕", label:"早上的咖啡", time:"今天" },{ emoji:"📱", label:"刷到有趣的新闻", time:"今天" },{ emoji:"🍜", label:"晚饭", time:"昨天" },{ emoji:"💻", label:"工作", time:"昨天" },{ emoji:"🌧", label:"下雨", time:"前天" },{ emoji:"🎮", label:"打游戏", time:"3天前" },{ emoji:"🍺", label:"朋友聚会", time:"4天前" },{ emoji:"🌙", label:"深夜", time:"5天前" }];
-
-    // 歌单
-    const playlist = isTsundere
-      ? [{ title:'路过人间', artist:'郁可唯', time:'刚刚' },{ title:'唯一', artist:'告五人', time:'昨天' },{ title:'起风了', artist:'买辣椒也用券', time:'昨天' },{ title:'小半', artist:'陈粒', time:'前天' },{ title:'喜欢你', artist:'陈洁仪', time:'4天前' }]
-      : isGentle
-      ? [{ title:'小美满', artist:'周深', time:'刚刚' },{ title:'日常', artist:'田馥甄', time:'昨天' },{ title:'暖暖', artist:'梁静茹', time:'昨天' },{ title:'小手拉大手', artist:'梁静茹', time:'前天' },{ title:'陪你度过漫长岁月', artist:'陈奕迅', time:'3天前' }]
-      : [{ title:'空城', artist:'杨坤', time:'刚刚' },{ title:'演员', artist:'薛之谦', time:'昨天' },{ title:'丑八怪', artist:'薛之谦', time:'昨天' },{ title:'像我这样的人', artist:'毛不易', time:'前天' },{ title:'平凡之路', artist:'朴树', time:'4天前' }];
-
-    // 所有联系人确保有conversations条目
+    // 联系人活跃时间随机刷新
+    const timePool = ['刚刚','5分钟前','半小时前','1小时前','今天上午','今天下午','昨晚'];
     contacts.forEach(function(c) {
-      if (c.id !== 'you' && !convos[c.id]) {
-        convos[c.id] = isTsundere
-          ? [{ from:'them', text:'找我有事？' },{ from:'me', text:'没事不能找你？' },{ from:'them', text:'……行吧' }]
-          : isGentle
-          ? [{ from:'them', text:'好久不见呀~' },{ from:'me', text:'是呀，最近还好吗' },{ from:'them', text:'挺好的，想你了！' }]
-          : [{ from:'them', text:'在吗' },{ from:'me', text:'在' },{ from:'them', text:'行' }];
+      if (c.id !== 'you' && Math.random() < 0.4) {
+        c.time = timePool[Math.floor(Math.random() * timePool.length)];
       }
     });
 
-    // 外卖订单（按性格）
-    const foodOrders = isTsundere
-      ? [{ shop:'肯德基', items:'香辣鸡腿堡套餐', price:39.9, time:'昨晚', status:'已送达' },
-         { shop:'一点点', items:'四季奶青 加波霸', price:16, time:'昨天下午', status:'已送达' },
-         { shop:'沙县小吃', items:'蒸饺+拌面', price:18, time:'前天', status:'已送达' },
-         { shop:'绝味鸭脖', items:'鸭锁骨+藕片', price:28, time:'3天前', status:'已送达' }]
-      : isGentle
-      ? [{ shop:'好利来', items:'半熟芝士+芋泥面包', price:48, time:'今天下午', status:'配送中' },
-         { shop:'瑞幸咖啡', items:'生椰拿铁 少冰', price:19.9, time:'今天早上', status:'已送达' },
-         { shop:'老乡鸡', items:'鸡汤+蒸蛋+米饭', price:32, time:'昨天', status:'已送达' },
-         { shop:'鲜芋仙', items:'芋圆4号', price:28, time:'前天', status:'已送达' }]
-      : [{ shop:'麦当劳', items:'板烧鸡腿堡套餐', price:36, time:'昨晚', status:'已送达' },
-         { shop:'星巴克', items:'冰美式 大杯', price:32, time:'今天早上', status:'已送达' },
-         { shop:'美团外卖', items:'黄焖鸡米饭', price:25, time:'昨天', status:'已送达' },
-         { shop:'蜜雪冰城', items:'柠檬水+甜筒', price:8, time:'前天', status:'已送达' }];
+    // 相册（按时间段动态变化）
+    const album = getDynamicAlbum(charId, isTsundere, isGentle, isCool);
 
-    // 浏览器搜索记录（最有叙事潜力的部分）
-    const browserHistory = isTsundere
-      ? [{ query:'怎么哄生气的女朋友', time:'今天' },
-         { query:'傲娇的人怎么表达关心', time:'昨天' },
-         { query:'她喜欢的歌单', time:'昨天' },
-         { query:'蛋糕店几点开门', time:'前天' },
-         { query:'吵架后怎么和好', time:'3天前' },
-         { query:'她最近在看什么剧', time:'4天前' },
-         { query:'送什么礼物不会太明显', time:'5天前' },
-         { query:'如何假装不在意', time:'6天前' }]
-      : isGentle
-      ? [{ query:'今日菜谱 简单好吃', time:'今天' },
-         { query:'她喜欢吃甜的还是咸的', time:'昨天' },
-         { query:'适合送花的节日', time:'昨天' },
-         { query:'怎么让心情变好', time:'前天' },
-         { query:'杭州周末去哪玩', time:'3天前' },
-         { query:'她最近忙不忙', time:'4天前' },
-         { query:'治愈系电影推荐', time:'5天前' },
-         { query:'拼多多鲜花优惠券', time:'6天前' }]
-      : [{ query:'今天天气', time:'今天' },
-         { query:'附近有什么好吃的', time:'昨天' },
-         { query:'周末去哪玩', time:'昨天' },
-         { query:'如何提高工作效率', time:'前天' },
-         { query:'现在流行什么', time:'3天前' },
-         { query:'她喜欢什么', time:'4天前' },
-         { query:'怎么聊天不尴尬', time:'5天前' },
-         { query:'深夜emo怎么办', time:'6天前' }];
+    // 歌单（动态轮换）
+    const playlist = getDynamicPlaylist(charId, isTsundere, isGentle, isCool);
 
-    return { contacts, conversations: convos, album, playlist, foodOrders, browserHistory };
+    // 外卖订单（动态轮换+混入聊天话题）
+    const foodOrders = getDynamicFoodOrders(charId, isTsundere, isGentle, isCool);
+
+    // 浏览器搜索记录（混入最近聊天话题）
+    const browserHistory = getDynamicBrowserHistory(charId, isTsundere, isGentle, isCool);
+
+    return { contacts, album, playlist, foodOrders, browserHistory };
   }
 }
 
@@ -1658,4 +1585,160 @@ async function callLLMApiForSecret(prompt) {
   const data = await resp.json();
   const content = data.choices?.[0]?.message?.content;
   return content ? content.trim() : '';
+}
+
+/* ==================== Secret 动态内容助手 ==================== */
+
+function getRecentChatTopics(charId) {
+  var msgs = chatData[charId] || [];
+  var topics = [];
+  for (var i = msgs.length - 1; i >= 0 && topics.length < 3; i--) {
+    var text = msgs[i].text || '';
+    if (text.length > 4 && text.length < 30 && msgs[i].role === 'user') {
+      topics.push(text.substring(0, 20));
+    }
+  }
+  return topics;
+}
+
+function getDynamicAlbum(charId, isTsundere, isGentle, isCool) {
+  var hour = new Date().getHours();
+  var timePeriod;
+  if (hour >= 5 && hour < 9) timePeriod = 'morning';
+  else if (hour >= 9 && hour < 12) timePeriod = 'late_morning';
+  else if (hour >= 12 && hour < 14) timePeriod = 'noon';
+  else if (hour >= 14 && hour < 18) timePeriod = 'afternoon';
+  else if (hour >= 18 && hour < 21) timePeriod = 'evening';
+  else timePeriod = 'night';
+
+  var setChoice = Math.floor(Math.random() * 2);
+
+  if (isTsundere) {
+    if (timePeriod === 'morning') {
+      return setChoice === 0
+        ? [{ emoji:'🌅', label:'早起看到的天空', time:'今天' },{ emoji:'☕', label:'她给我带的热美式', time:'今天' },{ emoji:'🐱', label:'小区流浪猫', time:'今天' },{ emoji:'📖', label:'她看书的样子', time:'最近' }]
+        : [{ emoji:'🌤', label:'今天阳光不错', time:'今天' },{ emoji:'🥐', label:'早餐', time:'今天' },{ emoji:'🌸', label:'路边花开了', time:'今天' },{ emoji:'🐕', label:'遛狗的大爷', time:'最近' }];
+    } else if (timePeriod === 'noon' || timePeriod === 'afternoon') {
+      return setChoice === 0
+        ? [{ emoji:'☕', label:'她喝的咖啡', time:'今天下午' },{ emoji:'🍰', label:'蛋糕店新品', time:'今天' },{ emoji:'🐱', label:'楼下晒太阳的猫', time:'今天' },{ emoji:'🌧', label:'突然下雨了', time:'今天' }]
+        : [{ emoji:'📱', label:'她发的消息', time:'今天' },{ emoji:'🍜', label:'午饭', time:'今天' },{ emoji:'🎵', label:'听到一首歌想到她', time:'最近' },{ emoji:'☁️', label:'天上的云像猫', time:'今天' }];
+    } else if (timePeriod === 'evening') {
+      return setChoice === 0
+        ? [{ emoji:'🌇', label:'放学路上的晚霞', time:'今天' },{ emoji:'🍚', label:'晚饭', time:'今天' },{ emoji:'🌙', label:'今天的月亮', time:'今天' },{ emoji:'💭', label:'在想她', time:'今天' }]
+        : [{ emoji:'🌆', label:'傍晚的城市', time:'今天' },{ emoji:'🥟', label:'路边的饺子馆', time:'今天' },{ emoji:'✨', label:'第一颗星星', time:'今天' },{ emoji:'📖', label:'她今天说的话', time:'最近' }];
+    } else {
+      return setChoice === 0
+        ? [{ emoji:'🌙', label:'今晚月色很好', time:'今晚' },{ emoji:'🌃', label:'城市夜景', time:'今晚' },{ emoji:'☕', label:'深夜的咖啡', time:'今晚' },{ emoji:'💤', label:'她应该睡了吧', time:'今晚' }]
+        : [{ emoji:'⭐', label:'星星', time:'今晚' },{ emoji:'📱', label:'翻来覆去看聊天记录', time:'今晚' },{ emoji:'🎧', label:'深夜歌单', time:'今晚' },{ emoji:'🌙', label:'想她', time:'今晚' }];
+    }
+  } else if (isGentle) {
+    if (timePeriod === 'morning' || timePeriod === 'late_morning') {
+      return setChoice === 0
+        ? [{ emoji:'🌸', label:'早上买的花', time:'今天' },{ emoji:'☀️', label:'好天气', time:'今天' },{ emoji:'🐱', label:'窗台的猫', time:'今天' },{ emoji:'📚', label:'晨读', time:'今天' }]
+        : [{ emoji:'🌷', label:'露珠', time:'今天' },{ emoji:'🥛', label:'热牛奶', time:'今天' },{ emoji:'🎵', label:'晨间旋律', time:'今天' },{ emoji:'🌿', label:'绿植新芽', time:'最近' }];
+    } else if (timePeriod === 'noon' || timePeriod === 'afternoon') {
+      return setChoice === 0
+        ? [{ emoji:'☕', label:'下午茶', time:'今天' },{ emoji:'🍰', label:'做了小蛋糕', time:'今天' },{ emoji:'🌸', label:'阳光下的花', time:'今天' },{ emoji:'📖', label:'看了一本好书', time:'今天' }]
+        : [{ emoji:'🌻', label:'向日葵', time:'今天' },{ emoji:'🧁', label:'烘焙时间', time:'今天' },{ emoji:'🐱', label:'猫咖的小橘', time:'最近' },{ emoji:'🎨', label:'画了一幅小画', time:'今天' }];
+    } else if (timePeriod === 'evening') {
+      return setChoice === 0
+        ? [{ emoji:'🌇', label:'晚霞', time:'今天' },{ emoji:'🍜', label:'做了晚饭', time:'今天' },{ emoji:'🌙', label:'月亮', time:'今天' },{ emoji:'💌', label:'想给她写信', time:'最近' }]
+        : [{ emoji:'🌆', label:'黄昏', time:'今天' },{ emoji:'🥗', label:'健康晚餐', time:'今天' },{ emoji:'✨', label:'星星出来了', time:'今天' },{ emoji:'🎶', label:'轻音乐', time:'今晚' }];
+    } else {
+      return setChoice === 0
+        ? [{ emoji:'🌙', label:'月色很美', time:'今晚' },{ emoji:'🕯', label:'香薰蜡烛', time:'今晚' },{ emoji:'📖', label:'睡前读物', time:'今晚' },{ emoji:'💤', label:'晚安', time:'今晚' }]
+        : [{ emoji:'⭐', label:'星空', time:'今晚' },{ emoji:'☕', label:'热牛奶', time:'今晚' },{ emoji:'🎵', label:'晚安曲', time:'今晚' },{ emoji:'🌙', label:'好梦', time:'今晚' }];
+    }
+  } else {
+    return setChoice === 0
+      ? [{ emoji:'☕', label:'咖啡', time:'今天' },{ emoji:'📱', label:'刷到有趣的新闻', time:'今天' },{ emoji:'🍜', label:'随便吃了点', time:'今天' },{ emoji:'💻', label:'干活', time:'今天' }]
+      : [{ emoji:'🎮', label:'打了一会儿游戏', time:'今天' },{ emoji:'🍺', label:'朋友叫喝酒', time:'最近' },{ emoji:'🌧', label:'下雨了', time:'今天' },{ emoji:'🌙', label:'又一天', time:'今晚' }];
+  }
+}
+
+function getDynamicPlaylist(charId, isTsundere, isGentle, isCool) {
+  var hour = new Date().getHours();
+  var vibe = (hour >= 5 && hour < 12) ? 'morning' : (hour >= 12 && hour < 18) ? 'afternoon' : (hour >= 18 && hour < 22) ? 'evening' : 'night';
+  var setIdx = Math.floor(Math.random() * 2);
+  var pools;
+  if (isTsundere) {
+    pools = vibe === 'morning'
+      ? [[{ title:'路过人间', artist:'郁可唯' },{ title:'唯一', artist:'告五人' },{ title:'小半', artist:'陈粒' },{ title:'喜欢你', artist:'陈洁仪' }],[{ title:'刚刚好', artist:'薛之谦' },{ title:'你就不要想起我', artist:'田馥甄' },{ title:'带我走', artist:'杨丞琳' },{ title:'爱丫爱丫', artist:'BY2' }]]
+      : vibe === 'afternoon'
+      ? [[{ title:'不值得', artist:'梦飞船' },{ title:'我怀念的', artist:'孙燕姿' }],[{ title:'倒带', artist:'蔡依林' },{ title:'安静', artist:'周杰伦' }]]
+      : vibe === 'evening'
+      ? [[{ title:'夜曲', artist:'周杰伦' },{ title:'黄昏', artist:'周传雄' },{ title:'慢慢', artist:'颜人中' }],[{ title:'特别的人', artist:'方大同' },{ title:'Love Song', artist:'方大同' }]]
+      : [[{ title:'我好想你', artist:'苏打绿' },{ title:'你就不要想起我', artist:'田馥甄' }],[{ title:'想你的夜', artist:'关喆' },{ title:'趁早', artist:'张宇' }]];
+  } else if (isGentle) {
+    pools = [[{ title:'小美满', artist:'周深' },{ title:'日常', artist:'田馥甄' },{ title:'暖暖', artist:'梁静茹' }],[{ title:'遇见', artist:'孙燕姿' },{ title:'明天你好', artist:'牛奶咖啡' },{ title:'和你一样', artist:'李宇春' }]];
+  } else {
+    pools = [[{ title:'空城', artist:'杨坤' },{ title:'演员', artist:'薛之谦' },{ title:'丑八怪', artist:'薛之谦' }],[{ title:'消愁', artist:'毛不易' },{ title:'南山南', artist:'马頔' },{ title:'理想三旬', artist:'陈鸿宇' }]];
+  }
+  var selected = pools[setIdx % pools.length];
+  var times = ['刚刚','今天','今天下午','昨晚'];
+  return selected.map(function(s) { return { title: s.title, artist: s.artist, time: times[Math.floor(Math.random()*4)] }; });
+}
+
+function getDynamicFoodOrders(charId, isTsundere, isGentle, isCool) {
+  var hour = new Date().getHours();
+  var setIdx = Math.floor(Math.random() * 3);
+  var baseOrders = isTsundere
+    ? [[{ shop:'肯德基', items:'香辣鸡腿堡套餐', price:39.9 },{ shop:'一点点', items:'四季奶青 加波霸', price:16 },{ shop:'沙县小吃', items:'蒸饺+拌面', price:18 },{ shop:'绝味鸭脖', items:'鸭锁骨+藕片', price:28 }],[{ shop:'麦当劳', items:'板烧鸡腿堡', price:34 },{ shop:'瑞幸咖啡', items:'生椰拿铁', price:19.9 },{ shop:'螺蛳粉', items:'螺蛳粉加蛋', price:25 },{ shop:'蜜雪冰城', items:'柠檬水', price:6 }],[{ shop:'便利蜂', items:'便当+酸奶', price:28.5 },{ shop:'麻辣烫', items:'自选麻辣烫', price:32 },{ shop:'正新鸡排', items:'鸡排+烤肠', price:15 }]]
+    : isGentle
+    ? [[{ shop:'好利来', items:'半熟芝士+芋泥面包', price:48 },{ shop:'瑞幸咖啡', items:'生椰拿铁 少冰', price:19.9 },{ shop:'老乡鸡', items:'鸡汤+蒸蛋+米饭', price:32 },{ shop:'鲜芋仙', items:'芋圆4号', price:28 }],[{ shop:'星巴克', items:'抹茶星冰乐', price:36 },{ shop:'喜茶', items:'多肉葡萄', price:28 },{ shop:'巴黎贝甜', items:'牛角包+牛奶', price:25 }],[{ shop:'味多美', items:'老婆饼+蛋挞', price:20 },{ shop:'吉野家', items:'肥牛饭套餐', price:38 },{ shop:'满记甜品', items:'杨枝甘露', price:32 }]]
+    : [[{ shop:'麦当劳', items:'板烧鸡腿堡套餐', price:36 },{ shop:'星巴克', items:'冰美式 大杯', price:32 },{ shop:'黄焖鸡米饭', items:'黄焖鸡米饭', price:25 },{ shop:'蜜雪冰城', items:'柠檬水+甜筒', price:8 }],[{ shop:'汉堡王', items:'皇堡套餐', price:42 },{ shop:'瑞幸咖啡', items:'厚乳拿铁', price:22 },{ shop:'沙县小吃', items:'鸡腿饭', price:18 }],[{ shop:'必胜客', items:'披萨外送', price:68 },{ shop:'肯德基', items:'奥尔良烤鸡腿堡', price:32 },{ shop:'马记永', items:'兰州牛肉面', price:26 }]];
+  var orders = baseOrders[setIdx % baseOrders.length].map(function(o) {
+    var statuses = ['已送达','已送达','配送中'];
+    var times = ['今天上午','今天中午','今天下午','昨天中午','昨天晚上'];
+    return { shop: o.shop, items: o.items, price: o.price, time: times[Math.floor(Math.random() * times.length)], status: statuses[Math.floor(Math.random() * statuses.length)] };
+  });
+  var topics = getRecentChatTopics(charId);
+  topics.forEach(function(t) {
+    if (t && (t.includes('吃') || t.includes('饭') || t.includes('喝') || t.includes('点'))) {
+      orders.unshift({ shop: '🍽 猜你想点', items: t, price: 0, time: '刚刚', status: '未下单' });
+    }
+  });
+  if (orders.length > 6) orders = orders.slice(0, 6);
+  return orders;
+}
+
+function getDynamicBrowserHistory(charId, isTsundere, isGentle, isCool) {
+  var base = isTsundere
+    ? [{ query:'怎么哄生气的女朋友', time:'今天' },
+       { query:'傲娇的人怎么表达关心', time:'昨天' },
+       { query:'她最近在看什么', time:'昨天' },
+       { query:'吵架后怎么和好', time:'3天前' },
+       { query:'送什么礼物不会太明显', time:'5天前' },
+       { query:'如何假装不在意', time:'6天前' }]
+    : isGentle
+    ? [{ query:'今日菜谱 简单好吃', time:'今天' },
+       { query:'她喜欢甜的还是咸的', time:'昨天' },
+       { query:'适合送花的节日', time:'昨天' },
+       { query:'怎么让心情变好', time:'前天' },
+       { query:'治愈系电影推荐', time:'5天前' },
+       { query:'拼多多鲜花优惠券', time:'6天前' }]
+    : [{ query:'今天天气', time:'今天' },
+       { query:'附近有什么好吃的', time:'昨天' },
+       { query:'周末去哪玩', time:'昨天' },
+       { query:'如何提高工作效率', time:'前天' },
+       { query:'她喜欢什么', time:'4天前' },
+       { query:'深夜emo怎么办', time:'6天前' }];
+
+  // 混入最近的聊天话题
+  var recentTopics = getRecentChatTopics(charId);
+  recentTopics.forEach(function(topic) {
+    if (topic && topic.length > 2) {
+      base.unshift({ query: topic, time: '刚刚' });
+    }
+  });
+
+  // 随机刷新部分时间
+  var times = ['刚刚','10分钟前','今天上午','今天下午','今天','昨天','前天'];
+  for (var i = 0; i < base.length; i++) {
+    if (Math.random() < 0.3) {
+      base[i].time = times[Math.floor(Math.random() * times.length)];
+    }
+  }
+
+  return base;
 }

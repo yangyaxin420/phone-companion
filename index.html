@@ -12,460 +12,6 @@
 <meta name="app-version" content="v3.5.2 (2026.07.13)">
 <title>我的手机</title>
 <link rel="stylesheet" href="css/style.css?v=5">
-<!--
-/* ==================== 1. 基础重置 ==================== */
-*{margin:0;padding:0;box-sizing:border-box;}
-html,body{width:100%;height:100%;background:#111;display:flex;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Hiragino Sans GB',sans-serif;color:#1e1e1e;overflow:hidden;}
-::-webkit-scrollbar{display:none;}
-*{scrollbar-width:none;-ms-overflow-style:none;}
-button{border:none;background:none;cursor:pointer;font:inherit;color:inherit;}
-input,textarea,select{font:inherit;color:inherit;border:none;outline:none;background:transparent;}
-ul{list-style:none;}
-
-/* ==================== 2. 手机外壳 ==================== */
-.phone-frame{width:375px;height:700px;max-height:100dvh;border-radius:44px;background:#f8f8f8;position:relative;overflow:hidden;box-shadow:0 0 0 8px #222,0 0 40px rgba(0,0,0,.6),inset 0 0 2px rgba(255,255,255,.1);}
-.phone-screen{width:100%;height:100%;display:flex;flex-direction:column;position:relative;}
-
-/* 手机端全屏模式 */
-@media (max-width:420px) {
-  .phone-frame{width:100vw;height:100dvh;border-radius:0;box-shadow:none;}
-  .status-bar{padding-top:env(safe-area-inset-top,0);height:auto;min-height:28px;padding-left:20px;padding-right:20px;}
-  .bottom-nav{padding-bottom:env(safe-area-inset-bottom,0);height:auto;min-height:50px;}
-}
-/* 平板/中等屏幕居中 */
-@media (min-width:421px) and (max-width:768px) {
-  .phone-frame{border-radius:30px;box-shadow:0 0 0 6px #222,0 0 30px rgba(0,0,0,.4);}
-}
-
-/* ==================== 3. 状态栏 ==================== */
-.status-bar{height:28px;background:#f8f8f8;display:flex;align-items:center;justify-content:space-between;padding:0 20px;font-size:11px;font-weight:600;flex-shrink:0;z-index:10;}
-.status-bar .sb-time{font-weight:700;}
-.status-bar .sb-icons{display:flex;gap:4px;font-size:10px;}
-
-/* ==================== 4. 内容区 ==================== */
-.content-area{flex:1;position:relative;overflow:hidden;}
-
-/* ==================== 5. 页面通用 & 过渡 ==================== */
-.page{position:absolute;top:0;left:0;width:100%;height:100%;display:none;flex-direction:column;background:#f8f8f8;overflow-y:auto;overflow-x:hidden;}
-.page.active{display:flex;}
-@keyframes slideInRight{from{transform:translateX(100%)}to{transform:translateX(0)}}
-@keyframes slideOutLeft{from{transform:translateX(0)}to{transform:translateX(-100%)}}
-@keyframes slideInLeft{from{transform:translateX(-100%)}to{transform:translateX(0)}}
-@keyframes slideOutRight{from{transform:translateX(0)}to{transform:translateX(100%)}}
-.anim-in-right{animation:slideInRight .28s ease forwards}
-.anim-out-left{animation:slideOutLeft .28s ease forwards}
-.anim-in-left{animation:slideInLeft .28s ease forwards}
-.anim-out-right{animation:slideOutRight .28s ease forwards}
-
-/* ==================== 6. 底部导航 ==================== */
-.bottom-nav{height:50px;background:#f8f8f8;border-top:1px solid #e0e0e0;display:flex;align-items:center;justify-content:space-around;flex-shrink:0;z-index:10;padding-bottom:4px;}
-.bottom-nav button{font-size:18px;padding:8px 18px;border-radius:20px;transition:all .15s;opacity:.5;}
-.bottom-nav button:active{transform:scale(.92);}
-.bottom-nav button.nav-enabled{opacity:1;}
-.bottom-nav button.nav-disabled{opacity:.25;pointer-events:none;}
-
-/* ==================== 7. 主页双屏 ==================== */
-.main-wrapper{display:flex;width:200%;height:100%;transition:transform .3s ease;}
-.main-screen{width:50%;height:100%;overflow-y:auto;padding:10px 16px 8px;}
-
-/* 天气卡片 */
-.weather-card{background:linear-gradient(135deg,#e8e8e8,#d0d0d0);border-radius:16px;padding:14px 16px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;transition:transform .1s;}
-.weather-card:active{transform:scale(.98);}
-.weather-info{font-size:12px;color:#555;line-height:1.6;}
-.weather-info .temp{font-size:28px;font-weight:700;color:#1e1e1e;}
-.weather-info .weather-detail{font-size:11px;color:#777;margin-top:2px;}
-.weather-icon{font-size:36px;}
-.weather-loading{font-size:12px;color:#999;}
-
-
-/* 人设名牌 */
-/* 图标网格 */
-.icon-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px 8px;padding:6px 0;}
-.icon-item{display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;-webkit-user-select:none;user-select:none;transition:transform .1s;}
-.icon-item:active{transform:scale(.92);}
-.icon-item.dragging{opacity:.4;}
-.icon-item.drag-over{border:2px dashed #aaa;border-radius:12px;}
-.icon-symbol{width:48px;height:48px;border-radius:14px;background:#e8e8e8;display:flex;align-items:center;justify-content:center;font-size:22px;color:#1e1e1e;transition:background .15s;}
-.icon-symbol:active{background:#ddd;}
-.icon-name{font-size:10px;color:#666;white-space:nowrap;}
-
-/* 倒数日卡片 */
-.countdown-card{background:linear-gradient(135deg,#e0e0e0,#ccc);border-radius:16px;padding:16px;margin-bottom:14px;cursor:pointer;position:relative;overflow:hidden;transition:transform .1s;min-height:90px;}
-.countdown-card:active{transform:scale(.98);}
-.countdown-card .cd-bg{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;opacity:.3;border-radius:16px;}
-.countdown-card .cd-content{position:relative;z-index:1;}
-.countdown-card .cd-event{font-size:16px;font-weight:600;margin-bottom:4px;}
-.countdown-card .cd-days{font-size:32px;font-weight:700;color:#1e1e1e;}
-.countdown-card .cd-date{font-size:11px;color:#666;margin-top:2px;}
-
-/* 倒数日编辑 */
-.cd-edit{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;z-index:100;}
-.cd-edit.show{display:flex;}
-.cd-edit-form{background:#f8f8f8;border-radius:20px;padding:24px;width:300px;display:flex;flex-direction:column;gap:12px;}
-.cd-edit-form h3{font-size:16px;text-align:center;}
-.cd-edit-form input{border:1px solid #ddd;border-radius:10px;padding:10px 12px;background:#fff;font-size:14px;}
-.cd-edit-form .btn-row{display:flex;gap:10px;justify-content:center;}
-.cd-edit-form .btn-row button{padding:8px 24px;border-radius:12px;font-size:14px;font-weight:600;}
-.cd-btn-save{background:#1e1e1e;color:#f8f8f8;}
-.cd-btn-cancel{background:#e0e0e0;color:#1e1e1e;}
-
-/* ==================== 8. 子页面通用 ==================== */
-.sub-page-header{padding:14px 16px 10px;font-size:17px;font-weight:700;border-bottom:1px solid #eee;background:#f8f8f8;flex-shrink:0;}
-.sub-page-body{flex:1;overflow-y:auto;padding:12px 16px;}
-
-/* ==================== 9. 任务清单 ==================== */
-.task-list{display:flex;flex-direction:column;gap:6px;}
-.task-item{display:flex;align-items:center;gap:10px;padding:10px 12px;background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.04);transition:transform .1s;}
-.task-item:active{transform:scale(.98);}
-.task-item.done .task-text{text-decoration:line-through;color:#aaa;}
-.task-check{width:22px;height:22px;border-radius:50%;border:2px solid #ccc;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:all .15s;font-size:12px;}
-.task-check.checked{background:#1e1e1e;border-color:#1e1e1e;color:#f8f8f8;}
-.task-text{flex:1;font-size:14px;}
-.task-del{font-size:16px;color:#ccc;cursor:pointer;padding:4px;}
-.task-del:hover{color:#e55;}
-.task-add-bar{display:flex;gap:8px;padding:10px 0;flex-shrink:0;}
-.task-add-bar input{flex:1;border:1px solid #ddd;border-radius:12px;padding:10px 14px;background:#fff;font-size:14px;}
-.task-add-bar button{background:#1e1e1e;color:#f8f8f8;border-radius:12px;padding:10px 18px;font-weight:600;font-size:14px;}
-
-/* ==================== 10. 闹钟 ==================== */
-.alarm-list{display:flex;flex-direction:column;gap:8px;}
-.alarm-item{display:flex;align-items:center;justify-content:space-between;padding:14px 14px;background:#fff;border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,.04);}
-.alarm-time{font-size:28px;font-weight:700;}
-.alarm-label{font-size:12px;color:#888;margin-top:2px;}
-.alarm-right{display:flex;align-items:center;gap:10px;}
-.alarm-del{font-size:18px;color:#ccc;cursor:pointer;}
-.alarm-del:hover{color:#e55;}
-.ios-toggle{width:46px;height:28px;border-radius:14px;background:#ddd;position:relative;cursor:pointer;transition:background .2s;}
-.ios-toggle.on{background:#4cd964;}
-.ios-toggle::after{content:'';position:absolute;top:2px;left:2px;width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:transform .2s;}
-.ios-toggle.on::after{transform:translateX(18px);}
-.alarm-add-bar{display:flex;gap:8px;padding:10px 0;flex-shrink:0;align-items:center;}
-.alarm-add-bar input{border:1px solid #ddd;border-radius:10px;padding:8px 12px;background:#fff;font-size:14px;}
-.alarm-add-bar input[type="time"]{width:110px;}
-.alarm-add-bar input[type="text"]{flex:1;}
-.alarm-add-bar button{background:#1e1e1e;color:#f8f8f8;border-radius:12px;padding:8px 16px;font-weight:600;font-size:14px;}
-
-/* 闹钟弹窗 */
-.alarm-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:200;}
-.alarm-modal.show{display:flex;}
-.alarm-modal-box{background:#f8f8f8;border-radius:20px;padding:30px;text-align:center;width:260px;}
-.alarm-modal-box .am-title{font-size:20px;font-weight:700;margin-bottom:8px;}
-.alarm-modal-box .am-time{font-size:36px;font-weight:700;margin-bottom:6px;}
-.alarm-modal-box .am-label{font-size:14px;color:#888;margin-bottom:16px;}
-.alarm-modal-box button{background:#1e1e1e;color:#f8f8f8;border-radius:14px;padding:10px 30px;font-size:15px;font-weight:600;}
-
-/* ==================== 11. 聊天 ==================== */
-.chat-page{display:flex;flex-direction:column;height:100%;}
-.chat-messages{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:8px;}
-.chat-msg{max-width:75%;padding:10px 14px;border-radius:16px;font-size:14px;line-height:1.5;word-break:break-word;}
-.chat-msg.ai{background:#e8e8e8;color:#1e1e1e;align-self:flex-start;border-bottom-left-radius:4px;}
-.chat-msg.user{background:#1e1e1e;color:#f8f8f8;align-self:flex-end;border-bottom-right-radius:4px;}
-.chat-msg.system{background:transparent;color:#999;align-self:center;font-size:12px;padding:4px 10px;max-width:90%;text-align:center;}
-.chat-typing{align-self:flex-start;padding:10px 14px;background:#e8e8e8;border-radius:16px;border-bottom-left-radius:4px;display:none;gap:4px;align-items:center;}
-.chat-typing.show{display:flex;}
-.chat-typing span{width:6px;height:6px;border-radius:50%;background:#999;animation:typingDot .6s infinite alternate;}
-.chat-typing span:nth-child(2){animation-delay:.15s;}
-.chat-typing span:nth-child(3){animation-delay:.3s;}
-@keyframes typingDot{from{opacity:.3;transform:translateY(0)}to{opacity:1;transform:translateY(-4px)}}
-.chat-input-bar{display:flex;gap:6px;padding:8px 14px;border-top:1px solid #eee;background:#f8f8f8;flex-shrink:0;align-items:flex-end;position:relative;}
-.chat-context-bar{display:flex;justify-content:space-between;align-items:center;padding:6px 14px;background:#f0f0f0;font-size:11px;color:#888;cursor:pointer;flex-shrink:0;border-top:1px solid #eee;}
-.chat-context-detail{padding:8px 14px;background:#f5f5f5;font-size:12px;color:#666;line-height:1.6;max-height:120px;overflow-y:auto;flex-shrink:0;}
-.chat-input-bar textarea{flex:1;border:1px solid #ddd;border-radius:14px;padding:8px 12px;background:#fff;font-size:14px;resize:none;max-height:80px;min-height:36px;line-height:1.4;}
-.chat-send-btn{background:#1e1e1e;color:#f8f8f8;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
-.chat-sp-config{margin-top:8px;padding:10px;background:#fff;border-radius:10px;border:1px solid #eee;}
-.chat-sp-config textarea{width:100%;height:50px;border:1px solid #ddd;border-radius:8px;padding:8px;font-size:12px;resize:none;background:#fafafa;}
-.chat-sp-config label{font-size:11px;color:#888;display:block;margin-bottom:4px;}
-.chat-quick-btn{padding:6px 14px;border-radius:10px;background:#e8e8e8;font-size:12px;font-weight:600;color:#1e1e1e;}
-
-/* ==================== 表情面板 ==================== */
-.emoji-btn{background:none;border:none;font-size:20px;cursor:pointer;padding:0 6px;flex-shrink:0;line-height:1;border-radius:8px;transition:background .15s;}
-.emoji-btn:active{background:#e8e8e8;}
-.emoji-panel{position:absolute;bottom:100%;left:0;right:0;background:#fafafa;border-top:1px solid #e5e5e5;border-radius:16px 16px 0 0;padding:12px 10px 8px;display:none;flex-direction:column;max-height:260px;z-index:50;box-shadow:0 -4px 20px rgba(0,0,0,.1);}
-.emoji-panel.show{display:flex;}
-.emoji-panel-tabs{display:flex;gap:4px;margin-bottom:10px;padding:2px;background:#eee;border-radius:10px;padding:3px;}
-.emoji-tab{padding:5px 12px;border-radius:8px;font-size:11px;font-weight:600;background:transparent;cursor:pointer;border:none;color:#888;transition:all .15s;}
-.emoji-tab.active{background:#fff;color:#1e1e1e;box-shadow:0 1px 3px rgba(0,0,0,.1);}
-.emoji-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:1px;overflow-y:auto;flex:1;padding:2px 0;-webkit-overflow-scrolling:touch;}
-.emoji-grid-item{font-size:24px;padding:6px 2px;text-align:center;cursor:pointer;border-radius:8px;transition:all .1s;line-height:1.2;}
-.emoji-grid-item:hover{background:#e8e8e8;}
-.emoji-grid-item:active{transform:scale(1.2);background:#e0e0e0;}
-.emoji-custom-bar{display:flex;gap:6px;padding-top:8px;border-top:1px solid #e5e5e5;align-items:center;}
-.emoji-custom-bar input{flex:1;border:1px solid #ddd;border-radius:10px;padding:7px 12px;font-size:13px;background:#fff;}
-.emoji-custom-bar button{padding:7px 14px;border-radius:10px;background:#1e1e1e;color:#f8f8f8;font-size:12px;font-weight:600;border:none;cursor:pointer;white-space:nowrap;}
-.emoji-custom-bar button:active{opacity:.8;}
-.emoji-manage{display:flex;flex-wrap:wrap;gap:4px;padding:4px 0;}
-.emoji-manage-item{position:relative;display:inline-block;}
-.emoji-manage-item .emoji-del{position:absolute;top:-4px;right:-4px;width:16px;height:16px;border-radius:50%;background:#e55;color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:none;line-height:1;}
-.emoji-msg{font-size:32px;line-height:1.3;}
-.chat-msg.user.emoji-only{background:transparent;padding:4px 8px;}
-.chat-msg.ai.emoji-only{background:transparent;padding:4px 8px;}
-.emoji-img-msg{max-width:120px;max-height:120px;border-radius:12px;display:block;}
-.chat-msg.user.emoji-img-only{background:transparent;padding:4px 8px;}
-.chat-msg.ai.emoji-img-only{background:transparent;padding:4px 8px;}
-.emoji-img-item{width:56px;height:56px;border-radius:10px;overflow:hidden;cursor:pointer;position:relative;border:2px solid #e8e8e8;transition:border-color .15s;}
-.emoji-img-item:hover{border-color:#bbb;}
-.emoji-img-item:active{transform:scale(.92);}
-.emoji-img-item img{width:100%;height:100%;object-fit:cover;}
-.emoji-img-item .emoji-del{position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:#e55;color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:2px solid #fafafa;line-height:1;}
-.emoji-custom-section{margin-top:8px;border-top:1px solid #e5e5e5;padding-top:8px;}
-.emoji-custom-section-title{font-size:11px;color:#999;margin-bottom:6px;font-weight:600;}
-.emoji-img-grid{display:flex;flex-wrap:wrap;gap:6px;}
-.emoji-add-btn{width:56px;height:56px;border-radius:10px;border:2px dashed #ccc;display:flex;align-items:center;justify-content:center;font-size:22px;color:#bbb;cursor:pointer;transition:all .15s;}
-.emoji-add-btn:hover{border-color:#999;color:#999;}
-.emoji-add-btn:active{transform:scale(.95);}
-.emoji-add-actions{display:flex;gap:8px;margin-top:4px;}
-.emoji-add-actions button{flex:1;padding:8px;border-radius:10px;border:1px solid #ddd;background:#fff;font-size:12px;cursor:pointer;}
-.emoji-add-actions button:active{background:#eee;}
-/* 聊天时间戳 */
-.chat-msg-time{font-size:10px;color:#bbb;margin-top:2px;display:none;}
-.chat-msg:hover .chat-msg-time,.chat-msg:last-child .chat-msg-time{display:block;}
-
-/* ==================== 14. 朋友圈 ==================== */
-.moments-list{display:flex;flex-direction:column;gap:10px;}
-.moment-card{background:#fff;border-radius:14px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.04);}
-.moment-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
-.moment-user{font-size:13px;font-weight:600;}
-.moment-time{font-size:11px;color:#aaa;}
-.moment-content{font-size:14px;line-height:1.6;margin-bottom:8px;}
-.moment-actions{display:flex;gap:14px;align-items:center;}
-.moment-comments{background:#f5f5f5;border-radius:8px;padding:8px 10px;margin-top:6px;font-size:13px;}
-.moment-comment-item{padding:3px 0;line-height:1.4;}
-.moment-comment-item b{color:#1e1e1e;}
-.moment-photo{margin-top:6px;border-radius:8px;overflow:hidden;}
-.moment-photo img{width:100%;max-height:200px;object-fit:cover;}
-.moment-like{display:flex;align-items:center;gap:4px;cursor:pointer;font-size:13px;color:#888;transition:color .15s;}
-.moment-like.liked{color:#e55;}
-.moment-like:active{transform:scale(.92);}
-.moment-comment{font-size:13px;color:#888;cursor:pointer;}
-
-/* ==================== 15. 陪伴计时 ==================== */
-.companion-page{display:flex;flex-direction:column;align-items:center;padding:16px;}
-.companion-activities{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:100%;margin-bottom:20px;}
-.companion-act-btn{padding:14px 8px;border-radius:14px;background:#e8e8e8;font-size:13px;font-weight:600;text-align:center;transition:all .15s;}
-.companion-act-btn:active{transform:scale(.95);}
-.companion-act-btn.selected{background:#1e1e1e;color:#f8f8f8;}
-.companion-timer{font-size:48px;font-weight:700;letter-spacing:2px;margin-bottom:20px;font-variant-numeric:tabular-nums;}
-.companion-btns{display:flex;gap:12px;}
-.companion-btn{padding:12px 28px;border-radius:14px;font-size:14px;font-weight:600;background:#1e1e1e;color:#f8f8f8;}
-.companion-btn.secondary{background:#e0e0e0;color:#1e1e1e;}
-.companion-btn:active{transform:scale(.95);}
-
-/* ==================== 16. 日程 ==================== */
-.schedule-page{padding:12px 16px;display:flex;flex-direction:column;gap:8px;}
-.schedule-item{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.04);}
-.schedule-item.done .schedule-text{text-decoration:line-through;color:#aaa;}
-.schedule-check{width:22px;height:22px;border-radius:50%;border:2px solid #ccc;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;font-size:12px;}
-.schedule-check.checked{background:#1e1e1e;border-color:#1e1e1e;color:#f8f8f8;}
-.schedule-text{flex:1;font-size:14px;line-height:1.4;}
-.schedule-time{font-size:11px;color:#999;white-space:nowrap;}
-.schedule-del{font-size:16px;color:#ccc;cursor:pointer;padding:4px;}
-.schedule-del:hover{color:#e55;}
-.schedule-date-group{font-size:13px;font-weight:700;color:#888;padding:8px 4px 4px;}
-.schedule-preview{background:#fff3e0;border-radius:12px;padding:12px;margin:6px 0;border-left:3px solid #ff9800;}
-.schedule-preview-item{display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:13px;}
-.schedule-preview-item span{flex:1;}
-.schedule-confirm-btn{padding:6px 14px;border-radius:10px;background:#1e1e1e;color:#f8f8f8;font-size:12px;font-weight:600;white-space:nowrap;}
-.schedule-confirm-btn:active{transform:scale(.95);}
-.schedule-edit-btn{background:#e0e0e0;color:#1e1e1e;margin-right:4px;}
-
-/* ==================== 17. 记账 ==================== */
-.expense-page{padding:12px 16px;display:flex;flex-direction:column;gap:10px;}
-.expense-form{background:#fff;border-radius:14px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.04);}
-.expense-form-row{display:flex;gap:8px;margin-bottom:8px;align-items:center;}
-.expense-form-row label{font-size:12px;color:#888;min-width:40px;}
-.expense-form-row input,.expense-form-row select{flex:1;border:1px solid #ddd;border-radius:10px;padding:8px 10px;background:#fff;font-size:13px;appearance:auto;}
-.expense-cat-grid{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;}
-.expense-cat-btn{padding:6px 14px;border-radius:10px;background:#f0f0f0;font-size:12px;cursor:pointer;transition:all .1s;}
-.expense-cat-btn:active{transform:scale(.95);}
-.expense-cat-btn.selected{background:#1e1e1e;color:#f8f8f8;}
-/* 记账三Tab */
-.expense-tabs{display:flex;gap:4px;background:#eee;border-radius:10px;padding:3px;margin:8px 16px 0;flex-shrink:0;}
-.expense-tab{padding:6px 0;flex:1;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;transition:all .1s;text-align:center;background:transparent;color:#888;}
-.expense-tab.active{background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.1);color:#1e1e1e;}
-.expense-stats-tabs{display:flex;gap:4px;background:#eee;border-radius:10px;padding:3px;margin-bottom:8px;}
-.expense-stats-tab{padding:6px 0;flex:1;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;transition:all .1s;text-align:center;background:transparent;color:#888;}
-.expense-stats-tab.active{background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.1);color:#1e1e1e;}
-
-/* 明细按天分组 */
-.expense-date-group{font-size:13px;font-weight:700;color:#555;padding:10px 0 4px;border-top:1px solid #eee;margin-top:4px;}
-.expense-date-group:first-child{border-top:none;margin-top:0;}
-.expense-date-summary{font-size:11px;color:#999;margin-bottom:6px;padding:0 4px;}
-.expense-detail-item{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#fff;border-radius:10px;margin-bottom:4px;font-size:13px;}
-.expense-detail-item .edi-left{display:flex;gap:10px;align-items:center;}
-.expense-detail-item .edi-cat{font-weight:600;color:#555;min-width:40px;}
-.expense-detail-item .edi-note{color:#999;font-size:11px;}
-.expense-detail-item .edi-amount{font-weight:600;}
-.expense-detail-item .edi-amount.expense{color:#e76f51;}
-.expense-detail-item .edi-amount.income{color:#4caf50;}
-.expense-detail-item .edi-del{color:#ccc;cursor:pointer;padding:4px;font-size:14px;}
-.expense-detail-item .edi-del:hover{color:#e55;}
-.expense-summary{display:flex;gap:12px;justify-content:space-around;background:#fff;border-radius:14px;padding:12px;box-shadow:0 1px 3px rgba(0,0,0,.04);}
-.expense-summary-item{text-align:center;}
-.expense-summary-item .amount{font-size:18px;font-weight:700;}
-.expense-summary-item .amount.income{color:#4caf50;}
-.expense-summary-item .amount.expense{color:#e76f51;}
-.expense-summary-item .label{font-size:11px;color:#999;}
-.expense-list{display:flex;flex-direction:column;gap:4px;flex:1;overflow-y:auto;}
-.expense-item{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#fff;border-radius:10px;font-size:13px;}
-.expense-item .ei-left{display:flex;gap:10px;align-items:center;}
-.expense-item .ei-cat{font-weight:600;color:#555;}
-.expense-item .ei-note{color:#999;font-size:11px;}
-.expense-item .ei-amount{font-weight:600;}
-.expense-item .ei-amount.expense{color:#e76f51;}
-.expense-item .ei-amount.income{color:#4caf50;}
-.expense-item .ei-del{color:#ccc;cursor:pointer;padding:4px;font-size:14px;}
-.expense-item .ei-del:hover{color:#e55;}
-
-/* ==================== 18. Secret ==================== */
-.secret-desk{display:flex;flex-direction:column;align-items:center;padding:20px;gap:20px;}
-.secret-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;width:100%;max-width:240px;}
-.secret-icon{display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;transition:transform .1s;}
-.secret-icon:active{transform:scale(.92);}
-.secret-icon .si-symbol{width:64px;height:64px;border-radius:18px;background:#e8e8e8;display:flex;align-items:center;justify-content:center;font-size:28px;}
-.secret-icon .si-name{font-size:11px;color:#666;}
-.secret-content{padding:12px 16px;flex:1;overflow-y:auto;width:100%;}
-.secret-note-card{background:#fff;border-radius:12px;padding:12px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,.04);}
-.secret-note-card .sn-time{font-size:11px;color:#bbb;margin-bottom:4px;}
-.secret-note-card .sn-text{font-size:13px;line-height:1.6;color:#555;}
-.secret-chat-item{display:flex;gap:8px;padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:13px;line-height:1.5;}
-.secret-chat-item .sci-role{font-weight:600;min-width:36px;flex-shrink:0;}
-.secret-chat-item .sci-role.ai{color:#1e1e1e;}
-.secret-chat-item .sci-role.user{color:#888;}
-.secret-chat-item .sci-name{font-weight:600;min-width:44px;flex-shrink:0;font-size:12px;}
-.secret-chat-item .sci-name.me{color:#1e1e1e;}
-.secret-chat-item .sci-name.other{color:#888;}
-.secret-contact-header{padding:10px 0 4px;font-size:13px;font-weight:700;color:#444;border-top:1px solid #e8e8e8;margin-top:4px;}
-.secret-contact-header:first-of-type{border-top:none;margin-top:0;}
-.secret-photo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
-.secret-photo-item{aspect-ratio:1;border-radius:10px;background:linear-gradient(145deg,#f0f0f0,#e0e0e0);display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:24px;position:relative;overflow:hidden;cursor:default;}
-.secret-photo-item .sp-emoji{font-size:28px;margin-bottom:2px;}
-.secret-photo-item .sp-label{font-size:8px;color:#888;text-align:center;padding:0 2px;line-height:1.2;}
-.secret-photo-time{font-size:9px;color:#bbb;margin-top:2px;text-align:center;}
-.secret-playlist-item{display:flex;align-items:center;gap:10px;padding:10px 12px;background:#fff;border-radius:12px;margin-bottom:6px;box-shadow:0 1px 3px rgba(0,0,0,.04);}
-.secret-playlist-item .sp-icon{font-size:20px;width:36px;text-align:center;}
-.secret-playlist-item .sp-info{flex:1;}
-.secret-playlist-item .sp-title{font-size:13px;font-weight:500;color:#333;}
-.secret-playlist-item .sp-artist{font-size:11px;color:#999;}
-.secret-playlist-item .sp-time{font-size:10px;color:#ccc;white-space:nowrap;}
-.playlist-header{font-size:13px;font-weight:700;color:#666;padding:12px 0 6px;}
-
-/* ==================== 19. 骰子/抽签 聊天按钮 ==================== */
-.chat-dice-menu{position:absolute;bottom:100%;left:4px;background:#fff;border-radius:14px;box-shadow:0 2px 16px rgba(0,0,0,.15);padding:6px;display:none;z-index:60;min-width:120px;}
-.chat-dice-menu.show{display:block;}
-.chat-dice-menu button{display:block;width:100%;padding:8px 14px;border-radius:8px;font-size:13px;text-align:left;background:none;border:none;cursor:pointer;}
-.chat-dice-menu button:active{background:#f0f0f0;}
-.chat-dice-draw{display:inline-block;font-size:32px;padding:4px;}
-
-/* ==================== 20. 人设书 ==================== */
-.persona-page{padding:16px;display:flex;flex-direction:column;gap:14px;}
-.persona-field{display:flex;flex-direction:column;gap:6px;}
-.persona-field label{font-size:12px;color:#888;font-weight:600;}
-.persona-field input,.persona-field textarea{border:1px solid #ddd;border-radius:12px;padding:10px 14px;background:#fff;font-size:14px;}
-.persona-field textarea{min-height:120px;resize:vertical;line-height:1.6;}
-.persona-save{padding:12px;border-radius:14px;background:#1e1e1e;color:#f8f8f8;font-size:15px;font-weight:600;text-align:center;}
-.persona-save:active{transform:scale(.97);}
-.persona-section{border-top:1px solid #eee;padding-top:14px;margin-top:4px;}
-.persona-section-title{font-size:13px;font-weight:700;color:#1e1e1e;margin-bottom:10px;}
-.persona-hint{font-size:11px;color:#aaa;line-height:1.5;margin-top:4px;}
-.api-status{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;}
-.api-status.on{background:#e8f5e9;color:#4caf50;}
-.api-status.off{background:#ffebee;color:#f44336;}
-
-
-/* ==================== 19. 骨架屏 ==================== */
-.skeleton{background:linear-gradient(90deg,#e8e8e8 25%,#f2f2f2 50%,#e8e8e8 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:8px;}
-@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
-
-/* ==================== 20. 通用按压效果 ==================== */
-.pressable{transition:transform .08s;}
-.pressable:active{transform:scale(.96);}
-
-/* ==================== 21. 潮汐（月经日历） ==================== */
-.tide-page{display:flex;flex-direction:column;height:100%;}
-.tide-cal-header{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;flex-shrink:0;}
-.tide-cal-header .tide-month{font-size:16px;font-weight:700;}
-.tide-cal-header button{font-size:16px;padding:4px 12px;border-radius:8px;background:#e8e8e8;}
-.tide-cal-header button:active{background:#ddd;}
-.tide-weekdays{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;font-size:11px;color:#999;padding:0 8px;flex-shrink:0;}
-.tide-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;padding:4px 8px;gap:2px;flex-shrink:0;}
-.tide-day{position:relative;padding:6px 2px;border-radius:10px;font-size:13px;cursor:pointer;transition:background .1s;min-height:32px;display:flex;flex-direction:column;align-items:center;gap:1px;}
-.tide-day:active{background:#eee;}
-.tide-day.today{font-weight:700;color:#e91e63;}
-.tide-day.period{background:#fce4ec;border-radius:10px;}
-.tide-day.predicted{background:#f3e5f5;border-radius:10px;opacity:.7;}
-.tide-day.other-month{color:#ccc;}
-.tide-day .tide-dot{width:5px;height:5px;border-radius:50%;background:#e91e63;}
-.tide-day .tide-dot.predicted-dot{background:#ba68c8;}
-.tide-info{padding:12px 16px;flex-shrink:0;display:flex;gap:8px;flex-wrap:wrap;}
-.tide-info-chip{padding:6px 12px;border-radius:10px;background:#f5f5f5;font-size:12px;font-weight:600;color:#666;}
-.tide-info-chip.urgent{background:#fce4ec;color:#e91e63;}
-.tide-info-chip.soon{background:#f3e5f5;color:#9c27b0;}
-.tide-info-chip.ok{background:#e8f5e9;color:#4caf50;}
-.tide-edit-section{padding:8px 16px;border-top:1px solid #eee;flex:1;overflow-y:auto;}
-.tide-edit-title{font-size:13px;font-weight:700;margin-bottom:8px;color:#666;}
-.tide-form-row{display:flex;gap:8px;margin-bottom:8px;align-items:center;}
-.tide-form-row label{font-size:12px;color:#888;white-space:nowrap;min-width:50px;}
-.tide-form-row input{flex:1;border:1px solid #ddd;border-radius:10px;padding:8px 10px;background:#fff;font-size:13px;}
-.tide-btn{padding:8px 16px;border-radius:10px;font-size:13px;font-weight:600;}
-.tide-btn-primary{background:#e91e63;color:#fff;}
-.tide-btn-secondary{background:#f5f5f5;color:#666;}
-.tide-btn:active{opacity:.8;}
-
-/* 心情选择器 */
-.tide-mood-picker{display:none;padding:12px 16px;border-top:1px solid #eee;background:#fafafa;}
-.tide-mood-picker-title{font-size:14px;font-weight:700;margin-bottom:8px;text-align:center;}
-.tide-mood-options{display:flex;flex-wrap:wrap;justify-content:center;gap:4px;}
-.tide-mood-options button{padding:8px 12px;border-radius:12px;background:#f0f0f0;font-size:18px;cursor:pointer;border:none;transition:all .1s;}
-.tide-mood-options button:active{transform:scale(.92);background:#e0e0e0;}
-.tide-period-list{margin-top:8px;}
-.tide-period-item{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#fafafa;border-radius:10px;margin-bottom:4px;font-size:12px;}
-.tide-period-item .tpi-dates{color:#333;}
-.tide-period-item .tpi-len{color:#999;font-size:11px;}
-.tide-period-item .tpi-del{color:#ccc;cursor:pointer;font-size:14px;}
-.tide-period-item .tpi-del:hover{color:#e91e63;}
-.tide-legend{display:flex;gap:12px;padding:4px 16px;font-size:11px;color:#999;align-items:center;flex-shrink:0;}
-.tide-legend-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:2px;}
-
-/* ==================== 22. 每日心情 ==================== */
-.mood-page{display:flex;flex-direction:column;height:100%;}
-.mood-cal-header{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;flex-shrink:0;}
-.mood-cal-header .mood-month{font-size:16px;font-weight:700;}
-.mood-cal-header button{font-size:16px;padding:4px 12px;border-radius:8px;background:#e8e8e8;}
-.mood-cal-header button:active{background:#ddd;}
-.mood-weekdays{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;font-size:11px;color:#999;padding:0 8px;flex-shrink:0;}
-.mood-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;padding:4px 8px;gap:2px;flex-shrink:0;}
-.mood-day{position:relative;padding:4px 2px;border-radius:10px;font-size:11px;cursor:pointer;min-height:38px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;transition:background .1s;}
-.mood-day:active{background:#eee;}
-.mood-day.today{font-weight:700;}
-.mood-day.other-month{color:#ccc;}
-.mood-day .mood-emoji{font-size:14px;}
-.mood-day .mood-date{font-size:10px;color:#999;}
-.mood-chart-section{padding:12px 16px;border-top:1px solid #eee;flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;}
-.mood-chart-title{font-size:13px;font-weight:700;color:#666;}
-.mood-chart-wrap{width:100%;background:#fafafa;border-radius:12px;padding:8px;overflow:hidden;}
-.mood-today-section{padding:8px 16px;flex-shrink:0;border-top:1px solid #eee;}
-.mood-today-title{font-size:12px;color:#888;margin-bottom:6px;}
-.mood-emoji-picker{display:flex;gap:6px;flex-wrap:wrap;}
-.mood-emoji-btn{font-size:22px;padding:4px;border-radius:8px;cursor:pointer;transition:transform .1s;}
-.mood-emoji-btn:active{transform:scale(.9);}
-/* 微信风格联系人列表 */
-.secret-contact-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f0f0f0;cursor:pointer;transition:background .1s;}
-.secret-contact-item:active{background:#f5f5f5;}
-.secret-contact-item .sci-avatar{width:44px;height:44px;border-radius:12px;background:#e8e8e8;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;}
-.secret-contact-item .sci-info{flex:1;min-width:0;}
-.secret-contact-item .sci-name-row{display:flex;align-items:center;gap:6px;margin-bottom:2px;}
-.secret-contact-item .sci-nickname{font-size:14px;font-weight:500;color:#333;}
-.secret-contact-item .sci-lastmsg{font-size:12px;color:#999;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.secret-contact-item .sci-time{font-size:10px;color:#ccc;white-space:nowrap;flex-shrink:0;}
-.convo-bubble{display:flex;margin-bottom:8px;}
-.convo-bubble.me{justify-content:flex-end;}
-.convo-bubble.them{justify-content:flex-start;}
-.convo-text{max-width:75%;padding:10px 14px;border-radius:16px;font-size:14px;line-height:1.5;word-break:break-word;}
-.convo-bubble.me .convo-text{background:#1e1e1e;color:#f8f8f8;border-bottom-right-radius:4px;}
-.convo-bubble.them .convo-text{background:#e8e8e8;color:#1e1e1e;border-bottom-left-radius:4px;}
-.mood-emoji-btn.selected{background:#e8e8e8;}
-.mood-insight{font-size:12px;color:#888;padding:6px 0;line-height:1.6;}
--->
 </head>
 <body>
 
@@ -523,7 +69,7 @@ ul{list-style:none;}
       <div class="schedule-list" id="scheduleList"></div>
     </div>
     <div class="task-add-bar" style="padding:10px 16px;border-top:1px solid #eee;background:#f8f8f8;">
-      <input type="text" id="taskInput" placeholder="添加日程..." onkeydown="if(event.key==='Enter')addTask()" style="flex:1;">
+      <input type="text" id="taskInput" placeholder="添加日程..." onkeydown="if(event.key==='Enter')addTask()" class="flex-1">
       <button onclick="addTask()" style="background:#1e1e1e;color:#f8f8f8;border-radius:12px;padding:10px 18px;font-weight:600;font-size:14px;">添加</button>
     </div>
   </div>
@@ -543,11 +89,11 @@ ul{list-style:none;}
 
   <!-- ===== 记账 ===== -->
   <div class="page" id="page-expense">
-    <div class="sub-page-header" style="display:flex;justify-content:space-between;align-items:center;">
+    <div class="sub-page-header flex-between">
       <span>💰 记账</span>
-      <div style="display:flex;gap:6px;">
-        <button onclick="document.getElementById('expImportInput').click()" style="font-size:13px;background:none;border:none;cursor:pointer;color:#888;">📥导入</button>
-        <button onclick="exportExpense()" style="font-size:13px;background:none;border:none;cursor:pointer;color:#888;">📤导出</button>
+      <div class="flex-gap6">
+        <button onclick="document.getElementById('expImportInput').click()" class="txt-muted">📥导入</button>
+        <button onclick="exportExpense()" class="txt-muted">📤导出</button>
         <button onclick="clearAllExpense()" style="font-size:13px;background:none;border:none;cursor:pointer;color:#e55;">🗑清空</button>
       </div>
       <input type="file" id="expImportInput" accept=".json" style="display:none;" onchange="importExpense(event)">
@@ -557,7 +103,7 @@ ul{list-style:none;}
       <button class="expense-tab" data-tab="income" onclick="switchExpenseTab('income')">收入</button>
       <button class="expense-tab" data-tab="stats" onclick="switchExpenseTab('stats')">统计</button>
     </div>
-    <div class="expense-page" style="overflow-y:auto;">
+    <div class="expense-page scroll-y">
       <!-- 记账表单 -->
       <div class="expense-form">
         <div class="expense-form-row">
@@ -594,7 +140,7 @@ ul{list-style:none;}
   </div>
   <!-- ===== Secret ===== -->
   <div class="page" id="page-secret">
-    <div class="sub-page-header" style="display:flex;justify-content:space-between;align-items:center;">
+    <div class="sub-page-header flex-between">
       <span id="secretTitle">🔍 AI的手机</span>
       <button id="secretBackBtn" onclick="showSecretDesk()" style="display:none;font-size:13px;background:none;border:none;cursor:pointer;color:#888;">← 返回</button>
     </div>
@@ -604,21 +150,17 @@ ul{list-style:none;}
       <!-- 角色切换 -->
       <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:10px;" id="secretCharSwitcher"></div>
       <div class="secret-grid">
-        <div class="secret-icon" onclick="showSecretChat()">
-          <div class="si-symbol">💬</div>
-          <div class="si-name">聊天记录</div>
-        </div>
         <div class="secret-icon" onclick="showSecretNotes()">
           <div class="si-symbol">📓</div>
           <div class="si-name">记事本</div>
         </div>
-        <div class="secret-icon" onclick="showSecretPlaylist()">
-          <div class="si-symbol">🎵</div>
-          <div class="si-name">他的歌单</div>
-        </div>
         <div class="secret-icon" onclick="showSecretAlbum()">
           <div class="si-symbol">🖼</div>
-          <div class="si-name">他的相册</div>
+          <div class="si-name">相册</div>
+        </div>
+        <div class="secret-icon" onclick="showSecretPlaylist()">
+          <div class="si-symbol">🎵</div>
+          <div class="si-name">最近播放</div>
         </div>
         <div class="secret-icon" onclick="showSecretFoodDelivery()">
           <div class="si-symbol">🍔</div>
@@ -640,7 +182,7 @@ ul{list-style:none;}
 
   <!-- ===== 晞晞日报 ===== -->
   <div class="page" id="page-daily">
-    <div class="sub-page-header" style="display:flex;justify-content:space-between;align-items:center;">
+    <div class="sub-page-header flex-between">
       <span>📋 晞晞日报</span>
       <button onclick="showDailyToast('💡 每天记一条，自动生成日报/周报/月报')" style="font-size:13px;color:#888;background:none;border:none;cursor:pointer;">?</button>
     </div>
@@ -654,7 +196,7 @@ ul{list-style:none;}
       <!-- 输入区（JS动态控制） -->
       <div id="dailyInputArea"></div>
       <!-- 按钮 -->
-      <div style="display:flex;gap:8px;">
+      <div class="flex-gap8">
         <button id="dailyBtn" onclick="generateDailyReport()" style="flex:1;padding:10px;background:#5B7FFF;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;">🤖 生成日报</button>
         <button onclick="fillDailyDemo()" style="padding:10px 16px;background:none;border:1px solid #e0e0e0;border-radius:12px;font-size:13px;color:#888;cursor:pointer;">✨ 示例</button>
       </div>
@@ -670,9 +212,9 @@ ul{list-style:none;}
   <!-- ===== 聊天列表（微信风格） ===== -->
   <div class="page" id="page-conv-list">
     <div class="chat-wallpaper"></div>
-    <div class="sub-page-header" style="display:flex;justify-content:space-between;align-items:center;position:relative;z-index:2;background:rgba(255,255,255,.72);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);">
+    <div class="sub-page-header flex-between page-header-blur">
       <span>💬 消息</span>
-      <div style="display:flex;gap:8px;">
+      <div class="flex-gap8">
         <button id="btnManageChars" onclick="toggleCharManage()" style="font-size:14px;font-weight:400;color:#A0AEC0;">···</button>
         <button onclick="showAddCharDialog()" style="font-size:16px;font-weight:400;">+ 角色</button>
       </div>
@@ -685,10 +227,10 @@ ul{list-style:none;}
   <!-- ===== 聊天 ===== -->
   <div class="page" id="page-chat">
     <div class="chat-wallpaper"></div>
-    <div class="sub-page-header" style="display:flex;justify-content:space-between;align-items:center;position:relative;z-index:2;background:rgba(255,255,255,.72);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);">
+    <div class="sub-page-header flex-between page-header-blur">
       <button onclick="showConvList()" style="font-size:18px;font-weight:400;background:none;border:none;">‹ 返回</button>
       <span id="chatTitle">聊天</span>
-      <div style="display:flex;gap:6px;">
+      <div class="flex-gap6">
         <button onclick="startVoiceCall()" style="font-size:16px;background:none;border:none;cursor:pointer;" title="语音通话">📞</button>
         <button onclick="toggleSpConfig()" style="font-size:18px;font-weight:400;">⚙</button>
       </div>
@@ -704,9 +246,26 @@ ul{list-style:none;}
       <div class="chat-input-bar">
         <button class="emoji-btn" id="emojiToggle" onclick="toggleEmojiPanel()">😊</button>
         <button class="emoji-btn" id="diceToggle" onclick="toggleDiceMenu()" style="font-size:18px;">🎲</button>
+        <button class="emoji-btn" id="replyModeToggle" onclick="toggleReplyMode()" style="font-size:16px;position:relative;" title="回复模式">💬</button>
         <div class="chat-dice-menu" id="diceMenu">
           <button onclick="sendDice()">🎲 掷骰子</button>
           <button onclick="sendLottery()">🎯 抽签</button>
+        </div>
+        <div class="reply-mode-popup" id="replyModePopup">
+          <div class="txt-mid">回复条数</div>
+          <div style="display:flex;gap:4px;margin-bottom:10px;" id="replyCountBtns">
+            <button class="reply-cbtn active" data-n="1" onclick="setReplyCount(1)">1</button>
+            <button class="reply-cbtn" data-n="2" onclick="setReplyCount(2)">2</button>
+            <button class="reply-cbtn" data-n="3" onclick="setReplyCount(3)">3</button>
+            <button class="reply-cbtn" data-n="4" onclick="setReplyCount(4)">4</button>
+            <button class="reply-cbtn" data-n="5" onclick="setReplyCount(5)">5</button>
+          </div>
+          <div class="txt-mid">回复长度</div>
+          <div style="display:flex;gap:4px;" id="replyLengthBtns">
+            <button class="reply-lbtn active" data-l="short" onclick="setReplyLength('short')">短</button>
+            <button class="reply-lbtn" data-l="medium" onclick="setReplyLength('medium')">中</button>
+            <button class="reply-lbtn" data-l="long" onclick="setReplyLength('long')">长</button>
+          </div>
         </div>
         <textarea id="chatInput" rows="1" placeholder="说点什么..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}"></textarea>
         <button class="chat-send-btn" onclick="sendChat()">↑</button>
@@ -751,7 +310,7 @@ ul{list-style:none;}
 
   <!-- ===== 朋友圈 ===== -->
   <div class="page" id="page-moments">
-    <div class="sub-page-header" style="display:flex;justify-content:space-between;align-items:center;">
+    <div class="sub-page-header flex-between">
       <span>朋友圈</span>
       <button onclick="showMomentEditor()" style="font-size:20px;background:none;border:none;cursor:pointer;">✏️</button>
     </div>
@@ -763,7 +322,7 @@ ul{list-style:none;}
   <!-- ===== 陪伴计时 ===== -->
   <div class="page" id="page-companion">
     <div class="sub-page-header">陪伴 · 专注计时</div>
-    <div class="companion-page" style="overflow-y:auto;">
+    <div class="companion-page scroll-y">
       <!-- 任务输入 -->
       <div class="companion-input-group">
         <div class="input-label">📝 任务</div>
@@ -855,7 +414,7 @@ ul{list-style:none;}
   <!-- ===== 我的人设 ===== -->
   <div class="page" id="page-persona">
     <div class="sub-page-header">🧍 我的人设</div>
-    <div class="persona-page" style="overflow-y:auto;">
+    <div class="persona-page scroll-y">
       <div class="persona-hint" style="margin-bottom:12px;">让 AI 更了解你，回复会更贴心</div>
 
       <div class="persona-field">
@@ -920,7 +479,7 @@ ul{list-style:none;}
           <label>持续天数</label>
           <input type="number" id="tideDuration" value="5" min="1" max="14">
         </div>
-        <div style="display:flex;gap:8px;">
+        <div class="flex-gap8">
           <button class="tide-btn tide-btn-primary" onclick="tideAddPeriod()">记录</button>
           <button class="tide-btn tide-btn-secondary" onclick="tideAutoPredict()">自动预测下月</button>
         </div>
@@ -1010,8 +569,8 @@ ul{list-style:none;}
           <label>API Key</label>
           <input type="password" id="settingsApiKey" placeholder="sk-xxxxxxxx">
         </div>
-        <div style="display:flex;gap:8px;">
-          <button class="persona-save" onclick="saveSettingsApiConfig()" style="flex:1;">💾 保存</button>
+        <div class="flex-gap8">
+          <button class="persona-save flex-1" onclick="saveSettingsApiConfig()">💾 保存</button>
           <button class="persona-save" onclick="testSettingsApiConnection()" style="flex:1;background:#e0e0e0;color:#1e1e1e;">🔌 测试</button>
         </div>
       </div>

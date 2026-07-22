@@ -11,6 +11,107 @@ function showDaily() {
   switchDailyMode('daily');
   renderDayList();
   renderReportList();
+  checkAutoReports();
+}
+
+/* ===== 每周一/每月1号自动总结 ===== */
+function checkAutoReports() {
+  const track = lsGet('auto_report_track', {});
+  const today = new Date();
+
+  // 周一 → 检查周报
+  if (today.getDay() === 1) {
+    const monday = getMonday(today);
+    const weekKey = 'weekly_' + monday;
+    if (!track[weekKey]) {
+      tryAutoGenerate('weekly', weekKey, track);
+    }
+  }
+
+  // 每月1号 → 检查月报
+  if (today.getDate() === 1) {
+    const ym = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0');
+    const monthKey = 'monthly_' + ym;
+    if (!track[monthKey]) {
+      tryAutoGenerate('monthly', monthKey, track);
+    }
+  }
+}
+
+async function tryAutoGenerate(mode, trackKey, track) {
+  const title = mode === 'weekly' ? '周报' : '月报';
+  const now = new Date();
+
+  // 先标记，防止重复触发
+  track[trackKey] = 'running';
+  lsSet('auto_report_track', track);
+
+  // 收集数据
+  let text = '', dateLabel = '';
+
+  if (mode === 'weekly') {
+    const monday = getMonday(now);
+    const sunday = getSunday(now);
+    const records = getDayRecords();
+    const days = getDateRange(monday, sunday);
+    const entries = days.filter(d => records[d]).map(d => '【' + d + '】' + records[d].text);
+    if (entries.length === 0) {
+      track[trackKey] = 'empty'; lsSet('auto_report_track', track);
+      return;
+    }
+    text = entries.join('\n\n');
+    dateLabel = monday + '~' + sunday;
+  } else {
+    const ym = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    const records = getDayRecords();
+    const days = Object.keys(records).filter(d => d.startsWith(ym)).sort();
+    const entries = days.map(d => '【' + d + '】' + records[d].text);
+    if (entries.length === 0) {
+      track[trackKey] = 'empty'; lsSet('auto_report_track', track);
+      return;
+    }
+    text = entries.join('\n\n');
+    dateLabel = ym;
+  }
+
+  // 有API Key → 静默自动生成
+  if (typeof apiConfig !== 'undefined' && apiConfig && apiConfig.apiKey) {
+    try {
+      const btn = document.getElementById('dailyBtn');
+      if (btn) btn.disabled = true;
+      const result = await callDailyAI(text, dateLabel, '', mode);
+      saveReport(mode, dateLabel, '', result);
+      track[trackKey] = 'done';
+      lsSet('auto_report_track', track);
+      // 刷新报告列表
+      renderReportList();
+      showDailyToast('📬 ' + title + '已自动生成（骆云影看过了）');
+    } catch(e) {
+      console.error('自动生成' + title + '失败:', e);
+      track[trackKey] = 'failed';
+      lsSet('auto_report_track', track);
+    } finally {
+      const btn = document.getElementById('dailyBtn');
+      if (btn) btn.disabled = false;
+    }
+  } else {
+    // 无API Key → 提示手动生成
+    track[trackKey] = 'pending';
+    lsSet('auto_report_track', track);
+    showAutoReportReminder(mode);
+  }
+}
+
+function showAutoReportReminder(mode) {
+  const container = document.getElementById('dailyResults');
+  if (!container) return;
+  const label = mode === 'weekly' ? '周报' : '月报';
+  container.innerHTML =
+    '<div style="background:#FFF8E1;border-radius:12px;padding:12px 14px;border:1px solid #FFE082;font-size:13px;animation:fadeIn .3s;">' +
+      '<div style="font-weight:600;color:#F57F17;margin-bottom:4px;">📬 今日' + label + '待生成</div>' +
+      '<div style="color:#795548;line-height:1.6;">今天' + (label === '周报' ? '周一' : '本月1号') + '！切换到「' + label + '」tab，点「生成」按钮自动总结 ✨</div>' +
+    '</div>';
+  container.style.display = 'block';
 }
 
 /* ===== Tab切换 ===== */

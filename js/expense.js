@@ -8,52 +8,6 @@ function renderExpense() {
   if (typeof renderExpenseList === 'function') renderExpenseList('expense');
 }
 
-function renderExpenseChart() {
-  const canvas = document.getElementById("expChart");
-  if (!canvas) return;
-  const ctx = canvas.getContext("2d");
-  const w = canvas.width, h = canvas.height;
-  ctx.clearRect(0, 0, w, h);
-  const records = getExpRecords();
-  const now = new Date();
-  const monthPrefix = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
-  const pieRecs = records.filter(function(r) { return r.date && r.date.startsWith(monthPrefix) && r.type !== "income"; });
-  if (pieRecs.length === 0) {
-    ctx.fillStyle = "#ccc"; ctx.font = "12px sans-serif"; ctx.textAlign = "center";
-    ctx.fillText("暂无数据", w/2, h/2);
-    return;
-  }
-  const catTotals = {};
-  pieRecs.forEach(function(r) { if (!catTotals[r.category]) catTotals[r.category] = 0; catTotals[r.category] += r.amount; });
-  const cats = Object.keys(catTotals);
-  const total = pieRecs.reduce(function(s,r) { return s + r.amount; }, 0);
-  const pieColors = ["#e76f51","#f4a261","#e9c46a","#2a9d8f","#264653","#a855f7","#ec4899","#f97316"];
-  var cx = 55, cy = 55, radius = 38;
-  var angle = -Math.PI / 2;
-  cats.forEach(function(cat, i) {
-    var slice = (catTotals[cat] / total) * Math.PI * 2;
-    ctx.beginPath(); ctx.moveTo(cx, cy);
-    ctx.arc(cx, cy, radius, angle, angle + slice);
-    ctx.closePath();
-    ctx.fillStyle = pieColors[i % pieColors.length];
-    ctx.fill();
-    angle += slice;
-  });
-  var lx = 110, ly = 6;
-  cats.forEach(function(cat, i) {
-    ctx.fillStyle = pieColors[i % pieColors.length];
-    ctx.fillRect(lx, ly + i * 14, 9, 9);
-    ctx.fillStyle = "#555";
-    ctx.font = "8px sans-serif";
-    ctx.textAlign = "left";
-    var pct = (catTotals[cat] / total * 100).toFixed(0);
-    ctx.fillText(cat + " " + pct + "%", lx + 13, ly + i * 14 + 8);
-  });
-  ctx.fillStyle = "#999";
-  ctx.font = "9px sans-serif";
-  ctx.textAlign = "left";
-  ctx.fillText("支出分类", 4, 12);
-}
 
 function renderExpenseLineChart() {
   const canvas = document.getElementById('expLineChart');

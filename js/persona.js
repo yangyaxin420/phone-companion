@@ -28,7 +28,12 @@ function loadPersona() {
 
   worldBook = lsGet('worldBook', '');
 
-  apiConfig = lsGet('apiConfig', { baseUrl:'https://api.deepseek.com', apiKey:'', model:'deepseek-chat', useCorsProxy:false });
+  var saved = lsGet('apiConfig', null);
+  if (saved) {
+    Object.assign(apiConfig, saved);
+  } else {
+    apiConfig = { baseUrl:'https://api.deepseek.com', apiKey:'', model:'deepseek-chat', useCorsProxy:false };
+  }
   if (apiConfig.useCorsProxy && (!apiConfig.baseUrl || apiConfig.baseUrl.includes('deepseek.com'))) {
     apiConfig.useCorsProxy = false;
     lsSet('apiConfig', apiConfig);
@@ -38,9 +43,6 @@ function loadPersona() {
   updateApiStatusBadge();
 }
 
-function savePersona() {
-  // 已移到聊天页的 AI 人设弹窗
-}
 
 function saveWorldBook() {
   worldBook = document.getElementById('worldBook').value.trim();
