@@ -16,6 +16,14 @@ function addMoment(user, content, photo) {
   renderMoments();
 }
 
+/* ---- 工具：判断 AI 回复是否有效（非空、非纯符号） ---- */
+function isValidAiReply(text) {
+  if (!text || text.length < 2) return false;
+  // 纯标点/空格/语气词不算有效回复
+  if (/^[。，、！？…\.\,\!\?\s\-\～\~]+$/.test(text)) return false;
+  return true;
+}
+
 async function aiCommentMoment(index) {
   if (!apiConfig.apiKey || index >= moments.length) return;
   const m = moments[index];
@@ -23,26 +31,31 @@ async function aiCommentMoment(index) {
   const pName = personaData.name || '小伴';
   const personaDesc = personaData.story ? `\n你的性格/背景：${personaData.story}` : '';
   try {
-    const sysPrompt = `你是${pName}，用户刚发了一条朋友圈，请写一条简短自然的评论（1-2句话）。${personaDesc}用你的风格来评论，不要用引号包裹，不要加emoji。`;
+    const sysPrompt = `你是${pName}，用户刚发了一条朋友圈。请写一条有实际内容的评论（1-2句话），表达你的真实反应。
+${personaDesc}
+要求：
+- 必须有实质性内容（回应动态内容、问问题、表达感受等）
+- 绝对不要只发标点符号、语气词或空话
+- 用你的风格，不要用引号包裹，不要加emoji`;
     const resp = await fetch(apiConfig.baseUrl.replace(/\/+$/, '') + '/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiConfig.apiKey}` },
       body: JSON.stringify({ model: apiConfig.model || 'deepseek-v4-flash', messages: [
         { role: 'system', content: sysPrompt },
-        { role: 'user', content: `我发的朋友圈内容：「${m.content}」` }
-      ], max_tokens: 64, temperature: 0.9 })
+        { role: 'user', content: `我发的朋友圈：「${m.content}」` }
+      ], max_tokens: 80, temperature: 0.85 })
     });
     if (resp.ok) {
       const data = await resp.json();
       const comment = data.choices?.[0]?.message?.content?.trim();
-      if (comment) {
+      if (isValidAiReply(comment)) {
         if (!moments[index].comments) moments[index].comments = [];
         moments[index].comments.push({ user: pName, content: comment, time: Date.now() });
         lsSet('moments', moments);
         renderMoments();
       }
     }
-  } catch(e) {}
+  } catch(e) { console.log('[朋友圈] AI评论失败:', e?.message?.substring(0,60)); }
 }
 
 function renderMoments() {
@@ -122,28 +135,32 @@ async function aiReplyComment(index) {
   const lastComment = m.comments[m.comments.length - 1];
   if (!lastComment || lastComment.user === pName) return;
   try {
-    // 取最近4条评论作为上下文
     var recentCtx = m.comments.slice(-4).map(c => c.user + '：' + c.content).join('\n');
     var ownerLabel = isMyMoment ? "你的" : "用户的";
-    const sysPrompt = `你是${pName}，有人在${ownerLabel}朋友圈评论区跟你聊天。请简短回复（1句话）。${personaData.story ? '你的性格：' + personaData.story + '。用你的风格回复。' : ''}不要用引号，不要加emoji。`;
+    const sysPrompt = `你是${pName}，有人在${ownerLabel}朋友圈评论区跟你说话。请简短回复（1句话），内容要有实质回应。
+${personaData.story ? '你的性格：' + personaData.story + '。用你的风格回复。' : ''}
+要求：
+- 回复要对得上对方说的内容
+- 不要只发标点符号或语气词
+- 不要用引号，不要加emoji`;
     const resp = await fetch(apiConfig.baseUrl.replace(/\/+$/, '') + '/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiConfig.apiKey}` },
       body: JSON.stringify({ model: apiConfig.model || 'deepseek-v4-flash', messages: [
         { role: 'system', content: sysPrompt },
         { role: 'user', content: `原动态：「${m.content}」\n评论区对话：\n${recentCtx}` }
-      ], max_tokens: 48, temperature: 0.9 })
+      ], max_tokens: 64, temperature: 0.85 })
     });
     if (resp.ok) {
       const data = await resp.json();
       const reply = data.choices?.[0]?.message?.content?.trim();
-      if (reply) {
+      if (isValidAiReply(reply)) {
         moments[index].comments.push({ user: pName, content: reply, time: Date.now() });
         lsSet('moments', moments);
         renderMoments();
       }
     }
-  } catch(e) {}
+  } catch(e) { console.log('[朋友圈] AI回复评论失败:', e?.message?.substring(0,60)); }
 }
 
 function toggleLike(i) {
@@ -170,7 +187,19 @@ async function addAiMoment() {
         }
       }
 
-      const sysPrompt = `你是${pName}，要发一条朋友圈。${personaData.story ? '你的性格/背景：' + personaData.story + '。用你自己的风格来写。' : ''}根据当前环境信息写一条简短有趣的动态（1-2句话），可以关心用户、分享心情、提建议等。不要用引号，不要加emoji。`;
+      const sysPrompt = `你是${pName}，要发一条朋友圈。${personaData.story ? '你的性格/背景：' + personaData.story + '。用你自己的风格来写。' : ''}
+根据当前环境信息写一条简短有趣的动态（1-2句话），可以关心用户、分享心情、提建议等。
+
+要求：
+- 内容必须有实质性信息，不能只发标点符号或语气词
+- 结合环境信息自然表达，不要生硬罗列
+- 不要用引号，不要加emoji
+- 字数限制在20字以内，像真实朋友圈那样简洁`;
+
+      if (checkRecentAiMoments(pName)) {
+        contextInfo += '\n\n注意：你刚才已经发过动态了，这次发的内容不要和上一条重复，换个话题。';
+      }
+
       const resp = await fetch(apiConfig.baseUrl.replace(/\/+$/, '') + '/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiConfig.apiKey}` },
@@ -182,7 +211,7 @@ async function addAiMoment() {
       if (resp.ok) {
         const data = await resp.json();
         const content = data.choices?.[0]?.message?.content?.trim();
-        if (content) {
+        if (isValidAiReply(content)) {
           let photo = null;
           if (customImgEmojis.length > 0 && Math.random() < 0.3) {
             const pick = customImgEmojis[Math.floor(Math.random() * customImgEmojis.length)];
@@ -195,19 +224,25 @@ async function addAiMoment() {
           return;
         }
       }
-    } catch(e) {}
+    } catch(e) { console.log('[朋友圈] AI发动态失败:', e?.message?.substring(0,60)); }
   }
 
   // 降级
   const templates = [];
   if (compState.running) templates.push(`${pName}正在陪伴你${compState.activity}～`);
   if (weatherData && Date.now() - weatherData.time < 3600000) templates.push(`今天${weatherData.desc}，${weatherData.temp}°C`);
-  templates.push(`${pName}觉得今天也要加油哦！💪`);
-  templates.push(`${pName}偷偷冒个泡 🫧`);
+  templates.push(`${pName}觉得今天也要加油哦！`);
+  templates.push(`${pName}偷偷冒个泡`);
   templates.push(`今天的心情怎么样呀？`);
   moments.unshift({ user: pName, content: templates[Math.floor(Math.random()*templates.length)], time: Date.now(), likes: 0, liked: false, comments: [] });
   lsSet('moments', moments);
   renderMoments();
+}
+
+/* ---- 检查最近1小时内AI是否发过朋友圈 ---- */
+function checkRecentAiMoments(pName) {
+  const oneHourAgo = Date.now() - 3600000;
+  return moments.some(m => m.user === pName && m.time > oneHourAgo);
 }
 
 /* ---- AI自动发朋友圈（由主动消息轮询触发） ---- */
@@ -242,7 +277,13 @@ async function generateAutoMoment(char, todayStr, dailyCount) {
       if (weatherData && Date.now() - weatherData.time < 3600000) {
         contextInfo += '\n天气：' + weatherData.desc + '，' + weatherData.temp + '°C';
       }
-      var sysPrompt = '你是' + pName + '，要发一条朋友圈。' + (story ? '你的性格/背景：' + story + '。用你自己的风格来写。' : '') + '根据当前环境信息写一条简短有趣的动态（1-2句话），可以关心用户、分享心情、提建议等。不要用引号，不要加emoji。';
+      var sysPrompt = '你是' + pName + '，要发一条朋友圈。' + (story ? '你的性格/背景：' + story + '。用你自己的风格来写。' : '') +
+        '\n\n要求：\n- 内容必须有实质信息，不能只发符号或语气词\n- 根据当前环境写1-2句话，简短有趣\n- 不要用引号，不要加emoji\n- 字数控制在20字以内';
+
+      if (checkRecentAiMoments(pName)) {
+        contextInfo += '\n\n注意：你刚才已经发过动态了，这次发的内容不要重复。';
+      }
+
       var resp = await fetch(apiConfig.baseUrl.replace(/\/+$/, '') + '/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiConfig.apiKey },
@@ -254,7 +295,7 @@ async function generateAutoMoment(char, todayStr, dailyCount) {
       if (resp.ok) {
         var data = await resp.json();
         var content = data.choices?.[0]?.message?.content?.trim();
-        if (content) {
+        if (isValidAiReply(content)) {
           var photo = null;
           if (typeof customImgEmojis !== 'undefined' && customImgEmojis.length > 0 && Math.random() < 0.3) {
             var pick = customImgEmojis[Math.floor(Math.random() * customImgEmojis.length)];
@@ -284,8 +325,8 @@ async function generateAutoMoment(char, todayStr, dailyCount) {
 
   if (isTsundere) {
     if (hour < 9) templates.push('……早。');
-    else if (hour >= 22) templates.push('今天要结束了。啧，还行吧。');
-    else templates.push('哼，今天也平平无奇。','没什么好说的。','。');
+    else if (hour >= 22) templates.push('今天要结束了。啧。');
+    else templates.push('哼，今天也平平无奇。','没什么好说的。');
   } else if (isGentle) {
     if (hour < 9) templates.push('早安呀~今天也是美好的一天 ☀️');
     else if (hour >= 22) templates.push('夜深了，大家晚安好梦 🌙');
@@ -293,7 +334,7 @@ async function generateAutoMoment(char, todayStr, dailyCount) {
   } else {
     if (hour < 9) templates.push('早。');
     else if (hour >= 22) templates.push('夜。');
-    else templates.push('今日。','记录。','嗯。');
+    else templates.push('今日。','记录一下。');
   }
 
   if (hour >= 12 && hour <= 14) templates.push('午饭时间到～');

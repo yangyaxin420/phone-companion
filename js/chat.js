@@ -579,66 +579,89 @@ function setReplyLength(l) {
 }
 
 /* ---- 生成多条回复 ---- */
+/* ---- 生成多条回复（一次API生成所有，避免重复） ---- */
 async function generateMultiReplies(text, count, length) {
   const replies = [];
   const tokens = length === 'short' ? 256 : length === 'medium' ? 512 : 1024;
-  const lengthHint = length === 'short' ? '极简短' : length === 'medium' ? '中等长度' : '可以稍长一些';
+  const lengthHint = length === 'short' ? '简短一些' : length === 'medium' ? '中等长度，说清楚即可' : '可以稍长一些，把想说的说完整';
 
-  for (let i = 0; i < count; i++) {
-    const prompt = `这是你的第${i+1}条回复（共${count}条），请回复${lengthHint}的内容。${i > 0 ? '上一条你已经说过了，这次说点不一样的，换个角度或补充新内容。' : ''}`;
+  // 走 API：一次请求生成所有不同回复
+  if (apiConfig.apiKey) {
+    const pName = personaData.name || '小伴';
+    const personaPart = personaData.story ? `\n你的人设背景：${personaData.story}` : '';
+    const contextBlock = buildChatContext();
+    const contextMsgs = chatMessages.slice(-20).map(m => ({
+      role: m.role === 'ai' ? 'assistant' : m.role === 'user' ? 'user' : 'system',
+      content: m.text
+    }));
 
-    // 复用 callLLMApi 但附加额外指令
-    let reply;
-    if (apiConfig.apiKey) {
-      // 构造临时请求
-      let apiUrl = apiConfig.baseUrl.replace(/\/+$/, '') + '/chat/completions';
-      const pName = personaData.name || '小伴';
-      const personaPart = personaData.story ? `\n\n你的人设背景：${personaData.story}` : '';
-      const worldBookPart = worldBook ? `\n\n【世界书】\n${worldBook}` : '';
-      const contextBlock = buildChatContext();
-      const fullPrompt = systemPrompt + personaPart + worldBookPart + contextBlock +
-        `\n\n你现在是${pName}。${lengthHint}，1-3句话。不要动作描写，不要emoji。\n\n` + prompt;
+    // 提取最近AI回复，防止重复
+    const lastAiTexts = chatMessages.slice(-10).filter(m => m.role === 'ai').slice(-3).map(m => `"${m.text.substring(0,50)}"`).join(', ');
+    const antiRepeat = lastAiTexts ? `\n你最近说过的内容（不要再重复）：${lastAiTexts}\n` : '\n';
 
-      const contextMsgs = chatMessages.slice(-20).map(m => ({
-        role: m.role === 'ai' ? 'assistant' : m.role === 'user' ? 'user' : 'system',
-        content: m.text
-      }));
+    const sysPrompt = systemPrompt + personaPart + contextBlock +
+      `\n\n你现在是${pName}。` +
+      `\n用户给你发了一条消息，你需要生成${count}条不同的回复供用户选择。` +
+      antiRepeat +
+      `\n要求：
+1. 每条回复${lengthHint}，每一条都要不一样
+2. 从不同角度回应：认真回应、吐槽、关心、反问、调侃……换着花样来
+3. 每条回复之间要有明显区别，不要只是换几个词
+4. 不要动作描写
+5. 用 --- 分隔每条回复（不要加序号）`;
 
+    try {
       const body = {
         model: apiConfig.model || 'deepseek-v4-flash',
         messages: [
-          { role: 'system', content: fullPrompt },
+          { role: 'system', content: sysPrompt },
           ...contextMsgs,
           { role: 'user', content: text }
         ],
-        max_tokens: tokens,
-        temperature: 0.85 + Math.random() * 0.15
+        max_tokens: tokens * count,
+        temperature: 0.9,
+        frequency_penalty: 0.5
       };
 
-      const resp = await fetch(apiUrl, {
+      const resp = await fetch(apiConfig.baseUrl.replace(/\/+$/, '') + '/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiConfig.apiKey },
         body: JSON.stringify(body)
       });
+
       if (resp.ok) {
         const data = await resp.json();
-        reply = data.choices?.[0]?.message?.content?.trim();
+        const content = data.choices?.[0]?.message?.content?.trim();
+        if (content) {
+          // 用 --- 分隔，过滤空白
+          const splits = content.split(/---+/).map(s => s.trim()).filter(s => s.length > 1);
+          for (let s of splits) {
+            const parsed = parseAiActions(s);
+            replies.push(parsed.display || s);
+            if (parsed.actions) executeAiActions(parsed.actions);
+            if (replies.length >= count) break;
+          }
+        }
       }
+    } catch(e) {
+      console.log('[多条回复] API失败:', e?.message?.substring(0,60));
     }
-
-    if (!reply) {
-      // 本地降级：换不同措辞
-      reply = generateLocalReply(text + '（第' + (i+1) + '次）');
-      if (i > 0) {
-        const alt = ['嗯。', '也是。', '就这样。', '你说呢。', '……', '行吧。', '知道了。'];
-        reply = alt[i % alt.length];
-      }
-    }
-
-    const parsed = parseAiActions(reply);
-    replies.push(parsed.display || reply);
-    if (parsed.actions) executeAiActions(parsed.actions);
   }
+
+  // 如果API返回不够，本地补
+  while (replies.length < count) {
+    const i = replies.length;
+    let fallback = generateLocalReply(text);
+    if (i > 0) {
+      const alt = ['嗯。', '也是。', '你说呢。', '……', '行吧。', '知道了。', '好吧。', '随你。'];
+      // 选一个还没用过的
+      const used = replies.map(r => r.substring(0,4));
+      const available = alt.filter(a => !used.some(u => u.includes(a.substring(0,2))));
+      fallback = available.length > 0 ? available[i % available.length] : alt[i % alt.length];
+    }
+    replies.push(fallback);
+  }
+
   return replies;
 }
 
@@ -879,11 +902,18 @@ async function callLLMApi(userText) {
     contextBlock += `\n最近朋友圈：${recentM}`;
   }
 
-  const fullSystemPrompt = systemPrompt + personaPart + worldBookPart + contextBlock + `\n\n你的名字叫${pName}。回复规则：
-1. 极简短，1-2句话，像微信聊天
+  // 提取最近几条AI回复，告诉AI别再重复
+  const lastAiReplies = chatMessages.slice(-8).filter(m => m.role === 'ai').slice(-3).map(m => m.text);
+  const antiRepeatHint = lastAiReplies.length > 0
+    ? `\n\n【你最近说过的话 — 请不要再重复这些内容】\n` + lastAiReplies.map((r, i) => `${i+1}. ${r.substring(0,80)}`).join('\n')
+    : '';
+
+  const fullSystemPrompt = systemPrompt + personaPart + worldBookPart + contextBlock + antiRepeatHint + `\n\n你的名字叫${pName}。回复规则：
+1. 回复要内容充实、有条理，说清楚你想表达的东西，不要挤牙膏一样一次只蹦几个字
 2. 绝对不要用动作描写（如*微笑*、*拥抱*、*拍肩*），只说纯文字
-3. 不要加任何emoji（除非用户主动发表情）
-4. 不要长篇大论、不要总结、不要解释
+3. 不要长篇大论、不要总结、不要解释
+4. 【最重要的规则】不要重复自己说过的话！每次回复必须有新内容、新角度。如果你发现想说的和之前说过的一样，立刻换一个方向
+5. 看一遍上面「你最近说过的话」，确保这次说的和那些都不一样
 
 【你可以执行的操作 — 在回复中用特殊标记】
 - 添加任务：在回复中包含 [TASK:任务内容] 即可自动添加到用户的任务清单
@@ -902,7 +932,7 @@ async function callLLMApi(userText) {
       ...contextMsgs,
       { role: 'user', content: userText }
     ],
-    max_tokens: 512,
+    max_tokens: 768,
     temperature: 0.8
   };
 
