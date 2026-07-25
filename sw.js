@@ -1,5 +1,5 @@
-const CACHE = 'phone-v10-clean';
-const SW_VERSION = 8;
+const CACHE = 'phone-v7';
+const SW_VERSION = 7;
 
 self.addEventListener('install', e => {
   console.log('[SW] Install v' + SW_VERSION);
@@ -18,12 +18,7 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  // HTML文件永不缓存，直接从网络拉最新版
-  if (e.request.mode === 'navigate' || (e.request.url.includes('.html'))) {
-    e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
-    return;
-  }
-  // 其他资源（JS/CSS/图片）：网络优先，缓存兜底
+  // 网络优先，缓存兜底（不再只从缓存读）
   e.respondWith(
     fetch(e.request).then(r => {
       const clone = r.clone();
@@ -34,10 +29,6 @@ self.addEventListener('fetch', e => {
 });
 
 self.addEventListener('message', e => {
-  if (e.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-    return;
-  }
   if (e.data.type === 'schedule-notification') {
     const { title, body, time } = e.data;
     const delay = Math.max(0, time - Date.now());
