@@ -734,9 +734,28 @@ function init() {
   if (weatherCity) fetchWeather();
 }
 init();
-// 注册 Service Worker
+// 注册 Service Worker（带版本号，强刷新）
 if ("serviceWorker" in navigator && location.protocol !== 'file:') {
-  navigator.serviceWorker.register("sw.js").catch(function(e) { console.log("SW注册失败:", e); });
+  navigator.serviceWorker.register("sw.js?v=9").then(function(reg) {
+    // 如果有等待中的新 SW，立即激活并刷新页面
+    if (reg.waiting) {
+      reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+    }
+    // 监听到新 SW，自动更新
+    reg.addEventListener('updatefound', function() {
+      var newSW = reg.installing;
+      newSW.addEventListener('statechange', function() {
+        if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+          newSW.postMessage({ type: 'SKIP_WAITING' });
+          setTimeout(function() { location.reload(); }, 500);
+        }
+      });
+    });
+  }).catch(function(e) { console.log("SW注册失败:", e); });
+  // 监听 SW 状态变化，自动刷新
+  navigator.serviceWorker.addEventListener('controllerchange', function() {
+    location.reload();
+  });
 }
 requestNotificationPermission();
 </script>

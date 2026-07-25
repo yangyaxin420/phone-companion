@@ -29,6 +29,10 @@ self.addEventListener('fetch', e => {
 });
 
 self.addEventListener('message', e => {
+  if (e.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+    return;
+  }
   if (e.data.type === 'schedule-notification') {
     const { title, body, time } = e.data;
     const delay = Math.max(0, time - Date.now());
