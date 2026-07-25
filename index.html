@@ -733,7 +733,8 @@ function init() {
   // 天气
   if (weatherCity) fetchWeather();
 }
-  // 清理旧 Service Worker（解决缓存问题）
+init();
+ // 清理旧 Service Worker（解决缓存问题）
   if ('caches' in window) { caches.keys().then(function(ks) { ks.forEach(function(k) { caches.delete(k); }); }); }
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.getRegistrations().then(function(rs) { rs.forEach(function(r) { r.unregister(); }); });
