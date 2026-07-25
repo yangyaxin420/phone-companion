@@ -733,10 +733,12 @@ function init() {
   // 天气
   if (weatherCity) fetchWeather();
 }
-  // 注册 Service Worker
-  if ("serviceWorker" in navigator && location.protocol !== 'file:') {
-    navigator.serviceWorker.register("sw.js").catch(function(e) { console.log("SW注册失败:", e); });
+  // 清理旧 Service Worker（解决缓存问题）
+  if ('caches' in window) { caches.keys().then(function(ks) { ks.forEach(function(k) { caches.delete(k); }); }); }
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(function(rs) { rs.forEach(function(r) { r.unregister(); }); });
   }
+  // 不注册新 Service Worker，避免缓存问题
   requestNotificationPermission();
 </script>
 </body>
