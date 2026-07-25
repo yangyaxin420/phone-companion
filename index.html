@@ -734,28 +734,33 @@ function init() {
   if (weatherCity) fetchWeather();
 }
 init();
-// 注册 Service Worker（带版本号，强刷新）
+// 版本号 — 每次更新记得改这个值
+var APP_VER = 'v3.5.4';
+var OLD_VER = localStorage.getItem('phone_app_ver');
+if (OLD_VER && OLD_VER !== APP_VER) {
+  // 版本变了 → 清空所有缓存并刷新
+  if ('caches' in window) { caches.keys().then(function(keys) { keys.forEach(function(k) { caches.delete(k); }); }); }
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(function(regs) { regs.forEach(function(r) { r.unregister(); }); });
+  }
+  localStorage.setItem('phone_app_ver', APP_VER);
+  location.reload(true);
+} else if (!OLD_VER) {
+  localStorage.setItem('phone_app_ver', APP_VER);
+}
+// 注册 Service Worker
 if ("serviceWorker" in navigator && location.protocol !== 'file:') {
-  navigator.serviceWorker.register("sw.js?v=9").then(function(reg) {
-    // 如果有等待中的新 SW，立即激活并刷新页面
-    if (reg.waiting) {
-      reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-    }
-    // 监听到新 SW，自动更新
+  navigator.serviceWorker.register("sw.js").then(function(reg) {
     reg.addEventListener('updatefound', function() {
-      var newSW = reg.installing;
-      newSW.addEventListener('statechange', function() {
-        if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
-          newSW.postMessage({ type: 'SKIP_WAITING' });
-          setTimeout(function() { location.reload(); }, 500);
+      var sw = reg.installing;
+      sw.addEventListener('statechange', function() {
+        if (sw.state === 'installed' && navigator.serviceWorker.controller) {
+          sw.postMessage({ type: 'SKIP_WAITING' });
         }
       });
     });
   }).catch(function(e) { console.log("SW注册失败:", e); });
-  // 监听 SW 状态变化，自动刷新
-  navigator.serviceWorker.addEventListener('controllerchange', function() {
-    location.reload();
-  });
+  navigator.serviceWorker.addEventListener('controllerchange', function() { location.reload(); });
 }
 requestNotificationPermission();
 </script>
