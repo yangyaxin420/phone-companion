@@ -733,24 +733,21 @@ function init() {
   // 天气
   if (weatherCity) fetchWeather();
 }
-init();
-// 版本号 — 每次更新记得改这个值
-var APP_VER = 'v3.5.4';
-var OLD_VER = localStorage.getItem('phone_app_ver');
-if (OLD_VER && OLD_VER !== APP_VER) {
-  // 版本变了 → 清空所有缓存并刷新
-  if ('caches' in window) { caches.keys().then(function(keys) { keys.forEach(function(k) { caches.delete(k); }); }); }
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.getRegistrations().then(function(regs) { regs.forEach(function(r) { r.unregister(); }); });
-  }
-  localStorage.setItem('phone_app_ver', APP_VER);
-  location.reload(true);
-} else if (!OLD_VER) {
-  localStorage.setItem('phone_app_ver', APP_VER);
-}
-// 注册 Service Worker
-if ("serviceWorker" in navigator && location.protocol !== 'file:') {
-  navigator.serviceWorker.register("sw.js").then(function(reg) {
+	// 版本号 — 每次更新记得改这个值
+	var APP_VER = 'v3.5.4';
+	var OLD_VER = localStorage.getItem('phone_app_ver');
+	// 版本变了 OR 第一次运行（刚更新完）→ 清空缓存+SW+刷新
+	if (!OLD_VER || OLD_VER !== APP_VER) {
+	  if ('caches' in window) { caches.keys().then(function(keys) { keys.forEach(function(k) { caches.delete(k); }); }); }
+	  if ('serviceWorker' in navigator) {
+	    navigator.serviceWorker.getRegistrations().then(function(regs) { regs.forEach(function(r) { r.unregister(); }); });
+	  }
+	  localStorage.setItem('phone_app_ver', APP_VER);
+	  location.reload(true);
+	}
+	// 注册 Service Worker
+	if ("serviceWorker" in navigator && location.protocol !== 'file:') {
+	  navigator.serviceWorker.register("sw.js").then(function(reg) {
     reg.addEventListener('updatefound', function() {
       var sw = reg.installing;
       sw.addEventListener('statechange', function() {
