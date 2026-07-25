@@ -27,7 +27,7 @@ async function aiCommentMoment(index) {
     const resp = await fetch(apiConfig.baseUrl.replace(/\/+$/, '') + '/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiConfig.apiKey}` },
-      body: JSON.stringify({ model: apiConfig.model || 'deepseek-chat', messages: [
+      body: JSON.stringify({ model: apiConfig.model || 'deepseek-v4-flash', messages: [
         { role: 'system', content: sysPrompt },
         { role: 'user', content: `我发的朋友圈内容：「${m.content}」` }
       ], max_tokens: 64, temperature: 0.9 })
@@ -129,7 +129,7 @@ async function aiReplyComment(index) {
     const resp = await fetch(apiConfig.baseUrl.replace(/\/+$/, '') + '/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiConfig.apiKey}` },
-      body: JSON.stringify({ model: apiConfig.model || 'deepseek-chat', messages: [
+      body: JSON.stringify({ model: apiConfig.model || 'deepseek-v4-flash', messages: [
         { role: 'system', content: sysPrompt },
         { role: 'user', content: `原动态：「${m.content}」\n评论区对话：\n${recentCtx}` }
       ], max_tokens: 48, temperature: 0.9 })
@@ -174,7 +174,7 @@ async function addAiMoment() {
       const resp = await fetch(apiConfig.baseUrl.replace(/\/+$/, '') + '/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiConfig.apiKey}` },
-        body: JSON.stringify({ model: apiConfig.model || 'deepseek-chat', messages: [
+        body: JSON.stringify({ model: apiConfig.model || 'deepseek-v4-flash', messages: [
           { role: 'system', content: sysPrompt },
           { role: 'user', content: contextInfo }
         ], max_tokens: 64, temperature: 0.9 })
@@ -246,7 +246,7 @@ async function generateAutoMoment(char, todayStr, dailyCount) {
       var resp = await fetch(apiConfig.baseUrl.replace(/\/+$/, '') + '/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiConfig.apiKey },
-        body: JSON.stringify({ model: apiConfig.model || 'deepseek-chat', messages: [
+        body: JSON.stringify({ model: apiConfig.model || 'deepseek-v4-flash', messages: [
           { role: 'system', content: sysPrompt },
           { role: 'user', content: contextInfo }
         ], max_tokens: 64, temperature: 0.9 })

@@ -323,7 +323,7 @@ ${un}发来了ta在${dateLabel}（${modeLabel}）的记录。${tLine}
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiConfig.apiKey },
     body: JSON.stringify({
-      model: apiConfig.model || 'deepseek-chat',
+      model: apiConfig.model || 'deepseek-v4-flash',
       messages: [
         { role: 'system', content: sp + '\n\n用户记录如下：' },
         { role: 'user', content: text }

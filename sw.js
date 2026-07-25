@@ -1,4 +1,4 @@
-const CACHE = 'phone-v7';
+const CACHE = 'phone-v8';
 const SW_VERSION = 7;
 
 self.addEventListener('install', e => {

@@ -46,7 +46,7 @@ function setCurrentChat(msgs) {
 let systemPrompt = lsGet('sp', DEFAULT_CHARACTERS[0].systemPrompt);
 let personaData = lsGet('persona', { name:'骆云影', story:DEFAULT_CHARACTERS[0].story });
 let worldBook = lsGet('worldBook', '');
-let apiConfig = lsGet('apiConfig', { baseUrl:'https://api.deepseek.com', apiKey:'', model:'deepseek-chat', useCorsProxy:false });
+let apiConfig = lsGet('apiConfig', { baseUrl:'https://api.deepseek.com', apiKey:'', model:'deepseek-v4-flash', useCorsProxy:false });
 
 /* ---- 角色切换 ---- */
 function switchCharacter(charId) {
@@ -605,7 +605,7 @@ async function generateMultiReplies(text, count, length) {
       }));
 
       const body = {
-        model: apiConfig.model || 'deepseek-chat',
+        model: apiConfig.model || 'deepseek-v4-flash',
         messages: [
           { role: 'system', content: fullPrompt },
           ...contextMsgs,
@@ -896,7 +896,7 @@ async function callLLMApi(userText) {
   }));
 
   const body = {
-    model: apiConfig.model || 'deepseek-chat',
+    model: apiConfig.model || 'deepseek-v4-flash',
     messages: [
       { role: 'system', content: fullSystemPrompt },
       ...contextMsgs,

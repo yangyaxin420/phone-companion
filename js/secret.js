@@ -1562,7 +1562,7 @@ async function callLLMApiForSecret(prompt) {
     apiUrl = buildCorsProxyUrl(apiUrl);
   }
   const body = {
-    model: apiConfig.model || 'deepseek-chat',
+    model: apiConfig.model || 'deepseek-v4-flash',
     messages: [
       { role: 'system', content: '你是一个温柔而真实的角色，正在回复一封匿名信。请用你的性格说话，回复要真诚、有温度。不要加任何动作描写或表情符号。' },
       { role: 'user', content: prompt }

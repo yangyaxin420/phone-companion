@@ -32,7 +32,12 @@ function loadPersona() {
   if (saved) {
     Object.assign(apiConfig, saved);
   } else {
-    apiConfig = { baseUrl:'https://api.deepseek.com', apiKey:'', model:'deepseek-chat', useCorsProxy:false };
+    apiConfig = { baseUrl:'https://api.deepseek.com', apiKey:'', model:'deepseek-v4-flash', useCorsProxy:false };
+  }
+  // 模型名迁移：deepseek-chat → deepseek-v4-flash（2026-07-24 停用）
+  if (apiConfig.model === 'deepseek-chat' || apiConfig.model === 'deepseek-reasoner') {
+    apiConfig.model = 'deepseek-v4-flash';
+    lsSet('apiConfig', apiConfig);
   }
   if (apiConfig.useCorsProxy && (!apiConfig.baseUrl || apiConfig.baseUrl.includes('deepseek.com'))) {
     apiConfig.useCorsProxy = false;
@@ -57,7 +62,7 @@ function saveApiConfig() {
   apiConfig.apiKey = keyEl.value.trim();
   // 保留已有配置，只更新 key
   if (!apiConfig.baseUrl) apiConfig.baseUrl = 'https://api.deepseek.com';
-  if (!apiConfig.model) apiConfig.model = 'deepseek-chat';
+  if (!apiConfig.model) apiConfig.model = 'deepseek-v4-flash';
   lsSet('apiConfig', apiConfig);
   updateApiStatusBadge();
   if (apiConfig.apiKey) {
@@ -73,7 +78,7 @@ async function testApiConnection() {
   const key = keyEl.value.trim();
   if (!key) { addChatSystem('❌ 请先填写 API Key'); return; }
   const baseUrl = apiConfig.baseUrl || 'https://api.deepseek.com';
-  const model = apiConfig.model || 'deepseek-chat';
+  const model = apiConfig.model || 'deepseek-v4-flash';
   addChatSystem('🔄 正在测试 API 连接...');
   const baseEndpoint = baseUrl.replace(/\/+$/, '') + '/chat/completions';
   const testBody = { model, messages: [{ role: 'user', content: '你好，请用一句话回复测试成功' }], max_tokens: 32 };
