@@ -61,9 +61,8 @@ function renderInputArea() {
   } else if (_mode === 'weekly') {
     const monday = getMonday(new Date());
     const sunday = getSunday(new Date());
-    const records = getDayRecords();
-    const weekKeys = getDateRange(monday, sunday);
-    const weekRecords = weekKeys.filter(d => records[d]);
+    const allReports = lsGet('daily_reports', []);
+    const weekReps = allReports.filter(r => r.mode === 'daily' && r.dateLabel >= monday && r.dateLabel <= sunday);
     area.innerHTML = `
       <div style="font-size:12px;color:#999;margin-bottom:4px;">📅 选择日期范围</div>
       <div style="display:flex;gap:6px;margin-bottom:6px;">
@@ -74,21 +73,21 @@ function renderInputArea() {
       <div style="font-size:12px;color:#999;margin-bottom:4px;">🎯 本周主题（可选）</div>
       <input type="text" id="dailyTheme" placeholder="例如：专心考试" style="width:100%;padding:8px 12px;border:1px solid #e0e0e0;border-radius:10px;font-size:13px;background:#fff;box-sizing:border-box;">
       <div style="font-size:12px;color:#888;margin-top:6px;padding:8px 10px;background:#f8f9fe;border-radius:8px;">
-        📊 已记录 <strong>${weekRecords.length}</strong> 天${weekRecords.length > 0 ? '：' + weekRecords.map(d => d.slice(5)).join('、') : ''}
+        📊 本周已有日报 <strong>${weekReps.length}</strong> 篇${weekReps.length > 0 ? '（' + weekReps.map(r => r.dateLabel.slice(5)).join('、') + '）' : ''}
       </div>
     `;
   } else { // monthly
     const now = new Date();
-    const ym = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
-    const records = getDayRecords();
-    const monthKeys = Object.keys(records).filter(d => d.startsWith(ym));
+    const ym = _fmtDate(now).slice(0,7);
+    const allReports = lsGet('daily_reports', []);
+    const monthReps = allReports.filter(r => r.mode === 'daily' && r.dateLabel.startsWith(ym));
     area.innerHTML = `
       <div style="font-size:12px;color:#999;margin-bottom:4px;">📅 选择月份</div>
       <input type="month" id="dailyMonth" value="${ym}" style="width:100%;padding:8px 10px;border:1px solid #e0e0e0;border-radius:10px;font-size:13px;background:#fff;box-sizing:border-box;margin-bottom:8px;">
       <div style="font-size:12px;color:#999;margin-bottom:4px;">🎯 本月主题（可选）</div>
       <input type="text" id="dailyTheme" placeholder="例如：暑假探索" style="width:100%;padding:8px 12px;border:1px solid #e0e0e0;border-radius:10px;font-size:13px;background:#fff;box-sizing:border-box;">
       <div style="font-size:12px;color:#888;margin-top:6px;padding:8px 10px;background:#f8f9fe;border-radius:8px;">
-        📊 本月已记录 <strong>${monthKeys.length}</strong> 天
+        📊 本月已有日报 <strong>${monthReps.length}</strong> 篇
       </div>
     `;
   }
@@ -143,24 +142,26 @@ async function generateDailyReport() {
     const end = document.getElementById('dailyWeekEnd')?.value;
     if (!start || !end) { showDailyToast('📅 选一下日期范围'); return; }
     theme = document.getElementById('dailyTheme')?.value.trim() || '';
-    const records = getDayRecords();
-    const days = getDateRange(start, end);
-    const entries = days.filter(d => records[d]).map(d => `【${d}】${records[d].text}`);
-    if (entries.length === 0) {
-      const allKeys = Object.keys(records);
-      showDailyToast('📭 区间无记录（已有' + allKeys.length + '条记录：' + allKeys.slice(-5).join(',') + '，区间：' + start + '~' + end + '）');
-      return;
-    }
+    // 优先从历史日报中读取
+    const allReports = lsGet('daily_reports', []);
+    const dailyReps = allReports.filter(r => r.mode === 'daily' && r.dateLabel >= start && r.dateLabel <= end);
+    const entries = dailyReps.flatMap(r =>
+      (r.comments || []).map(c => `【${r.dateLabel}】${c.event}`)
+    );
+    if (entries.length === 0) { showDailyToast('📭 这个区间还没有日报，先生成几天日报再来'); return; }
     text = entries.join('\n\n');
     dateLabel = start + '~' + end;
   } else { // monthly
     const ym = document.getElementById('dailyMonth')?.value;
     if (!ym) { showDailyToast('📅 选一下月份'); return; }
     theme = document.getElementById('dailyTheme')?.value.trim() || '';
-    const records = getDayRecords();
-    const days = Object.keys(records).filter(d => d.startsWith(ym)).sort();
-    const entries = days.map(d => `【${d}】${records[d].text}`);
-    if (entries.length === 0) { showDailyToast('📭 这个月还没有每日记录，先去日报记几天'); return; }
+    // 优先从历史日报中读取
+    const allReports = lsGet('daily_reports', []);
+    const dailyReps = allReports.filter(r => r.mode === 'daily' && r.dateLabel.startsWith(ym));
+    const entries = dailyReps.flatMap(r =>
+      (r.comments || []).map(c => `【${r.dateLabel}】${c.event}`)
+    );
+    if (entries.length === 0) { showDailyToast('📭 这个月还没有日报，先生成几天日报再来'); return; }
     text = entries.join('\n\n');
     dateLabel = ym;
   }
