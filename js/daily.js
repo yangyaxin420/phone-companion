@@ -141,8 +141,11 @@ async function generateDailyReport() {
     // 优先从历史日报中读取
     const allReports = lsGet('daily_reports', []);
     const dailyReps = allReports.filter(r => r.mode === 'daily' && r.dateLabel >= start && r.dateLabel <= end);
+    // 把日报的事件和已有点评都传给AI，让它综合概括
     const entries = dailyReps.flatMap(r =>
-      (r.comments || []).map(c => `【${r.dateLabel}】${c.event}`)
+      (r.comments || []).map(c =>
+        `【${r.dateLabel}】${c.event}\n  ${personaData?.name || '骆云影'}当时的点评：${c.yunying_says}`
+      )
     );
     if (entries.length === 0) { showDailyToast('📭 这个区间还没有日报，先生成几天日报再来'); return; }
     text = entries.join('\n\n');
@@ -212,7 +215,43 @@ async function callDailyAI(text, dateLabel, theme, mode) {
   const modeLabel = { daily:'今天', weekly:'这周', monthly:'这个月', summary:'这段时间' }[mode] || '这段时间';
   const tLine = theme ? `\n${un}给${modeLabel}定的主题是：${theme}` : '';
 
-  // 综合总结模式：不同的prompt
+  // 周报：综合概括，不逐条点评
+  if (mode === 'weekly') {
+    const sp = `你是${pName}。${story}
+傲娇暴躁，嘴硬心软，说话简洁冷淡带刺，但偶尔会透出关心。讨厌肉麻和废话。
+以下是${un}在${dateLabel}的日报记录，以及你当时对每条事件的点评。${tLine}
+请综合这一周的日报内容，做以下事情：
+1. 提炼出3-5个本周关键词（主题/情绪/重要事件）
+2. 写一段本周总评——综合来看她这周过得怎么样、有什么变化
+3. 不要逐条重复点评，你已经点评过了
+
+返回严格JSON（不要markdown代码块）：
+{
+  "keywords": ["关键词1","关键词2","关键词3"],
+  "overall": "本周总评（毒舌但透着关心，2-3句话）"
+}`;
+    const apiUrl = (apiConfig.baseUrl || 'https://api.deepseek.com').replace(/\/+$/, '') + '/chat/completions';
+    const resp = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiConfig.apiKey },
+      body: JSON.stringify({
+        model: apiConfig.model || 'deepseek-v4-flash',
+        messages: [
+          { role: 'system', content: sp + '\n\n记录如下：' },
+          { role: 'user', content: text }
+        ],
+        temperature: 0.7, max_tokens: 1024
+      })
+    });
+    if (!resp.ok) throw new Error('API错误(' + resp.status + ')');
+    const json = await resp.json();
+    const content = json.choices?.[0]?.message?.content || '';
+    const jm = content.match(/\{[\s\S]*\}/);
+    if (jm) return JSON.parse(jm[0]);
+    throw new Error('AI返回格式不对，重新试试');
+  }
+
+  // 综合总结模式
   if (mode === 'summary') {
     const sp = `你是${pName}。${story}
 傲娇暴躁，嘴硬心软，但心里其实很在意她。
@@ -335,7 +374,7 @@ function dailyRuleParse(text) {
     };
   }
   return {
-    keywords: _mode === 'monthly' ? ['生活','学习','娱乐'] : undefined,
+    keywords: _mode === 'monthly' ? ['生活','学习','娱乐'] : _mode === 'weekly' ? ['日常','成长','生活'] : undefined,
     comments: sents.map(s => {
       const p = pool[cls(s)] || ['嗯。'];
       return { event: s, yunying_says: p[Math.floor(Math.random() * p.length)] };
@@ -351,7 +390,7 @@ function renderReport(result, theme, reportId) {
   const container = document.getElementById('dailyResults');
   const charName = (personaData && personaData.name) || '骆云影';
 
-  // 综合总结模式：显示sections
+  // 综合总结模式（sections）
   if (_mode === 'summary' && result && result.sections) {
     let html = '';
     if (result.overall) {
@@ -368,6 +407,24 @@ function renderReport(result, theme, reportId) {
         <div style="font-size:13px;color:#555;line-height:1.7;">${s.content}</div>
       </div>`;
     });
+    container.innerHTML = html;
+    return;
+  }
+
+  // 周报模式（keywords + overall，无逐条点评）
+  if (_mode === 'weekly' && result && result.keywords && result.overall) {
+    let html = '';
+    if (result.keywords && result.keywords.length > 0) {
+      html += `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">`;
+      result.keywords.forEach(kw => {
+        html += `<span style="padding:4px 12px;border-radius:14px;background:linear-gradient(135deg,#667eea20,#764ba220);color:#667eea;font-size:12px;font-weight:600;">#${escHtml(kw)}</span>`;
+      });
+      html += `</div>`;
+    }
+    html += `<div style="background:linear-gradient(135deg,#f0f4ff,#fff);border-radius:16px;padding:16px;border:1px solid #e8eeff;">
+      <div style="font-size:13px;font-weight:600;color:#5B7FFF;margin-bottom:6px;">💬 ${charName}的本周点评</div>
+      <div style="font-size:14px;line-height:1.7;color:#333;">${result.overall}</div>
+    </div>`;
     container.innerHTML = html;
     return;
   }
