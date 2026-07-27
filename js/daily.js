@@ -63,7 +63,7 @@ function renderInputArea() {
         📊 本周已有日报 <strong>${weekReps.length}</strong> 篇${weekReps.length > 0 ? '（' + weekReps.map(r => r.dateLabel.slice(5)).join('、') + '）' : ''}
       </div>
     `;
-  } else { // monthly
+  } else if (_mode === 'monthly') {
     const now = new Date();
     const ym = _fmtDate(now).slice(0,7);
     const allReports = lsGet('daily_reports', []);
@@ -150,7 +150,7 @@ async function generateDailyReport() {
     if (entries.length === 0) { showDailyToast('📭 这个区间还没有日报，先生成几天日报再来'); return; }
     text = entries.join('\n\n');
     dateLabel = start + '~' + end;
-  } else { // monthly
+  } else if (_mode === 'monthly') {
     const ym = document.getElementById('dailyMonth')?.value;
     if (!ym) { showDailyToast('📅 选一下月份'); return; }
     theme = document.getElementById('dailyTheme')?.value.trim() || '';
