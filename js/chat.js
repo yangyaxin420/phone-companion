@@ -239,8 +239,8 @@ async function generateMemoryNote(charId, force) {
             { role: 'system', content: `你是${pName}。${story ? '性格：'+story : ''}\n回顾上面的对话，用一句话记下你在对话中注意到的事。只要事实，不要描写和抒情。比如「她喜欢吃甜的」「她今天好像不太开心」「她又在熬夜」。一句话，干净利落。` },
             { role: 'user', content: `对话：\n${recentMsgs.map(m => (m.role==='user'?'👤 用户：':'💬 我：')+m.text).join('\n')}` }
           ],
-          max_tokens: 512,
-          temperature: 0.6
+          max_tokens: 64,
+          temperature: 0.3
         })
       });
       if (resp.ok) {
