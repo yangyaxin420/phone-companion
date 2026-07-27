@@ -146,7 +146,11 @@ async function generateDailyReport() {
     const records = getDayRecords();
     const days = getDateRange(start, end);
     const entries = days.filter(d => records[d]).map(d => `【${d}】${records[d].text}`);
-    if (entries.length === 0) { showDailyToast('📭 这个区间还没有每日记录'); return; }
+    if (entries.length === 0) {
+      const allKeys = Object.keys(records);
+      showDailyToast('📭 区间无记录（已有' + allKeys.length + '条记录：' + allKeys.slice(-5).join(',') + '，区间：' + start + '~' + end + '）');
+      return;
+    }
     text = entries.join('\n\n');
     dateLabel = start + '~' + end;
   } else { // monthly
