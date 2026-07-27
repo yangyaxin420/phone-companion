@@ -200,6 +200,97 @@ function getRecentMemories(count) {
   return recent.map(function(m) { return m.text; }).join('\n');
 }
 
+/* ---- 记忆笔记系统（AI总结版） ---- */
+let memoryNotes = lsGet('memoryNotes', []);
+
+// 获取某个角色的记忆笔记
+function getCharMemoryNotes(charId, limit) {
+  return memoryNotes.filter(n => n.charId === charId).slice(-(limit || 20));
+}
+
+// 生成新的记忆笔记（从最近未总结的对话中）
+async function generateMemoryNote(charId, force) {
+  const msgs = chatData[charId] || [];
+  if (msgs.length < 4) return null;
+
+  // 找上次总结之后的新消息
+  const lastNote = memoryNotes.filter(n => n.charId === charId).pop();
+  const lastNoteTime = lastNote ? lastNote.createdAt : 0;
+  const newMsgs = msgs.filter(m => m.time > lastNoteTime && m.role !== 'system');
+
+  // 新消息少于4条且不强制则不生成
+  if (!force && newMsgs.length < 4) return null;
+
+  // 取最近15条用户+AI对话
+  const recentMsgs = msgs.filter(m => m.role !== 'system').slice(-15);
+  const pName = getCharById(charId)?.name || '小伴';
+  const story = getCharById(charId)?.story || '';
+
+  // 有API → AI总结（用轻量调用，不走callLLMApi的厚重上下文）
+  if (apiConfig && apiConfig.apiKey) {
+    try {
+      const apiUrl = (apiConfig.baseUrl || 'https://api.deepseek.com').replace(/\/+$/, '') + '/chat/completions';
+      const resp = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiConfig.apiKey },
+        body: JSON.stringify({
+          model: apiConfig.model || 'deepseek-v4-flash',
+          messages: [
+            { role: 'system', content: `你是${pName}。${story ? '性格：'+story : ''}\n回顾上面的对话，默默记下你在对话中注意到的事。就像在心里悄悄记笔记——她说了什么、喜欢什么、讨厌什么、心情怎么样。用「她说……」「她好像……」「我注意到……」这样的口吻，1-3句话，自然一点。` },
+            { role: 'user', content: `对话：\n${recentMsgs.map(m => (m.role==='user'?'👤 用户：':'💬 我：')+m.text).join('\n')}` }
+          ],
+          max_tokens: 512,
+          temperature: 0.6
+        })
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        const reply = data.choices?.[0]?.message?.content?.trim();
+        if (reply && reply.length > 10) {
+          const note = {
+            id: Date.now(),
+            charId,
+            summary: reply.trim(),
+            createdAt: Date.now(),
+            date: new Date().toISOString().split('T')[0]
+          };
+          memoryNotes.push(note);
+          if (memoryNotes.length > 100) memoryNotes = memoryNotes.slice(-100);
+          lsSet('memoryNotes', memoryNotes);
+          return note;
+        }
+      } // if resp.ok
+    } catch(e) {
+      console.log('[记忆笔记] AI生成失败:', e?.message?.substring(0,50));
+      return null;
+    }
+    return null; // API失败或回复太短，不生成规则总结
+  }
+
+  // 无API → 规则总结
+  const userMsgs = recentMsgs.filter(m => m.role === 'user').map(m => m.text);
+  const allText = userMsgs.join(' ');
+  let summary = '';
+  if (/累|困|熬夜/.test(allText)) summary += '她好像有点累。';
+  if (/吃|饭|食堂/.test(allText)) summary += '聊到了吃的。';
+  if (/难过|哭|不开心|emo/.test(allText)) summary += '她心情不太好。';
+  if (/开心|高兴|快乐/.test(allText)) summary += '她今天挺开心的。';
+  if (/学习|考试|课|作业/.test(allText)) summary += '她在忙学习的事。';
+  if (!summary) summary = '和她聊了一些日常。';
+
+  const note = {
+    id: Date.now(),
+    charId,
+    summary: summary.trim(),
+    createdAt: Date.now(),
+    date: new Date().toISOString().split('T')[0]
+  };
+  memoryNotes.push(note);
+  if (memoryNotes.length > 100) memoryNotes = memoryNotes.slice(-100);
+  lsSet('memoryNotes', memoryNotes);
+  return note;
+}
+
 function renderChat() {
   const container = document.getElementById('chatMessages');
   container.innerHTML = '';
@@ -590,7 +681,11 @@ async function generateMultiReplies(text, count, length) {
     const pName = personaData.name || '小伴';
     const personaPart = personaData.story ? `\n你的人设背景：${personaData.story}` : '';
     const contextBlock = buildChatContext();
-    const contextMsgs = chatMessages.slice(-20).map(m => ({
+    // 排除最后一条用户消息（已作为 text 单独传入），避免重复
+    const msgsForApi = chatMessages.length > 0 && chatMessages[chatMessages.length - 1].role === 'user'
+      ? chatMessages.slice(0, -1)
+      : chatMessages;
+    const contextMsgs = msgsForApi.slice(-20).map(m => ({
       role: m.role === 'ai' ? 'assistant' : m.role === 'user' ? 'user' : 'system',
       content: m.text
     }));
@@ -725,7 +820,10 @@ function saveAiConfig() {
   closeSpConfig();
 }
 
+let _chatSending = false;
+
 async function sendChat() {
+  if (_chatSending) return; // 防止重复发送
   const inp = document.getElementById('chatInput');
   const text = inp.value.trim();
   if (!text) return;
@@ -754,6 +852,7 @@ async function sendChat() {
     detectSongFromChat(text, currentCharId);
   }
 
+  _chatSending = true;
   const typing = document.getElementById('chatTyping');
   typing.classList.add('show');
 
@@ -779,6 +878,11 @@ async function sendChat() {
       saveChatData();
       renderChat();
     }
+
+    // 后台自动生成记忆笔记（不阻塞聊天）
+    if (apiConfig && apiConfig.apiKey) {
+      generateMemoryNote(currentCharId).catch(function(){});
+    }
   } catch(e) {
     typing.classList.remove('show');
     const fallback = generateLocalReply(text);
@@ -795,6 +899,8 @@ async function sendChat() {
     chatMessages.push({ role:'ai', text:fallback + `\n\n（⚠️ ${errMsg}，已切换本地回复）`, time: Date.now() });
     saveChatData();
     renderChat();
+  } finally {
+    _chatSending = false;
   }
 }
 
@@ -835,6 +941,14 @@ async function callLLMApi(userText) {
   var memoryBlock = getRecentMemories(20);
   if (memoryBlock) {
     contextBlock += '\n【AI的记忆 - 用户曾说过】\n' + memoryBlock;
+  }
+  // 记忆笔记（AI总结版）
+  var notesBlock = getCharMemoryNotes(currentCharId, 5);
+  if (notesBlock.length > 0) {
+    contextBlock += '\n【我的记忆笔记 - 我对用户的印象】\n';
+    notesBlock.forEach(function(n) {
+      contextBlock += '- ' + n.summary + '\n';
+    });
   }
   contextBlock += `\n当前时间：${dateStr} ${timeStr}`;
 
@@ -920,7 +1034,11 @@ async function callLLMApi(userText) {
 - 添加多个任务：每行一个 [TASK:xxx]
 - 你可以主动提及当前环境信息，比如天气变了提醒带伞、任务多的时候鼓励、经期前关心等。`;
 
-  const contextMsgs = chatMessages.slice(-20).map(m => ({
+  // 排除最后一条用户消息（已作为 userText 单独传入），避免重复
+  const msgsForApi = chatMessages.length > 0 && chatMessages[chatMessages.length - 1].role === 'user'
+    ? chatMessages.slice(0, -1)
+    : chatMessages;
+  const contextMsgs = msgsForApi.slice(-20).map(m => ({
     role: m.role === 'ai' ? 'assistant' : m.role === 'user' ? 'user' : 'system',
     content: m.text
   }));

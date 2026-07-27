@@ -11,107 +11,6 @@ function showDaily() {
   switchDailyMode('daily');
   renderDayList();
   renderReportList();
-  checkAutoReports();
-}
-
-/* ===== 每周一/每月1号自动总结 ===== */
-function checkAutoReports() {
-  const track = lsGet('auto_report_track', {});
-  const today = new Date();
-
-  // 周一 → 检查周报
-  if (today.getDay() === 1) {
-    const monday = getMonday(today);
-    const weekKey = 'weekly_' + monday;
-    if (!track[weekKey]) {
-      tryAutoGenerate('weekly', weekKey, track);
-    }
-  }
-
-  // 每月1号 → 检查月报
-  if (today.getDate() === 1) {
-    const ym = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0');
-    const monthKey = 'monthly_' + ym;
-    if (!track[monthKey]) {
-      tryAutoGenerate('monthly', monthKey, track);
-    }
-  }
-}
-
-async function tryAutoGenerate(mode, trackKey, track) {
-  const title = mode === 'weekly' ? '周报' : '月报';
-  const now = new Date();
-
-  // 先标记，防止重复触发
-  track[trackKey] = 'running';
-  lsSet('auto_report_track', track);
-
-  // 收集数据
-  let text = '', dateLabel = '';
-
-  if (mode === 'weekly') {
-    const monday = getMonday(now);
-    const sunday = getSunday(now);
-    const records = getDayRecords();
-    const days = getDateRange(monday, sunday);
-    const entries = days.filter(d => records[d]).map(d => '【' + d + '】' + records[d].text);
-    if (entries.length === 0) {
-      track[trackKey] = 'empty'; lsSet('auto_report_track', track);
-      return;
-    }
-    text = entries.join('\n\n');
-    dateLabel = monday + '~' + sunday;
-  } else {
-    const ym = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-    const records = getDayRecords();
-    const days = Object.keys(records).filter(d => d.startsWith(ym)).sort();
-    const entries = days.map(d => '【' + d + '】' + records[d].text);
-    if (entries.length === 0) {
-      track[trackKey] = 'empty'; lsSet('auto_report_track', track);
-      return;
-    }
-    text = entries.join('\n\n');
-    dateLabel = ym;
-  }
-
-  // 有API Key → 静默自动生成
-  if (typeof apiConfig !== 'undefined' && apiConfig && apiConfig.apiKey) {
-    try {
-      const btn = document.getElementById('dailyBtn');
-      if (btn) btn.disabled = true;
-      const result = await callDailyAI(text, dateLabel, '', mode);
-      saveReport(mode, dateLabel, '', result);
-      track[trackKey] = 'done';
-      lsSet('auto_report_track', track);
-      // 刷新报告列表
-      renderReportList();
-      showDailyToast('📬 ' + title + '已自动生成（骆云影看过了）');
-    } catch(e) {
-      console.error('自动生成' + title + '失败:', e);
-      track[trackKey] = 'failed';
-      lsSet('auto_report_track', track);
-    } finally {
-      const btn = document.getElementById('dailyBtn');
-      if (btn) btn.disabled = false;
-    }
-  } else {
-    // 无API Key → 提示手动生成
-    track[trackKey] = 'pending';
-    lsSet('auto_report_track', track);
-    showAutoReportReminder(mode);
-  }
-}
-
-function showAutoReportReminder(mode) {
-  const container = document.getElementById('dailyResults');
-  if (!container) return;
-  const label = mode === 'weekly' ? '周报' : '月报';
-  container.innerHTML =
-    '<div style="background:#FFF8E1;border-radius:12px;padding:12px 14px;border:1px solid #FFE082;font-size:13px;animation:fadeIn .3s;">' +
-      '<div style="font-weight:600;color:#F57F17;margin-bottom:4px;">📬 今日' + label + '待生成</div>' +
-      '<div style="color:#795548;line-height:1.6;">今天' + (label === '周报' ? '周一' : '本月1号') + '！切换到「' + label + '」tab，点「生成」按钮自动总结 ✨</div>' +
-    '</div>';
-  container.style.display = 'block';
 }
 
 /* ===== Tab切换 ===== */
@@ -130,7 +29,7 @@ function switchDailyMode(mode) {
 
 function updateBtnText() {
   const btn = document.getElementById('dailyBtn');
-  const labels = { daily:'🤖 生成今日日报', weekly:'🤖 生成本周周报', monthly:'🤖 生成本月月报' };
+  const labels = { daily:'🤖 生成今日日报', weekly:'🤖 生成周报', monthly:'🤖 生成月报' };
   btn.textContent = labels[_mode] || '🤖 生成报告';
 }
 
@@ -165,12 +64,16 @@ function renderInputArea() {
     const weekKeys = getDateRange(monday, sunday);
     const weekRecords = weekKeys.filter(d => records[d]);
     area.innerHTML = `
-      <div style="font-size:12px;color:#999;margin-bottom:4px;">📅 选择周</div>
-      <input type="date" id="dailyWeekStart" value="${monday}" style="flex:1;padding:8px 10px;border:1px solid #e0e0e0;border-radius:10px;font-size:13px;background:#fff;box-sizing:border-box;width:100%;margin-bottom:6px;">
-      <div style="font-size:12px;color:#999;margin-bottom:4px;">🎯 本周主线（可选）</div>
+      <div style="font-size:12px;color:#999;margin-bottom:4px;">📅 选择日期范围</div>
+      <div style="display:flex;gap:6px;margin-bottom:6px;">
+        <input type="date" id="dailyWeekStart" value="${monday}" style="flex:1;padding:8px 10px;border:1px solid #e0e0e0;border-radius:10px;font-size:13px;background:#fff;box-sizing:border-box;">
+        <span style="line-height:36px;color:#bbb;">—</span>
+        <input type="date" id="dailyWeekEnd" value="${sunday}" style="flex:1;padding:8px 10px;border:1px solid #e0e0e0;border-radius:10px;font-size:13px;background:#fff;box-sizing:border-box;">
+      </div>
+      <div style="font-size:12px;color:#999;margin-bottom:4px;">🎯 本周主题（可选）</div>
       <input type="text" id="dailyTheme" placeholder="例如：专心考试" style="width:100%;padding:8px 12px;border:1px solid #e0e0e0;border-radius:10px;font-size:13px;background:#fff;box-sizing:border-box;">
       <div style="font-size:12px;color:#888;margin-top:6px;padding:8px 10px;background:#f8f9fe;border-radius:8px;">
-        📊 本周已记录 <strong>${weekRecords.length}</strong> 天${weekRecords.length > 0 ? '：' + weekRecords.map(d => d.slice(5)).join('、') : ''}
+        📊 已记录 <strong>${weekRecords.length}</strong> 天${weekRecords.length > 0 ? '：' + weekRecords.map(d => d.slice(5)).join('、') : ''}
       </div>
     `;
   } else { // monthly
@@ -181,13 +84,11 @@ function renderInputArea() {
     area.innerHTML = `
       <div style="font-size:12px;color:#999;margin-bottom:4px;">📅 选择月份</div>
       <input type="month" id="dailyMonth" value="${ym}" style="width:100%;padding:8px 10px;border:1px solid #e0e0e0;border-radius:10px;font-size:13px;background:#fff;box-sizing:border-box;margin-bottom:8px;">
-      <div style="font-size:12px;color:#999;margin-bottom:4px;">🎯 本月主线（可选）</div>
+      <div style="font-size:12px;color:#999;margin-bottom:4px;">🎯 本月主题（可选）</div>
       <input type="text" id="dailyTheme" placeholder="例如：暑假探索" style="width:100%;padding:8px 12px;border:1px solid #e0e0e0;border-radius:10px;font-size:13px;background:#fff;box-sizing:border-box;">
       <div style="font-size:12px;color:#888;margin-top:6px;padding:8px 10px;background:#f8f9fe;border-radius:8px;">
         📊 本月已记录 <strong>${monthKeys.length}</strong> 天
       </div>
-      <div style="font-size:12px;color:#999;margin-top:8px;">📝 或直接粘贴一段记录</div>
-      <textarea id="dailyBulkInput" placeholder="直接把大段文字粘过来也行…" style="width:100%;min-height:60px;padding:10px;border:1px solid #e0e0e0;border-radius:10px;font-size:13px;line-height:1.6;resize:vertical;background:#fff;font-family:inherit;box-sizing:border-box;margin-top:4px;"></textarea>
     `;
   }
 }
@@ -238,32 +139,24 @@ async function generateDailyReport() {
     dateLabel = date;
   } else if (_mode === 'weekly') {
     const start = document.getElementById('dailyWeekStart')?.value;
-    if (!start) { showDailyToast('📅 选一下周'); return; }
+    const end = document.getElementById('dailyWeekEnd')?.value;
+    if (!start || !end) { showDailyToast('📅 选一下日期范围'); return; }
     theme = document.getElementById('dailyTheme')?.value.trim() || '';
-    const end = getSunday(new Date(start));
     const records = getDayRecords();
     const days = getDateRange(start, end);
     const entries = days.filter(d => records[d]).map(d => `【${d}】${records[d].text}`);
-    if (entries.length === 0) { showDailyToast('📭 这周还没有每日记录，先去日报记几天吧'); return; }
+    if (entries.length === 0) { showDailyToast('📭 这个区间还没有每日记录'); return; }
     text = entries.join('\n\n');
     dateLabel = start + '~' + end;
   } else { // monthly
     const ym = document.getElementById('dailyMonth')?.value;
     if (!ym) { showDailyToast('📅 选一下月份'); return; }
     theme = document.getElementById('dailyTheme')?.value.trim() || '';
-    const bulk = document.getElementById('dailyBulkInput')?.value.trim();
     const records = getDayRecords();
     const days = Object.keys(records).filter(d => d.startsWith(ym)).sort();
     const entries = days.map(d => `【${d}】${records[d].text}`);
-    if (bulk) {
-      text = (entries.length > 0 ? entries.join('\n\n') + '\n\n---\n\n' : '') + bulk;
-    } else if (entries.length > 0) {
-      text = entries.join('\n\n');
-    } else if (bulk) {
-      text = bulk;
-    } else {
-      showDailyToast('📭 这个月还没有记录，或者粘贴一段话吧'); return;
-    }
+    if (entries.length === 0) { showDailyToast('📭 这个月还没有每日记录，先去日报记几天'); return; }
+    text = entries.join('\n\n');
     dateLabel = ym;
   }
 
@@ -305,13 +198,17 @@ async function callDailyAI(text, dateLabel, theme, mode) {
   const modeLabel = { daily:'今天', weekly:'这周', monthly:'这个月' }[mode] || '这段时间';
   const tLine = theme ? `\n${un}给${modeLabel}定的主题是：${theme}` : '';
 
+  const isMonthly = mode === 'monthly';
+  const kwPart = isMonthly ? `\n\n另外，请从这${modeLabel}的记录中提炼出3-5个关键词（这个${modeLabel}的关键主题/情绪/事件），放在"keywords"数组中。` : '';
+
   const sp = `你是${pName}。${story}
 傲娇暴躁，嘴硬心软，说话简洁冷淡带刺，但偶尔会透出关心。讨厌肉麻和废话。
 ${un}发来了ta在${dateLabel}（${modeLabel}）的记录。${tLine}
 请以你的风格，逐条点评每条事件。每条点评1-2句话，毒舌但透着关心，用「你」称呼。
-不要用动作描写，不要加emoji，不要长篇大论。
+不要用动作描写，不要加emoji，不要长篇大论。${kwPart}
 返回严格JSON（不要markdown代码块）：
 {
+  ${isMonthly ? '"keywords": ["关键词1","关键词2","关键词3"],' : ''}
   "comments": [
     { "event": "事件原文", "yunying_says": "毒舌点评" }
   ],
@@ -361,6 +258,7 @@ function dailyRuleParse(text) {
     '发展':['哟，在搞正事了？','不错嘛，有点东西。']
   };
   return {
+    keywords: _mode === 'monthly' ? ['生活','学习','娱乐'] : undefined,
     comments: sents.map(s => {
       const p = pool[cls(s)] || ['嗯。'];
       return { event: s, yunying_says: p[Math.floor(Math.random() * p.length)] };
@@ -390,6 +288,15 @@ function renderReport(result, theme, reportId) {
   }
 
   let html = '';
+  // 月报显示关键词
+  if (_mode === 'monthly' && result.keywords && result.keywords.length > 0) {
+    html += `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">`;
+    result.keywords.forEach(kw => {
+      html += `<span style="padding:4px 12px;border-radius:14px;background:linear-gradient(135deg,#667eea20,#764ba220);color:#667eea;font-size:12px;font-weight:600;">#${escHtml(kw)}</span>`;
+    });
+    html += `</div>`;
+  }
+
   if (result.overall) {
     html += `<div style="background:linear-gradient(135deg,#f0f4ff,#fff);border-radius:16px;padding:16px;margin-bottom:16px;border:1px solid #e8eeff;">
       <div style="font-size:13px;font-weight:600;color:#5B7FFF;margin-bottom:6px;">💬 ${charName}说</div>
@@ -421,7 +328,41 @@ function renderReport(result, theme, reportId) {
     </div>`;
   });
 
+  // 月报底部加复盘按钮
+  if (_mode === 'monthly') {
+    const savedReport = lsGet('daily_reports', []).find(r => r.id == reportId);
+    const hasReview = savedReport && savedReport.reviewNote;
+    html += `<div style="margin-top:16px;border-top:2px dashed #e8eeff;padding-top:14px;">
+      <button onclick="toggleReview(${reportId})" style="width:100%;padding:10px;background:#f8f9fe;border:1px solid #e0e8ff;border-radius:12px;font-size:13px;font-weight:600;color:#667eea;cursor:pointer;">
+        📋 复盘${hasReview ? ' ✓' : ''}
+      </button>
+      <div id="reviewArea_${reportId}" style="display:${hasReview ? 'block' : 'none'};margin-top:8px;">
+        <textarea id="reviewInput_${reportId}" placeholder="写写这个月的复盘反思…" style="width:100%;min-height:80px;padding:10px;border:1px solid #e0e0e0;border-radius:10px;font-size:13px;line-height:1.6;resize:vertical;background:#fff;font-family:inherit;box-sizing:border-box;">${hasReview || ''}</textarea>
+        <button onclick="saveReview(${reportId})" style="width:100%;padding:8px;margin-top:6px;background:#667eea;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;">💾 保存复盘</button>
+      </div>
+    </div>`;
+  }
+
   container.innerHTML = html;
+}
+
+/* ===== 复盘 ===== */
+function toggleReview(reportId) {
+  const area = document.getElementById('reviewArea_' + reportId);
+  if (area) area.style.display = area.style.display === 'none' ? 'block' : 'none';
+}
+
+function saveReview(reportId) {
+  const input = document.getElementById('reviewInput_' + reportId);
+  if (!input) return;
+  const text = input.value.trim();
+  var reports = lsGet('daily_reports', []);
+  var r = reports.find(r => r.id == reportId);
+  if (r) {
+    r.reviewNote = text;
+    lsSet('daily_reports', reports);
+  }
+  showDailyToast(text ? '✅ 复盘已保存' : '🗑 复盘已清空');
 }
 
 /* ===== 批注 ===== */
@@ -459,10 +400,12 @@ function saveReport(mode, dateLabel, theme, result) {
   var id = Date.now();
   reports.unshift({
     id, mode, dateLabel, theme: theme || '',
+    keywords: result.keywords || [],
     overall: result.overall || '',
     comments: (result.comments || []).map(c => ({
       event: c.event, yunying_says: c.yunying_says, userNote: c.userNote || ''
     })),
+    reviewNote: '',
     createdAt: new Date().toISOString()
   });
   if (reports.length > 30) reports = reports.slice(0, 30);
@@ -563,7 +506,7 @@ function loadReport(reportId) {
     b.style.fontWeight = isActive ? '600' : '400';
   });
   updateBtnText();
-  renderReport({ comments: r.comments || [], overall: r.overall || '' }, r.theme, r.id);
+  renderReport({ comments: r.comments || [], overall: r.overall || '', keywords: r.keywords || [] }, r.theme, r.id);
   document.getElementById('dailyResults').style.display = 'block';
 }
 
@@ -600,14 +543,10 @@ function fillDailyDemo() {
     document.getElementById('dailyDayInput').value = '今天终于把论文写完了，下午去操场跑了3圈，晚上看了一集动漫。';
   } else if (_mode === 'weekly') {
     document.getElementById('dailyTheme').value = '充实的一周';
-    showDailyToast('✨ 示例已填充！点「生成周报」试试');
+    showDailyToast('✨ 示例已填充！调的日期范围就是本周');
   } else {
-    const ta = document.getElementById('dailyBulkInput');
-    if (ta) {
-      ta.value = '这个月看了一部电影叫《我看见两朵一样的云》，考了英语六级，期末周学了一点专业课。做了一个占卜网站，重新完善了AI陪伴网站。自己去做了一次DIY银戒指。读了《就像樱桃树那样对你》的情诗集。';
-    }
     document.getElementById('dailyTheme').value = '期末+暑假过渡';
-    showDailyToast('✨ 示例已填充！');
+    showDailyToast('✨ 示例已填充！调月份直接点生成');
   }
 }
 

@@ -542,31 +542,26 @@ function showSecretNotes() {
     h += '</div></div>';
   }
 
-  // === 关键记忆（只显示与当前角色有关的） ===
-  if (typeof memories !== 'undefined' && memories.length > 0) {
-    // 迁移旧记忆（没有 charId 的 → 归到默认角色 luo）
-    var needsSave = false;
-    memories.forEach(function(m) {
-      if (!m.charId) { m.charId = 'luo'; needsSave = true; }
-    });
-    if (needsSave) lsSet('memories', memories);
-
-    var charMemories = memories.filter(function(m) { return m.charId === secretCharId; });
-    if (charMemories.length > 0) {
-      var recentMemories = charMemories.slice(-20).reverse();
-      var memTitle = isTsundere ? '🧠 她说过的话（我才没刻意记）' : isGentle ? '🧠 关于她的事 ♡' : '🧠 记录：用户信息';
-      h += '<div class="secret-note-card">';
-      h += '<div class="sn-time">' + memTitle + '</div>';
-      recentMemories.forEach(function(mem) {
-        var d = new Date(mem.time);
-        var timeStr = d.getMonth()+1 + '月' + d.getDate() + '日';
-        h += '<div style="font-size:12px;color:#555;padding:4px 0;border-bottom:1px solid #f5f5f5;line-height:1.6;">' +
-          '<span style="color:#bbb;font-size:10px;">' + timeStr + '</span> ' +
-          escHtml(mem.text) + '</div>';
-      });
-      h += '</div>';
-    }
+  // === AI记忆笔记（自动总结，无需手动） ===
+  var charNotes = [];
+  if (typeof memoryNotes !== 'undefined' && memoryNotes.length > 0) {
+    charNotes = memoryNotes.filter(function(n) { return n.charId === secretCharId; }).slice(-10).reverse();
   }
+  var memTitle = isTsundere ? '🧠 记住的事（啧）' : isGentle ? '🧠 关于她的小笔记 ♡' : '🧠 记忆笔记';
+  h += '<div class="secret-note-card">';
+  h += '<div class="sn-time">' + memTitle + '</div>';
+  if (charNotes.length > 0) {
+    charNotes.forEach(function(n) {
+      var d = new Date(n.createdAt);
+      var timeStr = d.getMonth()+1 + '月' + d.getDate() + '日';
+      h += '<div style="font-size:13px;color:#555;padding:8px 0;border-bottom:1px solid #f5f5f5;line-height:1.7;">' +
+        '<span style="color:#bbb;font-size:10px;">' + timeStr + '</span><br>' +
+        escHtml(n.summary) + '</div>';
+    });
+  } else {
+    h += '<div style="font-size:12px;color:#bbb;padding:10px 0;text-align:center;">聊天几次后会自动生成记忆笔记<br><span style="font-size:11px;">AI会默默记住关于你的事</span></div>';
+  }
+  h += '</div>';
 
   // === 角色心声（性格化） ===
   if (topicKeywords.length > 0 || todayMsgs.length > 0) {
@@ -603,6 +598,13 @@ function showSecretNotes() {
   }
 
   container.innerHTML = h;
+
+  // 进入记事本时自动尝试生成记忆笔记（如有新对话）
+  if (typeof generateMemoryNote === 'function' && typeof memoryNotes !== 'undefined') {
+    setTimeout(function() {
+      generateMemoryNote(secretCharId).catch(function(){});
+    }, 1000);
+  }
 }
 
 function requestNotificationPermission() {
