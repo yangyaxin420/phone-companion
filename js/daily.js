@@ -36,7 +36,8 @@ function updateBtnText() {
 /* ===== 输入区 ===== */
 function renderInputArea() {
   const area = document.getElementById('dailyInputArea');
-  const today = new Date().toISOString().slice(0,10);
+  const _now = new Date();
+  const today = _fmtDate(_now);
   if (_mode === 'daily') {
     // 今天已有的记录
     const records = getDayRecords();
@@ -520,20 +521,31 @@ function delReport(reportId) {
 }
 
 /* ===== 工具 ===== */
+function _fmtDate(dt) {
+  return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
+}
 function getMonday(d) {
-  const dt = new Date(d); const day = dt.getDay();
+  const dt = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const day = dt.getDay();
   dt.setDate(dt.getDate() - (day === 0 ? 6 : day - 1));
-  return dt.toISOString().slice(0,10);
+  return _fmtDate(dt);
 }
 function getSunday(d) {
-  const dt = new Date(d); const day = dt.getDay();
+  const dt = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const day = dt.getDay();
   dt.setDate(dt.getDate() + (day === 0 ? 0 : 7 - day));
-  return dt.toISOString().slice(0,10);
+  return _fmtDate(dt);
 }
 function getDateRange(start, end) {
   const dates = [];
-  let d = new Date(start);
-  while (d <= new Date(end)) { dates.push(d.toISOString().slice(0,10)); d.setDate(d.getDate() + 1); }
+  const [sy, sm, sd] = start.split('-').map(Number);
+  const [ey, em, ed] = end.split('-').map(Number);
+  const d = new Date(sy, sm - 1, sd);
+  const endD = new Date(ey, em - 1, ed);
+  while (d <= endD) {
+    dates.push(_fmtDate(d));
+    d.setDate(d.getDate() + 1);
+  }
   return dates;
 }
 
