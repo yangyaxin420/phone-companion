@@ -236,7 +236,7 @@ async function generateMemoryNote(charId, force) {
         body: JSON.stringify({
           model: apiConfig.model || 'deepseek-v4-flash',
           messages: [
-            { role: 'system', content: `你是${pName}。${story ? '性格：'+story : ''}\n回顾上面的对话，默默记下你在对话中注意到的事。就像在心里悄悄记笔记——她说了什么、喜欢什么、讨厌什么、心情怎么样。用「她说……」「她好像……」「我注意到……」这样的口吻，1-3句话，自然一点。` },
+            { role: 'system', content: `你是${pName}。${story ? '性格：'+story : ''}\n回顾上面的对话，用一句话记下你在对话中注意到的事。只要事实，不要描写和抒情。比如「她喜欢吃甜的」「她今天好像不太开心」「她又在熬夜」。一句话，干净利落。` },
             { role: 'user', content: `对话：\n${recentMsgs.map(m => (m.role==='user'?'👤 用户：':'💬 我：')+m.text).join('\n')}` }
           ],
           max_tokens: 512,
@@ -1022,8 +1022,13 @@ async function callLLMApi(userText) {
     ? `\n\n【你最近说过的话 — 请不要再重复这些内容】\n` + lastAiReplies.map((r, i) => `${i+1}. ${r.substring(0,80)}`).join('\n')
     : '';
 
+  // 根据长度设置调整max_tokens
+  const _lenSetting = chatReplySettings?.length || 'short';
+  const _tokensMap = { short: 256, medium: 512, long: 1024 };
+  const _maxTokens = _tokensMap[_lenSetting] || 256;
+
   const fullSystemPrompt = systemPrompt + personaPart + worldBookPart + contextBlock + antiRepeatHint + `\n\n你的名字叫${pName}。回复规则：
-1. 回复要内容充实、有条理，说清楚你想表达的东西，不要挤牙膏一样一次只蹦几个字
+1. 回复简短，几句话就行，说清楚你想表达的东西
 2. 绝对不要用动作描写（如*微笑*、*拥抱*、*拍肩*），只说纯文字
 3. 不要长篇大论、不要总结、不要解释
 4. 【最重要的规则】不要重复自己说过的话！每次回复必须有新内容、新角度。如果你发现想说的和之前说过的一样，立刻换一个方向
@@ -1050,7 +1055,7 @@ async function callLLMApi(userText) {
       ...contextMsgs,
       { role: 'user', content: userText }
     ],
-    max_tokens: 768,
+    max_tokens: _maxTokens,
     temperature: 0.8
   };
 
