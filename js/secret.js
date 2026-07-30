@@ -71,7 +71,8 @@ JSON格式：
 }`;
 
     try {
-      const reply = await callLLMApi(prompt);
+      // 不走callLLMApi（太重了，会带聊天上下文），直接调API
+      const reply = await callSecretApi(prompt);
       const jsonMatch = reply.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         // 清理AI生成JSON：尾逗号 + 对象间缺逗号
@@ -1612,6 +1613,31 @@ async function sendSecretMailboxLetter() {
   letters.push({ from:'them', text: replyText, time: Date.now() });
   saveSecretMailbox(secretCharId, letters);
   renderSecretMailbox();
+}
+
+/* ---- Secret专用轻量API调用（不经过callLLMApi，不带聊天上下文） ---- */
+async function callSecretApi(prompt) {
+  if (!apiConfig || !apiConfig.apiKey) return '';
+  var apiUrl = (apiConfig.baseUrl || 'https://api.deepseek.com').replace(/\/+$/, '') + '/chat/completions';
+  var body = JSON.stringify({
+    model: apiConfig.model || 'deepseek-v4-flash',
+    messages: [
+      { role: 'system', content: '你是一个助手，根据用户描述生成JSON格式的手机内容。只输出JSON，不要额外文字。确保JSON完整有效。' },
+      { role: 'user', content: prompt }
+    ],
+    max_tokens: 1536,
+    temperature: 0.7
+  });
+  try {
+    var resp = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiConfig.apiKey },
+      body: body
+    });
+    if (!resp.ok) { console.log('[SecretApi] HTTP错误:', resp.status); return ''; }
+    var data = await resp.json();
+    return (data.choices?.[0]?.message?.content || '').trim();
+  } catch(e) { console.log('[SecretApi] 请求失败:', e.message.substring(0,50)); return ''; }
 }
 
 /* ---- 信箱专用LLM调用（轻量版） ---- */
