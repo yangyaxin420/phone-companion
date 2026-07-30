@@ -71,8 +71,8 @@ JSON格式：
 }`;
 
     try {
-      // 不走callLLMApi（太重了，会带聊天上下文），直接调API
-      const reply = await callSecretApi(prompt);
+      // 直接调API，但带上角色信息确保生成内容贴合人设
+      const reply = await callSecretApi(prompt, pName, story);
       const jsonMatch = reply.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         // 清理AI生成JSON：尾逗号 + 对象间缺逗号
@@ -1616,13 +1616,14 @@ async function sendSecretMailboxLetter() {
 }
 
 /* ---- Secret专用轻量API调用（不经过callLLMApi，不带聊天上下文） ---- */
-async function callSecretApi(prompt) {
+async function callSecretApi(prompt, charName, charStory) {
   if (!apiConfig || !apiConfig.apiKey) return '';
+  var personaInfo = '你是' + (charName || 'AI') + '。' + (charStory ? '你的性格/背景：' + charStory : '') + '请根据你的身份和日常习惯生成手机内容。';
   var apiUrl = (apiConfig.baseUrl || 'https://api.deepseek.com').replace(/\/+$/, '') + '/chat/completions';
   var body = JSON.stringify({
     model: apiConfig.model || 'deepseek-v4-flash',
     messages: [
-      { role: 'system', content: '你是一个助手，根据用户描述生成JSON格式的手机内容。只输出JSON，不要额外文字。确保JSON完整有效。' },
+      { role: 'system', content: personaInfo + ' 只输出JSON，不要额外文字。确保JSON完整有效。' },
       { role: 'user', content: prompt }
     ],
     max_tokens: 1536,
