@@ -74,7 +74,17 @@ JSON格式：
       const reply = await callLLMApi(prompt);
       const jsonMatch = reply.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
+        // 清理AI生成JSON：尾逗号 + 对象间缺逗号
+        var cleanJson = jsonMatch[0]
+          .replace(/,\s*([\]}])/g, '$1')
+          .replace(/\}\s*\{/g, '},{');
+        var parsed;
+        try {
+          parsed = JSON.parse(cleanJson);
+        } catch(parseErr) {
+          console.log('[Secret] JSON解析失败，原始响应片段:', reply.substring(0, 200));
+          throw new Error('JSON格式错误: ' + parseErr.message.substring(0, 40));
+        }
         // 如果没包含AI角色，手动加进去
         otherChars.forEach(c => {
           if (!parsed.contacts.find(ct => ct.id === 'ai_' + c.id)) {
@@ -98,7 +108,7 @@ JSON格式：
         return parsed;
       }
     } catch(e) {
-      console.log('[Secret] AI生成失败，5分钟内不再重试:', e.message.substring(0,50));
+      console.log('[Secret] AI生成失败，5分钟内不再重试:', e.message.substring(0,80));
       secretApiFailed[charIdToUse] = Date.now();
     }
   }
@@ -599,11 +609,60 @@ function showSecretNotes() {
 
   container.innerHTML = h;
 
-  // 进入记事本时自动尝试生成记忆笔记（如有新对话）
-  if (typeof generateMemoryNote === 'function' && typeof memoryNotes !== 'undefined') {
-    setTimeout(function() {
-      generateMemoryNote(secretCharId).catch(function(){});
-    }, 1000);
+  // 进入记事本时自动生成记忆笔记（强制刷新，仅当没有正在生成的请求）
+  if (typeof generateMemoryNote === 'function' && typeof memoryNotes !== 'undefined' && !window._genMemoBusy) {
+    window._genMemoBusy = true;
+    setTimeout(async function() {
+      try {
+        const newNote = await generateMemoryNote(secretCharId, true);
+        if (newNote) {
+          _refreshMemoryNotesCard();
+        }
+      } catch(e) {}
+      window._genMemoBusy = false;
+    }, 500);
+  }
+}
+
+/* ---- 刷新当前页面的记忆笔记卡片（不重新加载整页） ---- */
+function _refreshMemoryNotesCard() {
+  var container = document.getElementById('secretContent');
+  if (!container) return;
+  var cards = container.querySelectorAll('.secret-note-card');
+  // 找第三个卡片（第一个是今日摘要，第二个是本周记录，第三个是记忆笔记）
+  // 或者查找包含"记忆笔记"或"记住的事"文本的卡片
+  for (var ci = 0; ci < cards.length; ci++) {
+    var snTime = cards[ci].querySelector('.sn-time');
+    if (snTime && (snTime.textContent.indexOf('记住的事') !== -1 || snTime.textContent.indexOf('记忆笔记') !== -1 || snTime.textContent.indexOf('关于她') !== -1)) {
+      // 重建这个卡片的内容
+      var charNotes = [];
+      if (typeof memoryNotes !== 'undefined' && memoryNotes.length > 0) {
+        charNotes = memoryNotes.filter(function(n) { return n.charId === secretCharId; }).slice(-10).reverse();
+      }
+      var notesHtml = '';
+      var memTitle = snTime.textContent; // 保留原标题
+      if (charNotes.length > 0) {
+        charNotes.forEach(function(n) {
+          var d = new Date(n.createdAt);
+          var timeStr = d.getMonth()+1 + '月' + d.getDate() + '日';
+          notesHtml += '<div style="font-size:13px;color:#555;padding:8px 0;border-bottom:1px solid #f5f5f5;line-height:1.7;">' +
+            '<span style="color:#bbb;font-size:10px;">' + timeStr + '</span><br>' +
+            escHtml(n.summary) + '</div>';
+        });
+      } else {
+        notesHtml = '<div style="font-size:12px;color:#bbb;padding:10px 0;text-align:center;">聊天几次后会自动生成记忆笔记<br><span style="font-size:11px;">AI会默默记住关于你的事</span></div>';
+      }
+      // 替换卡片内容区域（跳过标题行）
+      var innerDivs = cards[ci].querySelectorAll('div');
+      for (var di = 0; di < innerDivs.length; di++) {
+        // 找到内容区（非sn-time的div）替换
+        if (!innerDivs[di].classList.contains('sn-time') && innerDivs[di].parentNode === cards[ci]) {
+          innerDivs[di].innerHTML = notesHtml;
+          break;
+        }
+      }
+      break;
+    }
   }
 }
 
@@ -1431,9 +1490,8 @@ function showSecretBrowser() {
   const container = document.getElementById("secretContent");
   const pName = getSecretCharName();
 
-  const data = getSecretForChar(secretCharId);
-  const useApi = data && data.browserHistory;
-  const history = useApi ? data.browserHistory : getPersonalityBrowserHistory(secretCharId);
+  // 每次都动态生成，不用缓存，确保内容刷新
+  const history = getPersonalityBrowserHistory(secretCharId);
 
   let h = '<div style="font-size:12px;color:#999;padding:0 0 8px;">' + escHtml(pName) + '的搜索记录 · 共' + history.length + '条</div>';
   h += '<div style="display:flex;flex-direction:column;gap:6px;">';

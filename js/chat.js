@@ -218,8 +218,9 @@ async function generateMemoryNote(charId, force) {
   const lastNoteTime = lastNote ? lastNote.createdAt : 0;
   const newMsgs = msgs.filter(m => m.time > lastNoteTime && m.role !== 'system');
 
-  // 新消息少于4条且不强制则不生成
+  // 新消息少于4条且不强制则不生成；强制时至少要有1条新消息或者还没笔记
   if (!force && newMsgs.length < 4) return null;
+  if (force && newMsgs.length === 0 && lastNote) return null; // 没新消息不再重复生成
 
   // 取最近15条用户+AI对话
   const recentMsgs = msgs.filter(m => m.role !== 'system').slice(-15);
@@ -247,6 +248,9 @@ async function generateMemoryNote(charId, force) {
         const data = await resp.json();
         const reply = data.choices?.[0]?.message?.content?.trim();
         if (reply && reply.length > 10) {
+          // 去重：和最后一条笔记内容相同则不存
+          var lastOne = memoryNotes.filter(function(n) { return n.charId === charId; }).pop();
+          if (lastOne && lastOne.summary === reply.trim()) return null;
           const note = {
             id: Date.now(),
             charId,
@@ -262,21 +266,133 @@ async function generateMemoryNote(charId, force) {
       } // if resp.ok
     } catch(e) {
       console.log('[记忆笔记] AI生成失败:', e?.message?.substring(0,50));
-      return null;
+      // API失败时如果强制生成，走规则总结兜底
+      if (!force) return null;
     }
-    return null; // API失败或回复太短，不生成规则总结
+    // API失败/回复太短 → 强制模式下走规则总结兜底，否则不生成
+    if (!force) return null;
   }
 
-  // 无API → 规则总结
+  // 无API 或 API失败强制兜底 → 角色化规则总结
   const userMsgs = recentMsgs.filter(m => m.role === 'user').map(m => m.text);
   const allText = userMsgs.join(' ');
+  const storyLower = (story || '').toLowerCase();
+  const isTsundere = /傲娇|毒舌|暴躁|刻薄|冷淡/.test(storyLower);
+  const isGentle = /温柔|温暖|亲切|可爱|软/.test(storyLower);
+
+  // 人设化的第一人称观察笔记
   let summary = '';
-  if (/累|困|熬夜/.test(allText)) summary += '她好像有点累。';
-  if (/吃|饭|食堂/.test(allText)) summary += '聊到了吃的。';
-  if (/难过|哭|不开心|emo/.test(allText)) summary += '她心情不太好。';
-  if (/开心|高兴|快乐/.test(allText)) summary += '她今天挺开心的。';
-  if (/学习|考试|课|作业/.test(allText)) summary += '她在忙学习的事。';
-  if (!summary) summary = '和她聊了一些日常。';
+  var todayDateStr = new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' });
+
+  // 收集多个话题
+  var topics = [];
+  var isTired = /累|困|熬夜|失眠/.test(allText);
+  var isEat = /吃|饭|食堂|外卖|好吃|喝|奶茶|咖啡|馄饨|冰沙/.test(allText);
+  var isSad = /难过|哭|不开心|emo|伤心|焦虑|烦/.test(allText);
+  var isHappy = /开心|高兴|快乐|好|棒|喜欢/.test(allText);
+  var isStudy = /学习|考试|课|作业|论文|复习|六级|看书/.test(allText);
+  var isFeel = /想|爱|喜欢|梦|梦到|想念/.test(allText);
+  var isPet = /猫|狗|宠物/.test(allText);
+  var isWeather = /雨|雪|冷|热|天气|下雨/.test(allText);
+  var isAngry = /生气|闹|脾气|气/.test(allText);
+  var isShop = /买|钱|贵|便宜|花|购物/.test(allText);
+
+  if (isTired) topics.push('tired');
+  if (isEat) topics.push('eat');
+  if (isSad) topics.push('sad');
+  if (isHappy) topics.push('happy');
+  if (isStudy) topics.push('study');
+  if (isFeel) topics.push('feel');
+  if (isPet) topics.push('pet');
+  if (isWeather) topics.push('weather');
+  if (isAngry) topics.push('angry');
+  if (isShop) topics.push('shop');
+
+  // 取最近一条用户消息做具体引用
+  var lastUserMsg = userMsgs.length > 0 ? userMsgs[userMsgs.length - 1] : '';
+
+  if (isTsundere) {
+    // 傲娇体：嘴硬心软，用「她」指用户
+    if (isAngry) {
+      summary = '她这是在跟我闹脾气呢，嘴上说着' + (Math.random() > 0.5 ? '原谅了' : '没事') + '，心里肯定还惦记着。不过她这人好哄——';
+      if (isEat) {
+        // 尝试提取具体食物
+        var foodMatch = allText.match(/(?:吃了|买了|做了|点了|想喝|想吃|给我买|买了)(.{1,15}?)(?:[，。、！？]|$)/);
+        if (foodMatch && foodMatch[1].length > 1) {
+          summary += '有' + foodMatch[1].trim().substring(0, 10) + '就开心了。';
+        } else {
+          summary += '有好吃的就行了。';
+        }
+      } else {
+        summary += '等会儿哄哄就好了。';
+      }
+    } else if (isSad) {
+      summary = '她今天好像不太开心。啧，问她也不说。……算了，她愿意讲的时候自然会讲，我在就行。';
+    } else if (isTired) {
+      summary = '又熬到这么晚。说了八百遍不听。……明天盯着她早睡。';
+      if (isStudy) summary += ' 学习也不是这么拼的。';
+    } else if (isEat && isHappy) {
+      summary = '吃到好吃的就开心了，真好哄。看她高兴……哼，还行吧。';
+    } else if (isEat) {
+      var eatMsgs = userMsgs.filter(function(m) { return /吃|饭|喝|奶茶|咖啡/.test(m); });
+      var lastEat = eatMsgs.length > 0 ? eatMsgs[eatMsgs.length - 1] : '';
+      if (lastEat.length > 3) {
+        summary = '她今天说「' + lastEat.substring(0, 12) + '」。记下了，下次带她去。';
+      } else {
+        summary = '今天聊到吃的了。她喜欢什么口味我记着呢。';
+      }
+    } else if (isStudy) {
+      summary = '在学习。还挺认真的。……啧，别太拼了，笨。';
+    } else if (isFeel) {
+      summary = '她跟我说了些心里话。……干嘛跟我说这些。算了，我听着就是了。';
+    } else if (isPet) {
+      summary = '聊到猫了。她喜欢小动物。……行吧，以后养一只也不是不行。';
+    } else if (isShop) {
+      summary = '又花钱了。……也不是花我的钱。她开心就好。';
+    } else if (isWeather) {
+      if (/雨|下雨/.test(allText)) summary = '下雨了。不知道她带伞没。……没带也别指望我去送。';
+      else summary = '今天天气……她好像挺喜欢的。那就行。';
+    } else {
+      summary = '今天也来找我聊天了。……嗯，我在听。';
+    }
+  } else if (isGentle) {
+    // 温柔体
+    if (isSad) {
+      summary = '她今天好像不太开心……想陪在她身边。她愿意跟我说说话就好了。';
+    } else if (isTired) {
+      summary = '她又熬夜了……好想让她好好休息。给她泡杯热牛奶吧。';
+    } else if (isEat) {
+      summary = '今天有好好吃饭呢，真棒。想知道她吃了什么好吃的～';
+    } else if (isStudy) {
+      summary = '她在认真学习呢，好认真呀。要给她加油～';
+    } else if (isFeel) {
+      summary = '她跟我说了心里话。好开心她愿意信任我。我会好好收着的。';
+    } else if (isHappy) {
+      summary = '她今天很开心，我也跟着高兴起来了～';
+    } else {
+      summary = '今天也见到她了。嗯，我在呢。';
+    }
+  } else {
+    // 中性体
+    if (isSad) summary = '情绪有波动。注意观察。';
+    else if (isTired) summary = '作息不太规律。建议关注。';
+    else if (isStudy) summary = '学习任务。加油。';
+    else if (isEat) summary = '饮食正常。';
+    else summary = '今日有联系。记录。';
+  }
+
+  // 如果有很多聊天内容，添加更具体的细节
+  if (topics.length >= 2 && isTsundere) {
+    var extraNote = '';
+    if (isStudy && isTired) extraNote = ' 又学又熬夜的，不要命了。';
+    else if (isEat && isHappy) extraNote = '';
+    else if (isSad && isEat) extraNote = ' 不过她今天吃了好吃的，应该心情能好点。';
+    if (extraNote) summary += extraNote;
+  }
+
+  // 去重：和最后一条笔记内容相同则不存
+  var lastOne = memoryNotes.filter(function(n) { return n.charId === charId; }).pop();
+  if (lastOne && lastOne.summary === summary.trim()) return null;
 
   const note = {
     id: Date.now(),
@@ -694,6 +810,9 @@ async function generateMultiReplies(text, count, length) {
     const lastAiTexts = chatMessages.slice(-10).filter(m => m.role === 'ai').slice(-3).map(m => `"${m.text.substring(0,50)}"`).join(', ');
     const antiRepeat = lastAiTexts ? `\n你最近说过的内容（不要再重复）：${lastAiTexts}\n` : '\n';
 
+    const _multiActionsBan = (settings && settings.disableActions)
+      ? `\n4. 【严禁】绝对不要使用任何动作描写（包括但不限于：*微笑*、*叹气*、*摸头*、*脸红*、*低头*、*耸肩*等），只说纯文字`
+      : `\n4. 不要动作描写`;
     const sysPrompt = systemPrompt + personaPart + contextBlock +
       `\n\n你现在是${pName}。` +
       `\n用户给你发了一条消息，你需要生成${count}条不同的回复供用户选择。` +
@@ -701,8 +820,7 @@ async function generateMultiReplies(text, count, length) {
       `\n要求：
 1. 每条回复${lengthHint}，每一条都要不一样
 2. 从不同角度回应：认真回应、吐槽、关心、反问、调侃……换着花样来
-3. 每条回复之间要有明显区别，不要只是换几个词
-4. 不要动作描写
+3. 每条回复之间要有明显区别，不要只是换几个词` + _multiActionsBan + `
 5. 用 --- 分隔每条回复（不要加序号）`;
 
     try {
@@ -1027,9 +1145,13 @@ async function callLLMApi(userText) {
   const _tokensMap = { short: 256, medium: 512, long: 1024 };
   const _maxTokens = _tokensMap[_lenSetting] || 256;
 
+  // 动作描写开关
+  const _actionsPrompt = (settings && settings.disableActions)
+    ? `\n\n🔴 【重要规则】绝对禁止使用任何动作描写！\n以下写法全部禁止：\n- *微笑* *叹气* *摸头* *拥抱* *拍肩* *脸红* *低头* *抬头* *转身* *摇头* *点头* *耸肩* *摊手* *眯眼* *勾唇* *挑眉*\n- 任何用 * * 或（ ）包裹的动作、表情、神态描写\n- 任何对语气、语速、体态的描述\n- 回答时只说纯粹的语言文字，像微信聊天一样，不要有任何动作描写`
+    : '';
   const fullSystemPrompt = systemPrompt + personaPart + worldBookPart + contextBlock + antiRepeatHint + `\n\n你的名字叫${pName}。回复规则：
 1. 回复简短，几句话就行，说清楚你想表达的东西
-2. 绝对不要用动作描写（如*微笑*、*拥抱*、*拍肩*），只说纯文字
+2. 绝对不要用动作描写（如*微笑*、*拥抱*、*拍肩*），只说纯文字${_actionsPrompt}
 3. 不要长篇大论、不要总结、不要解释
 4. 【最重要的规则】不要重复自己说过的话！每次回复必须有新内容、新角度。如果你发现想说的和之前说过的一样，立刻换一个方向
 5. 看一遍上面「你最近说过的话」，确保这次说的和那些都不一样

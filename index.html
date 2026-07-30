@@ -9,9 +9,9 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="theme-color" content="#F8FAFC">
-<meta name="app-version" content="v3.6.9 (2026.07.27)">
+<meta name="app-version" content="v3.9.2 (2026.07.30)">
 <title>我的手机</title>
-<link rel="stylesheet" href="css/style.css?v=9">
+<link rel="stylesheet" href="css/style.css?v=10">
 </head>
 <body>
 
@@ -561,6 +561,19 @@
         </div>
       </div>
 
+      <!-- 禁止动作描写 -->
+      <div class="settings-card">
+        <div class="settings-row">
+          <div class="settings-row-left">
+            <div class="settings-row-title">🚫 禁止动作描写</div>
+            <div class="settings-row-desc">禁止AI在回复中使用*笑*、*摸头*等动作描写，只说纯文字</div>
+          </div>
+          <div class="ios-toggle" id="settingDisableActions" onclick="toggleSetting(this,'disableActions')">
+            <div class="ios-toggle-slider"></div>
+          </div>
+        </div>
+      </div>
+
       <div style="height:1px;background:#eee;margin:4px 0;"></div>
 
       <!-- API配置 -->
@@ -680,19 +693,19 @@
 </div><!-- phone-frame -->
 
 <!-- script moved to external files -->
-<script src="js/utils.js?v=9"></script>
-<script src="js/app.js?v=9"></script>
-<script src="js/weather.js?v=9"></script>
-<script src="js/tasks.js?v=9"></script>
-<script src="js/expense.js?v=9"></script>
-<script src="js/chat.js?v=9"></script>
-<script src="js/secret.js?v=9"></script>
-<script src="js/moments.js?v=9"></script>
-<script src="js/persona.js?v=9"></script>
-<script src="js/daily.js?v=9"></script>
-<script src="js/tide.js?v=9"></script>
-<script src="js/companion.js?v=9"></script>
-<script src="js/settings.js?v=9"></script>
+<script src="js/utils.js?v=10"></script>
+<script src="js/app.js?v=10"></script>
+<script src="js/weather.js?v=10"></script>
+<script src="js/tasks.js?v=10"></script>
+<script src="js/expense.js?v=10"></script>
+<script src="js/chat.js?v=10"></script>
+<script src="js/secret.js?v=10"></script>
+<script src="js/moments.js?v=10"></script>
+<script src="js/persona.js?v=10"></script>
+<script src="js/daily.js?v=10"></script>
+<script src="js/tide.js?v=10"></script>
+<script src="js/companion.js?v=10"></script>
+<script src="js/settings.js?v=10"></script>
 <script>
 /* ==================== 初始化 ==================== */
 function init() {
@@ -726,9 +739,16 @@ function init() {
   // 更新上下文
   setInterval(updateChatContext, 30000);
   updateChatContext();
-  // 主动消息 + 自动朋友圈轮询（5分钟）
+  // 主动消息轮询（5分钟）
   setInterval(checkProactiveConditions, 300000);
   setTimeout(checkProactiveConditions, 60000);
+  // 自动朋友圈轮询（独立于主动消息，5分钟）
+  setInterval(function() {
+    if (typeof checkAutoMomentCondition === "function") checkAutoMomentCondition();
+  }, 300000);
+  setTimeout(function() {
+    if (typeof checkAutoMomentCondition === "function") checkAutoMomentCondition();
+  }, 120000);
   // 预加载表情
   preloadEmojiImages();
   // 天气
@@ -736,9 +756,9 @@ function init() {
 }
 init();
  // 清理旧 Service Worker（解决缓存问题）
-  if ('caches' in window) { caches.keys().then(function(ks) { ks.forEach(function(k) { caches.delete(k); }); }); }
+  if ('caches' in window) { try { caches.keys().then(function(ks) { ks.forEach(function(k) { caches.delete(k); }); }).catch(function(){}); } catch(e){} }
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.getRegistrations().then(function(rs) { rs.forEach(function(r) { r.unregister(); }); });
+    try { navigator.serviceWorker.getRegistrations().then(function(rs) { rs.forEach(function(r) { r.unregister(); }); }).catch(function(){}); } catch(e){}
   }
   // 不注册新 Service Worker，避免缓存问题
   requestNotificationPermission();

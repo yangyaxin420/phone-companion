@@ -9,63 +9,6 @@ function renderExpense() {
 }
 
 
-function renderExpenseLineChart() {
-  const canvas = document.getElementById('expLineChart');
-  if (!canvas) return;
-  const records = getExpRecords();
-  const now = new Date();
-  var weekAgo = new Date(now); weekAgo.setDate(weekAgo.getDate() - 6);
-  var weekStart = weekAgo.toISOString().split('T')[0];
-  const weekRecs = records.filter(function(r) { return r.date && r.date >= weekStart; });
-  if (weekRecs.length === 0) { canvas.style.display = 'none'; return; }
-  canvas.style.display = 'block';
-  const isIncome = expenseActiveTab === 'income';
-  var filtered = weekRecs.filter(function(r) { return isIncome ? r.type === 'income' : r.type !== 'income'; });
-  if (filtered.length === 0) { canvas.style.display = 'none'; return; }
-  canvas.style.display = 'block';
-  var dayMap = {};
-  filtered.forEach(function(r) {
-    if (!dayMap[r.date]) dayMap[r.date] = 0;
-    dayMap[r.date] += r.amount;
-  });
-  var days = Object.keys(dayMap).sort();
-  if (days.length < 2) { canvas.style.display = 'none'; return; }
-  canvas.style.display = 'block';
-  const ctx = canvas.getContext('2d');
-  const w = canvas.width, h = canvas.height;
-  ctx.clearRect(0, 0, w, h);
-  var max = Math.max.apply(null, days.map(function(d) { return dayMap[d]; })) * 1.2;
-  var padL = 30, padR = 6, padT = 16, padB = 16;
-  var gw = w - padL - padR, gh = h - padT - padB;
-  ctx.fillStyle = "#999"; ctx.font = "8px sans-serif"; ctx.textAlign = "right";
-  [0, 0.5, 1].forEach(function(ratio) {
-    var y = padT + gh * (1 - ratio);
-    ctx.fillText((max * ratio).toFixed(0), padL - 4, y + 3);
-    ctx.strokeStyle = "#f0f0f0"; ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
-  });
-  ctx.strokeStyle = isIncome ? '#4caf50' : '#e76f51';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  days.forEach(function(d, i) {
-    var x = padL + (i / (days.length - 1)) * gw;
-    var y = padT + gh - (dayMap[d] / max) * gh;
-    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-  });
-  ctx.stroke();
-  days.forEach(function(d, i) {
-    var x = padL + (i / (days.length - 1)) * gw;
-    var y = padT + gh - (dayMap[d] / max) * gh;
-    ctx.fillStyle = isIncome ? '#4caf50' : '#e76f51';
-    ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
-  });
-  ctx.fillStyle = "#999"; ctx.font = "8px sans-serif"; ctx.textAlign = "center";
-  days.forEach(function(d, i) {
-    ctx.fillText(d.slice(5), padL + (i / (days.length - 1)) * gw, h - 2);
-  });
-  ctx.fillStyle = "#999"; ctx.font = "9px sans-serif"; ctx.textAlign = "left";
-  ctx.fillText(isIncome ? '收入趋势(7天)' : '支出趋势(7天)', 4, 12);
-}
-
 function expSetType(type) {
   expType = type;
   renderExpenseCats();
@@ -225,7 +168,7 @@ function delExpense(id) {
   records = records.filter(function(r) { return r.id !== id; });
   saveExpRecords(records);
   renderExpense();
-  try { renderExpenseDetail(); } catch(e) {}
+
 }
 
 function exportExpense() {

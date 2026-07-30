@@ -12,12 +12,6 @@ function escAttr(s) {
   return s.replace(/'/g, "\\'").replace(/"/g, '&quot;');
 }
 
-function addChatSystem(text) {
-  chatMessages.push({ role:'system', text, time: Date.now() });
-  lsSet('chat', chatMessages);
-  renderChat();
-}
-
 function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath();
   ctx.moveTo(x+r, y);
