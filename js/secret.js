@@ -847,7 +847,48 @@ function showSecretAlbum() {
     h += '<div class="secret-photo-time">' + escHtml(p.time) + '</div>';
   });
   h += '</div>';
-  container.innerHTML = h;
+  container.innerHTML = h + '<div id="myPhotosSection">' + renderMyPhotosSection() + '</div>';
+}
+
+/* ---- 相册「你的照片」区：用户添加的照片，AI 会拿这些发私聊/朋友圈 ---- */
+function renderMyPhotosSection() {
+  const album = getAlbumPhotos();
+  let h = '<div style="height:1px;background:#E0F2FE;margin:14px 0;"></div>';
+  h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
+    + '<div style="font-size:12px;color:#999;">你的照片 · 骆云影会拿这些发给你</div>'
+    + '<button style="background:#BAE6FD;color:#1e3a5f;border:none;border-radius:10px;padding:6px 12px;font-size:13px;cursor:pointer;" onclick="document.getElementById(\'albumFileInput\').click()">＋ 添加</button>'
+    + '</div>';
+  h += '<input type="file" id="albumFileInput" accept="image/*" style="display:none;" onchange="handleAlbumFileSelect(event)">';
+  if (album.length === 0) {
+    h += '<div style="text-align:center;padding:20px;color:#aaa;font-size:13px;">还没有你的照片～<br>添加几张，骆云影就能分享给你啦</div>';
+  } else {
+    h += '<div class="secret-photo-grid">';
+    album.forEach(function(p) {
+      h += '<div class="secret-photo-item" style="position:relative;overflow:hidden;">'
+        + '<img src="' + p.src + '" style="width:100%;height:100%;object-fit:cover;border-radius:8px;display:block;">'
+        + '<button title="删除" onclick="deleteAlbumPhoto(\'' + p.id + '\');renderMyPhotosOnly();" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.5);color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:12px;line-height:20px;text-align:center;cursor:pointer;">×</button>'
+        + '</div>';
+    });
+    h += '</div>';
+  }
+  return h;
+}
+
+function renderMyPhotosOnly() {
+  const el = document.getElementById('myPhotosSection');
+  if (el) el.innerHTML = renderMyPhotosSection();
+}
+
+function handleAlbumFileSelect(event) {
+  const file = event.target.files && event.target.files[0];
+  event.target.value = '';
+  if (!file) return;
+  addAlbumPhoto(file).then(function() {
+    renderMyPhotosOnly();
+    if (typeof addChatSystem === 'function') addChatSystem('📷 照片已加到相册，骆云影可能会分享给你～');
+  }).catch(function(e) {
+    if (typeof addChatSystem === 'function') addChatSystem('❌ 添加照片失败：' + e.message);
+  });
 }
 
 /* ===== 歌单（按性格动态 + 聊天推荐收录 + 大池轮换） ===== */

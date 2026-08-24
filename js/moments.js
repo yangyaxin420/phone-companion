@@ -515,7 +515,11 @@ async function generateAutoMoment(char, todayStr, dailyCount) {
         var content = data.choices?.[0]?.message?.content?.trim();
         if (isValidAiReply(content)) {
           var photo = null;
-          if (typeof customImgEmojis !== 'undefined' && customImgEmojis.length > 0 && Math.random() < 0.3) {
+          // 相册有照片 → 优先随机一张相册照片；否则回退自定义 emoji 图
+          var albumPhotos = (typeof getAlbumPhotos === 'function') ? getAlbumPhotos() : [];
+          if (albumPhotos.length > 0 && Math.random() < 0.35) {
+            photo = albumPhotos[Math.floor(Math.random() * albumPhotos.length)].src;
+          } else if (typeof customImgEmojis !== 'undefined' && customImgEmojis.length > 0 && Math.random() < 0.3) {
             var pick = customImgEmojis[Math.floor(Math.random() * customImgEmojis.length)];
             if (typeof getEmojiImgURL === 'function') {
               var url = await getEmojiImgURL(pick.id);

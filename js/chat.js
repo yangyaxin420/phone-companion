@@ -446,6 +446,12 @@ function renderChat() {
     } else if (m.emoji) {
       el.classList.add('emoji-only');
       el.innerHTML = `<span class="emoji-msg">${escHtml(m.text)}</span>`;
+    } else if (m.photo) {
+      const img = document.createElement('img');
+      img.className = 'photo-msg';
+      img.src = m.photo;
+      img.loading = 'lazy';
+      el.appendChild(img);
     } else {
       el.textContent = m.text;
     }
@@ -463,6 +469,15 @@ function renderChat() {
   var doScroll = function() { container.scrollTop = container.scrollHeight; };
   requestAnimationFrame(doScroll);
   setTimeout(doScroll, 50);
+}
+
+/* 相册有照片时按概率给 AI 消息附带一张照片（私聊发图） */
+function maybeAttachPhoto(prob) {
+  const album = (typeof getAlbumPhotos === 'function') ? getAlbumPhotos() : [];
+  if (album.length > 0 && Math.random() < prob) {
+    return album[Math.floor(Math.random() * album.length)].src;
+  }
+  return null;
 }
 
 /* ---- 表情面板 ---- */
@@ -980,7 +995,7 @@ async function sendChat() {
       const entry = await ensureInnerDiary(currentCharId);
       typing.classList.remove('show');
       const diaryText = entry ? buildDiaryRecitation(entry) : generateLocalReply(text);
-      chatMessages.push({ role:'ai', text: diaryText, time: Date.now() });
+      chatMessages.push({ role:'ai', text: diaryText, time: Date.now(), photo: maybeAttachPhoto(0.12) });
       saveChatData();
       renderChat();
       return;
@@ -1003,7 +1018,7 @@ async function sendChat() {
 
     for (let i = 0; i < replies.length; i++) {
       if (i > 0) await new Promise(r => setTimeout(r, 600 + Math.random() * 400));
-      chatMessages.push({ role:'ai', text: replies[i], time: Date.now() });
+      chatMessages.push({ role:'ai', text: replies[i], time: Date.now(), photo: maybeAttachPhoto(0.12) });
       saveChatData();
       renderChat();
     }
@@ -1629,7 +1644,7 @@ async function generateProactiveMessage(scenario, char, isTsundere, isGentle) {
 }
 
 function sendProactiveMessage(text, char) {
-  chatMessages.push({ role: 'ai', text: text, time: Date.now() });
+  chatMessages.push({ role: 'ai', text: text, time: Date.now(), photo: maybeAttachPhoto(0.15) });
   saveChatData();
 
   if (currentPage === 'page-chat') {

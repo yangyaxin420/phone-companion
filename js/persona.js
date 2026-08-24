@@ -154,17 +154,6 @@ async function importData(event) {
       if (key.startsWith('_export')) continue;
       try { localStorage.setItem(key, JSON.stringify(val)); importCount++; } catch(e) {}
     }
-    if (data._exportPhotos && data._exportPhotos.length > 0) {
-      for (const p of data._exportPhotos) {
-        const blob = base64ToBlob(p.data, p.type);
-        await savePhotoToDB(p.id, blob);
-      }
-      for (const id of data._exportPhotos.map(p => p.id)) {
-        const blob = await getPhotoFromDB(id);
-        if (blob) photoURLs[id] = URL.createObjectURL(blob);
-      }
-      addChatSystem(`📷 已恢复 ${data._exportPhotos.length} 张照片`);
-    }
     if (data._exportEmojis && data._exportEmojis.length > 0) {
       await openEmojiDB();
       for (const ei of data._exportEmojis) {

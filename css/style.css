@@ -215,6 +215,7 @@ ul{list-style:none;}
 .chat-msg.user.emoji-only{background:transparent;padding:4px 8px;}
 .chat-msg.ai.emoji-only{background:transparent;padding:4px 8px;}
 .emoji-img-msg{max-width:120px;max-height:120px;border-radius:12px;display:block;}
+.photo-msg{width:100%;max-width:200px;max-height:260px;object-fit:cover;border-radius:12px;display:block;margin-top:4px;}
 .chat-msg.user.emoji-img-only{background:transparent;padding:4px 8px;}
 .chat-msg.ai.emoji-img-only{background:transparent;padding:4px 8px;}
 .emoji-img-item{width:56px;height:56px;border-radius:10px;overflow:hidden;cursor:pointer;position:relative;border:2px solid #E0F2FE;transition:border-color .15s;}
