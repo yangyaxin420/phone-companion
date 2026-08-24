@@ -8,13 +8,13 @@ input,textarea,select{font:inherit;color:inherit;border:none;outline:none;backgr
 ul{list-style:none;}
 
 /* ==================== 2. 手机外壳 ==================== */
-.phone-frame{width:375px;height:700px;max-height:100dvh;border-radius:44px;background:#F0F9FF;position:relative;overflow:hidden;box-shadow:0 0 0 8px #222,0 0 40px rgba(0,0,0,.6),inset 0 0 2px rgba(255,255,255,.1);}
+.phone-frame{width:375px;height:700px;max-height:100dvh;border-radius:44px;background:#EFF6FF;position:relative;overflow:hidden;box-shadow:0 0 0 8px #222,0 0 40px rgba(0,0,0,.6),inset 0 0 2px rgba(255,255,255,.1);}
 .phone-screen{width:100%;height:100%;display:flex;flex-direction:column;position:relative;}
 
 /* 壁纸底纹 */
 .wallpaper{
   position:absolute;inset:0;pointer-events:none;z-index:0;
-  background:linear-gradient(170deg, #F0F9FF 0%, #E0F2FE 45%, #BAE6FD 100%);
+  background:linear-gradient(170deg, #EFF6FF 0%, #DBEAFE 100%);
   background-size:cover;
 }
 
@@ -336,10 +336,10 @@ ul{list-style:none;}
 
 /* ==================== 18. Secret ==================== */
 .secret-desk{display:flex;flex-direction:column;align-items:center;padding:20px;gap:20px;}
-.secret-grid{display:flex;flex-wrap:nowrap;gap:8px;width:100%;justify-content:space-between;align-items:flex-start;padding:0 4px;}
+.secret-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;width:100%;max-width:220px;margin:0 auto;justify-items:center;}
 .secret-icon{display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;transition:transform .1s;min-width:0;}
 .secret-icon:active{transform:scale(.92);}
-.secret-icon .si-symbol{width:40px;height:40px;border-radius:12px;background:#E0F2FE;display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0;}
+.secret-icon .si-symbol{width:40px;height:40px;border-radius:12px;background:#DBEAFE;display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0;box-shadow:0 1px 3px rgba(30,64,175,.08);}
 .secret-icon .si-name{font-size:9px;color:#666;white-space:nowrap;}
 .secret-content{padding:12px 16px;flex:1;overflow-y:auto;width:100%;}
 .secret-note-card{background:#fff;border-radius:12px;padding:12px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,.04);}
