@@ -57,7 +57,7 @@ async function aiCommentMoment(index, charId) {
       body: JSON.stringify({
         model: apiConfig.model || 'deepseek-v4-flash',
         messages: [
-          { role: 'system', content: '你叫' + pName + '。' + charVoice + (charSp ? '\n' + charSp : '') + '\n请评论好友的朋友圈，1-2句话。直接写评论内容，不要加引号和emoji。评论要针对内容来写。' },
+          { role: 'system', content: '你叫' + pName + '。' + charVoice + (charSp ? '\n' + charSp : '') + '\n请评论好友的朋友圈，1-2句话。直接写评论内容，不要加引号和emoji。评论要针对内容来写。' + actionBanLine() },
           { role: 'user', content: m.content }
         ],
         max_tokens: 150,
@@ -305,7 +305,7 @@ async function aiReplyComment(index) {
       body: JSON.stringify({
         model: apiConfig.model || 'deepseek-v4-flash',
         messages: [
-          { role: 'system', content: '你叫' + pName + '。' + charVoice + (charSp ? '\n' + charSp : '') + '\n回复对方的一句评论，1句话。直接写回复内容，不要加引号和emoji。' },
+          { role: 'system', content: '你叫' + pName + '。' + charVoice + (charSp ? '\n' + charSp : '') + '\n回复对方的一句评论，1句话。直接写回复内容，不要加引号和emoji。' + actionBanLine() },
           { role: 'user', content: '原动态：' + m.content + '\n对方说：' + lastComment.content }
         ],
         max_tokens: 150,

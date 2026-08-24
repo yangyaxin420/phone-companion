@@ -4,6 +4,13 @@ function lsGet(key, def) { try { const v = localStorage.getItem('phone_'+key); r
 function lsSet(key, val) { try { localStorage.setItem('phone_'+key, JSON.stringify(val)); } catch(e) { showStorageWarning(); } }
 function showStorageWarning() { addChatSystem('⚠️ 存储空间不足，部分数据可能无法保存'); }
 
+// 按「禁止动作描写」开关返回禁令文案（供所有 AI 生成路径拼进 prompt）
+function actionBanLine() {
+  return (settings && settings.disableActions)
+    ? '绝对不要用任何动作描写（*微笑*、*叹气*、*摸头*、*脸红*、*低头*、*耸肩*等），只用纯文字。'
+    : '';
+}
+
 function escHtml(s) {
   if (typeof s !== 'string') return '';
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
