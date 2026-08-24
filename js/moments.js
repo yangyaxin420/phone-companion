@@ -6,6 +6,7 @@ function showMomentEditor() {
   if (content && content.trim()) {
     addMoment('我', content.trim());
     setTimeout(() => aiCommentMoment(0), 1500);
+    setTimeout(() => luoRespondToMoment(0), 2500);
   }
 }
 
@@ -13,6 +14,10 @@ function addMoment(user, content, photo) {
   const m = { user, content, time: Date.now(), likes: 0, liked: false, comments: [], photo: photo || null };
   moments.unshift(m);
   lsSet('moments', moments);
+  // 记录用户最近的动态，供骆云影发圈呼应
+  if (user === '我') {
+    lsSet('lastUserMoment', { content: content, time: Date.now() });
+  }
   renderMoments();
 }
 
@@ -24,16 +29,26 @@ function isValidAiReply(text) {
   return true;
 }
 
-async function aiCommentMoment(index) {
+async function aiCommentMoment(index, charId) {
   if (!apiConfig || !apiConfig.apiKey || index >= moments.length) {
     console.log('[朋友圈] 跳过评论: 无API Key');
     return;
   }
   const m = moments[index];
-  if (m.user === (personaData.name || '小伴')) return;
-  const pName = personaData.name || '小伴';
-  const charVoice = personaData.story ? '你的性格/背景：' + personaData.story : '';
-  const charSp = systemPrompt ? '你的说话风格：' + systemPrompt : '';
+  // 指定 charId 时用该角色的人设（如骆云影回应）；不传则用当前选中角色
+  const targetPers = charId ? lsGet('persona_' + charId, null) : null;
+  const pName = charId
+    ? (targetPers?.name || getCharById(charId)?.name || '小伴')
+    : (personaData.name || '小伴');
+  if (m.user === pName) return;
+  const rawStory = charId
+    ? (targetPers?.story || getCharById(charId)?.story || '')
+    : (personaData.story || '');
+  const rawSp = charId
+    ? (lsGet('sp_' + charId, '') || '')
+    : (systemPrompt || '');
+  const charVoice = rawStory ? '你的性格/背景：' + rawStory : '';
+  const charSp = rawSp ? '你的说话风格：' + rawSp : '';
 
   try {
     var resp = await fetch(apiConfig.baseUrl.replace(/\/+$/, '') + '/chat/completions', {
@@ -77,7 +92,7 @@ async function aiCommentMoment(index) {
   }
 
   // 降级
-  var fb = _fallbackMomentComment(m.content, pName);
+  var fb = _fallbackMomentComment(m.content, pName, rawStory);
   if (fb) {
     if (!moments[index].comments) moments[index].comments = [];
     moments[index].comments.push({ user: pName, content: fb, time: Date.now() });
@@ -87,15 +102,120 @@ async function aiCommentMoment(index) {
 }
 
 /* ---- 固定词汇降级（API全部失败时的最后防线） ---- */
-function _fallbackMomentComment(content, pName) {
+function _fallbackMomentComment(content, pName, charStory) {
   var t = content || '';
-  var isTsundere = /傲娇|毒舌|暴躁|刻薄|冷淡/.test((personaData.story || '').toLowerCase());
+  var isTsundere = /傲娇|毒舌|暴躁|刻薄|冷淡/.test((charStory || personaData.story || '').toLowerCase());
   if (/吃|饭|食堂|外卖|好吃|饿|喝|奶茶|咖啡/.test(t)) return isTsundere ? '又吃。' : '好吃吗？';
   if (/累|困|熬夜|失眠|辛苦/.test(t)) return isTsundere ? '……歇着吧。' : '辛苦了';
   if (/考试|学习|复习|作业|论文/.test(t)) return isTsundere ? '学你的吧。' : '加油';
   if (/开心|高兴|快乐|好玩|好棒/.test(t)) return isTsundere ? '啧。' : '真好呀';
   if (/难过|伤心|哭|不开心|emo/.test(t)) return isTsundere ? '……怎么了' : '抱抱';
   return isTsundere ? '……哦。' : '看到了';
+}
+
+/* ---- 骆云影主动回应动态 + 私聊 ---- */
+function _fallbackLuoMomentDm(content) {
+  var t = content || '';
+  if (/吃|饭|食堂|外卖|好吃|饿|喝|奶茶|咖啡/.test(t)) return '啧，又吃。……好吃吗。';
+  if (/累|困|熬夜|失眠|辛苦/.test(t)) return '……又熬夜。随你。';
+  if (/难过|伤心|哭|不开心|emo/.test(t)) return '……看到你那条朋友圈了。别想太多。';
+  if (/考试|学习|复习|作业|论文/.test(t)) return '学习？……行吧，别太拼。';
+  if (/开心|高兴|快乐|好玩|好棒/.test(t)) return '……看到你发圈了。哼，还行。';
+  return '……看到你发朋友圈了。';
+}
+
+async function generateLuoMomentDm(content, luo) {
+  if (apiConfig && apiConfig.apiKey) {
+    var reply = await callLightLlm(
+      '你是' + luo.name + '。' + (luo.story ? '你的性格/背景：' + luo.story : '') +
+      '\n你刚在朋友圈看到用户发了一条动态，私聊她。1-2句话，符合你的性格：嘴硬、简短、带点在意。不要动作描写，不要emoji。',
+      content
+    );
+    if (reply && reply.length > 2) return reply;
+  }
+  return _fallbackLuoMomentDm(content);
+}
+
+// 用户发动态后，骆云影主动回应（评论 + 概率私聊）
+async function luoRespondToMoment(index) {
+  if (currentCharId === 'luo') return; // 当前已在骆云影聊天，他自己发动态后会评论
+  var luo = getCharById('luo');
+  if (!luo) return;
+  if (!apiConfig || !apiConfig.apiKey || index >= moments.length) return;
+  var m = moments[index];
+  if (!m || m.user !== '我') return; // 只回应用户发的动态
+
+  // 2 小时冷却 + 每日 2 次
+  var cd = lsGet('momentReplyCooldown', {});
+  if (Date.now() - (cd.luo || 0) < 2 * 60 * 60 * 1000) return;
+  var todayStr = new Date().toISOString().split('T')[0];
+  var daily = lsGet('momentReplyDaily', {});
+  if ((daily[todayStr] || 0) >= 2) return;
+
+  // 骆云影评论（有 API 走 aiCommentMoment，无 API 主动补降级）
+  if (apiConfig.apiKey) {
+    await aiCommentMoment(index, 'luo');
+  } else {
+    var pName = lsGet('persona_luo', null)?.name || luo.name || '骆云影';
+    var fb = _fallbackMomentComment(m.content, pName, luo.story);
+    if (fb) {
+      if (!moments[index].comments) moments[index].comments = [];
+      moments[index].comments.push({ user: pName, content: fb, time: Date.now() });
+      lsSet('moments', moments);
+      renderMoments();
+    }
+  }
+
+  // 40% 概率私聊
+  if (Math.random() < 0.4) {
+    var dm = await generateLuoMomentDm(m.content, luo);
+    if (dm) pushCharMessage('luo', dm);
+  }
+
+  // 25% 概率自己也发一条相关的圈（回应式发圈）
+  if (Math.random() < 0.25) {
+    luoPostRelatedMoment(m.content);
+  }
+
+  cd.luo = Date.now();
+  lsSet('momentReplyCooldown', cd);
+  daily[todayStr] = (daily[todayStr] || 0) + 1;
+  lsSet('momentReplyDaily', daily);
+}
+
+// 用户发动态后，骆云影有概率也发一条相关的圈（回应式发圈）
+function _fallbackRelatedMoment(userContent) {
+  var t = userContent || '';
+  if (/吃|饭|奶茶|咖啡|喝|好吃/.test(t)) return '今天喝了杯奶茶，还行。……某人倒是挺爱这口的。';
+  if (/累|熬夜|困|失眠/.test(t)) return '……又是熬夜的一天。反正没人管。';
+  if (/开心|高兴|好玩|好棒/.test(t)) return '今天天气不错。……也挺好。';
+  if (/难过|哭|不开心|emo/.test(t)) return '窗外的灯还亮着。想说什么的时候，其实有人在听。';
+  if (/学习|考试|作业|论文/.test(t)) return '今天居然翻了两页书。……别学我，我那是闲着。';
+  return '今天没什么特别的。……嗯，就这样。';
+}
+
+async function luoPostRelatedMoment(userContent) {
+  var luo = getCharById('luo');
+  if (!luo) return;
+  var luoPers = lsGet('persona_luo', null);
+  var pName = luoPers?.name || luo.name || '骆云影';
+  var story = luoPers?.story || luo.story || '';
+
+  var content = null;
+  if (apiConfig && apiConfig.apiKey) {
+    var reply = await callLightLlm(
+      '你是' + pName + '。' + (story ? '你的性格/背景：' + story : '') +
+      '\n用户刚发了条朋友圈：「' + userContent.substring(0, 20) + '」，你也发一条朋友圈，有感而发、隐隐呼应她（别直接@她，别点破）。嘴硬声线，像真人的日常碎碎念，1-2句话，不用引号不用emoji，20字以内。',
+      '发一条呼应她的朋友圈'
+    );
+    if (reply && reply.length >= 2) content = reply;
+  }
+  if (!content) content = _fallbackRelatedMoment(userContent);
+  if (!content) return;
+
+  moments.unshift({ user: pName, content: content, time: Date.now(), likes: 0, liked: false, comments: [], photo: null });
+  lsSet('moments', moments);
+  renderMoments();
 }
 
 function renderMoments() {
@@ -368,10 +488,15 @@ async function generateAutoMoment(char, todayStr, dailyCount) {
       if (weatherData && Date.now() - weatherData.time < 3600000) {
         contextInfo += '\n天气：' + weatherData.desc + '，' + weatherData.temp + '°C';
       }
+      // 用户最近动态联动：骆云影有感而发
+      var lastUM = lsGet('lastUserMoment', null);
+      if (lastUM && Date.now() - lastUM.time < 24 * 60 * 60 * 1000 && char.id === 'luo') {
+        contextInfo += '\n用户最近发了条动态：「' + lastUM.content.substring(0, 20) + '」你可以有感而发回应一下（不要@她，就自然地提一嘴）。';
+      }
       var sysPrompt = '你是' + pName + '，要发一条朋友圈。' +
         (charStory ? '\n你的性格/背景：' + charStory : '') +
         (charSp ? '\n你的说话风格：' + charSp : '') +
-        '\n\n要求：\n- 内容必须有实质信息，不能只发符号或语气词\n- 符合你的人设和性格\n- 根据当前环境写1-2句话，简短有趣\n- 不要用引号，不要加emoji\n- 字数控制在20字以内';
+        '\n\n要求：\n- 像真人发朋友圈：写日常碎碎念，有细节、有情绪、不喊口号、不说教\n- 内容必须有实质信息，不能只发符号或语气词\n- 符合你的人设和性格\n- 根据当前环境写1-2句话，简短自然\n- 不要用引号，不要加emoji\n- 字数控制在20字以内';
 
       if (checkRecentAiMoments(pName)) {
         contextInfo += '\n\n注意：你刚才已经发过动态了，这次发的内容不要重复。';
@@ -409,7 +534,7 @@ async function generateAutoMoment(char, todayStr, dailyCount) {
     }
   }
 
-  // 本地降级——人设感知，动态内容
+  // 本地降级——人设感知，动态内容（活人日常：细节+情绪+轻收束）
   var storyLower = (charStory || '').toLowerCase();
   var isTsundere = /傲娇|毒舌|暴躁|刻薄|冷淡/.test(storyLower);
   var isGentle = /温柔|温暖|亲切|可爱|软/.test(storyLower);
@@ -424,27 +549,33 @@ async function generateAutoMoment(char, todayStr, dailyCount) {
   // 结合任务
   var undoneTasks = (typeof tasks !== 'undefined') ? tasks.filter(function(t) { return !t.done; }).length : 0;
 
+  // 用户最近动态（骆云影有感而发）
+  var lastUM = lsGet('lastUserMoment', null);
+  var hasRecentUserMoment = lastUM && Date.now() - lastUM.time < 24 * 60 * 60 * 1000 && char.id === 'luo';
+
   if (isTsundere) {
     if (hour < 9) {
-      templates.push('……醒了没。','早。');
+      templates.push('……醒了没。','早。','一杯咖啡续命。');
     } else if (hour >= 22) {
-      templates.push('今天要结束了。','夜深了。','啧，一天又没了。');
+      templates.push('今天要结束了。','夜深了。','啧，一天又没了。','台灯还亮着。习惯晚睡了。');
     } else {
-      templates.push('今天天气还行。','无聊。','……在干嘛。','晒个太阳。');
+      templates.push('今天天气还行。','无聊。','……在干嘛。','晒个太阳。','耳机里单曲循环。','便利店的热拿铁不错。','晚霞还行。拍了一张，懒得发。');
     }
-    if (isRainy) templates.push('下雨了。……带伞没。');
-    if (temp !== null && temp > 30) templates.push('热死了。…………');
-    if (undoneTasks > 3) templates.push('任务还没做完吧你。');
+    if (isRainy) templates.push('下雨了。……带伞没。','伞在门口。不知道给谁准备的了。');
+    if (temp !== null && temp > 30) templates.push('热死了。…………','风扇呼呼转。');
+    if (temp !== null && temp < 5) templates.push('冷。……穿厚点。');
+    if (undoneTasks > 3) templates.push('任务还没做完吧你。','一堆破事。……慢慢做。');
   } else if (isGentle) {
     if (hour < 9) {
-      templates.push('早安呀~今天也是美好的一天 ☀️','早～昨晚睡得好吗？');
+      templates.push('早安呀~今天也是美好的一天 ☀️','早～昨晚睡得好吗？','今天想喝杯热牛奶。');
     } else if (hour >= 22) {
-      templates.push('夜深了，大家晚安好梦 🌙','今天也要结束了，希望你今天过得开心');
+      templates.push('夜深了，大家晚安好梦 🌙','今天也要结束了，希望你今天过得开心','窗帘拉上，晚安。');
     } else {
-      templates.push('今天心情很好，希望你也一样 ♡','想分享今日份的温柔给你','悄悄许个愿，希望你开心','今天的天空很好看✨');
+      templates.push('今天心情很好，希望你也一样 ♡','想分享今日份的温柔给你','悄悄许个愿，希望你开心','今天的天空很好看✨','路过一家花店，花香真好闻','泡了杯茶，慢慢喝。');
     }
-    if (isRainy) templates.push('外面下雨了~记得带伞哦','下雨天适合窝在家里');
+    if (isRainy) templates.push('外面下雨了~记得带伞哦','下雨天适合窝在家里，泡杯热茶','雨声很好听。');
     if (temp !== null && temp > 30) templates.push('好热呀，注意防暑～');
+    if (temp !== null && temp < 5) templates.push('好冷，记得多穿点呀');
     if (undoneTasks > 3) templates.push('任务有点多呢，慢慢来，不着急～');
   } else {
     if (hour < 9) templates.push('早。');
@@ -454,9 +585,15 @@ async function generateAutoMoment(char, todayStr, dailyCount) {
   }
 
   // 通用
-  if (hour >= 12 && hour <= 14) templates.push('午饭时间。');
+  if (hour >= 12 && hour <= 14) templates.push('午饭时间。','午休。饭点了。');
   if (isRainy) templates.push('下雨天。');
   if (temp !== null && temp < 5) templates.push('好冷。注意保暖。');
+
+  // 骆云影回应式发圈：用户最近发过动态时优先有感而发
+  if (hasRecentUserMoment) {
+    var related = _fallbackRelatedMoment(lastUM.content);
+    if (related) templates.push(related);
+  }
 
   var content = templates[Math.floor(Math.random() * templates.length)];
   moments.unshift({ user: pName, content: content, time: Date.now(), likes: 0, liked: false, comments: [], photo: null });

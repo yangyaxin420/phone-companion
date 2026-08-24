@@ -625,6 +625,42 @@ function showSecretNotes() {
   }
 }
 
+/* ---- 内心日记：查看角色每天的日记 ---- */
+async function showSecretInnerDiary() {
+  document.getElementById('secretDesk').style.display = 'none';
+  document.getElementById('secretContent').style.display = 'block';
+  document.getElementById('secretBackBtn').style.display = 'inline';
+  document.getElementById('secretTitle').textContent = '📖 内心日记';
+  const pName = getSecretCharName();
+  document.getElementById('secretAiName').textContent = pName;
+  const container = document.getElementById('secretContent');
+
+  // 当天没有则懒生成（防并发）
+  var arr = getInnerDiary(secretCharId);
+  var todayStr = new Date().toISOString().split('T')[0];
+  if (!arr.some(function(e) { return e.date === todayStr; }) && !window._diaryBusy) {
+    window._diaryBusy = true;
+    try {
+      await ensureInnerDiary(secretCharId, todayStr);
+    } catch(e) {}
+    window._diaryBusy = false;
+    arr = getInnerDiary(secretCharId);
+  }
+
+  var h = '<div style="font-size:11px;color:#bbb;padding:0 0 10px;">📖 ' + pName + '的内心日记</div>';
+  if (arr.length === 0) {
+    h += '<div style="text-align:center;color:#aaa;font-size:14px;padding:40px 0;">还没有日记<br>聊聊天，让他记下今天的事</div>';
+  } else {
+    arr.slice().reverse().forEach(function(e) {
+      h += '<div class="secret-note-card" style="margin-bottom:10px;">' +
+        '<div class="sn-time" style="font-size:11px;color:#999;padding:8px 12px 2px;">' + escHtml(e.date) + (e.mood ? ' · ' + escHtml(e.mood) : '') + '</div>' +
+        '<div style="padding:6px 12px 12px;font-size:14px;line-height:1.8;color:#444;white-space:pre-line;">' + escHtml(e.content) + '</div>' +
+        '</div>';
+    });
+  }
+  container.innerHTML = h;
+}
+
 /* ---- 刷新当前页面的记忆笔记卡片（不重新加载整页） ---- */
 function _refreshMemoryNotesCard() {
   var container = document.getElementById('secretContent');

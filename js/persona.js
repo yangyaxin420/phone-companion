@@ -49,12 +49,6 @@ function loadPersona() {
 }
 
 
-function saveWorldBook() {
-  worldBook = document.getElementById('worldBook').value.trim();
-  lsSet('worldBook', worldBook);
-  addChatSystem(`📖 世界书已更新`);
-}
-
 function saveApiConfig() {
   // 兼容：设置页的输入框叫 settingsApiKey，旧人设页的叫 apiKey
   var keyEl = document.getElementById('settingsApiKey') || document.getElementById('apiKey');

@@ -195,8 +195,12 @@ function saveMemory(text) {
   lsSet('memories', memories);
 }
 
-function getRecentMemories(count) {
-  var recent = memories.slice(-(count || 30));
+function getRecentMemories(count, charId) {
+  var cid = charId || currentCharId;
+  // 只取该角色的记忆；旧记忆无 charId 时归默认角色 luo
+  var recent = memories.filter(function(m) {
+    return (m.charId === cid) || (!m.charId && cid === 'luo');
+  }).slice(-(count || 30));
   return recent.map(function(m) { return m.text; }).join('\n');
 }
 
@@ -753,28 +757,12 @@ function sendLottery() {
 /* ---- 多回复模式 ---- */
 let chatReplySettings = lsGet('chatReplySettings', { count:1, length:'short' });
 
-function toggleReplyMode() {
-  const popup = document.getElementById('replyModePopup');
-  const emojiPanel = document.getElementById('emojiPanel');
-  if (emojiPanel) emojiPanel.classList.remove('show');
-  popup.classList.toggle('show');
-  // 高亮toggle按钮
-  const btn = document.getElementById('replyModeToggle');
-  if (popup.classList.contains('show')) {
-    btn.style.color = '#5B7FFF';
-  } else if (chatReplySettings.count === 1) {
-    btn.style.color = '';
-  }
-}
-
 function setReplyCount(n) {
   chatReplySettings.count = n;
   lsSet('chatReplySettings', chatReplySettings);
   document.querySelectorAll('#replyCountBtns .reply-cbtn').forEach(b => {
     b.classList.toggle('active', parseInt(b.dataset.n) === n);
   });
-  const btn = document.getElementById('replyModeToggle');
-  btn.style.color = n > 1 ? '#5B7FFF' : '';
 }
 
 function setReplyLength(l) {
@@ -886,7 +874,7 @@ function buildChatContext() {
     if (currentChar && currentChar.relation) charRelation = currentChar.relation;
     block += `\n用户：${userPersona.name}，${userPersona.gender}，${userPersona.age}。关系：${charRelation}。`;
   }
-  var mem = getRecentMemories(15);
+  var mem = getRecentMemories(15, currentCharId);
   if (mem) block += '\n记忆：' + mem;
   const now = new Date();
   block += '\n时间：' + now.getFullYear() + '年' + (now.getMonth()+1) + '月' + now.getDate() + '日 ' + now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
@@ -901,9 +889,15 @@ function toggleSpConfig() {
   document.getElementById('modalAiName').value = personaData.name || '';
   document.getElementById('modalAiStory').value = personaData.story || '';
   document.getElementById('spTextarea').value = systemPrompt;
-  document.getElementById('modalWorldBook').value = worldBook || '';
   var char = characters.find(c => c.id === currentCharId);
   document.getElementById('modalRelation').value = (char && char.relation) || '恋人';
+  // 同步回复条数/长度选中状态
+  document.querySelectorAll('#replyCountBtns .reply-cbtn').forEach(b => {
+    b.classList.toggle('active', parseInt(b.dataset.n) === chatReplySettings.count);
+  });
+  document.querySelectorAll('#replyLengthBtns .reply-lbtn').forEach(b => {
+    b.classList.toggle('active', b.dataset.l === chatReplySettings.length);
+  });
   document.getElementById('spConfigModal').classList.add('show');
 }
 function closeSpConfig() { document.getElementById('spConfigModal').classList.remove('show'); }
@@ -922,7 +916,7 @@ function saveAiConfig() {
   personaData.name = document.getElementById('modalAiName').value.trim() || '小伴';
   personaData.story = document.getElementById('modalAiStory').value.trim();
   systemPrompt = document.getElementById('spTextarea').value;
-  worldBook = document.getElementById('modalWorldBook').value.trim();
+  // 世界书编辑入口已移除（v4.0），数据保留不动
   var relation = document.getElementById('modalRelation').value;
 
   lsSet('persona_' + currentCharId, personaData);
@@ -970,11 +964,25 @@ async function sendChat() {
     detectSongFromChat(text, currentCharId);
   }
 
+  // 吃醋触发（非骆云影角色互动时）
+  tryJealousyTrigger(text, currentCharId);
+
   _chatSending = true;
   const typing = document.getElementById('chatTyping');
   typing.classList.add('show');
 
   try {
+    // 内心日记暗号：命中后读日记作为回复（生成失败回退普通回复）
+    if (detectInnerDiaryRequest(text)) {
+      const entry = await ensureInnerDiary(currentCharId);
+      typing.classList.remove('show');
+      const diaryText = entry ? buildDiaryRecitation(entry) : generateLocalReply(text);
+      chatMessages.push({ role:'ai', text: diaryText, time: Date.now() });
+      saveChatData();
+      renderChat();
+      return;
+    }
+
     const count = chatReplySettings.count || 1;
     let replies;
     if (count > 1 && apiConfig.apiKey) {
@@ -1056,7 +1064,7 @@ async function callLLMApi(userText) {
     contextBlock += `\n【用户信息】你的用户叫${userPersona.name}，${userPersona.gender}，${userPersona.age}。性格：${userPersona.traits}。爱好：${userPersona.hobbies}。背景：${userPersona.background}。你和用户的关系：${charRelation}。在回复中自然融入这些信息，但不要生硬背诵。`;
   }
 
-  var memoryBlock = getRecentMemories(20);
+  var memoryBlock = getRecentMemories(20, currentCharId);
   if (memoryBlock) {
     contextBlock += '\n【AI的记忆 - 用户曾说过】\n' + memoryBlock;
   }
@@ -1204,6 +1212,37 @@ async function callLLMApi(userText) {
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw new Error('API 返回内容为空');
   return content.trim();
+}
+
+/* ---- 轻量 AI 调用（吃醋/私聊/内心日记共用） ---- */
+async function callLightLlm(systemContent, userContent, maxTokens, temperature) {
+  if (!apiConfig || !apiConfig.apiKey) return null;
+  try {
+    const apiUrl = (apiConfig.baseUrl || 'https://api.deepseek.com').replace(/\/+$/, '') + '/chat/completions';
+    const resp = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiConfig.apiKey },
+      body: JSON.stringify({
+        model: apiConfig.model || 'deepseek-v4-flash',
+        messages: [
+          { role: 'system', content: systemContent },
+          { role: 'user', content: userContent }
+        ],
+        max_tokens: maxTokens || 150,
+        temperature: temperature || 0.85
+      })
+    });
+    if (!resp.ok) {
+      console.log('[callLightLlm] API错误:', resp.status);
+      return null;
+    }
+    const data = await resp.json();
+    const text = (data.choices?.[0]?.message?.content || '').trim();
+    return text || null;
+  } catch(e) {
+    console.log('[callLightLlm] 调用失败:', e?.message?.substring(0, 60));
+    return null;
+  }
 }
 
 /* ---- 自动记账解析 ---- */
@@ -1567,152 +1606,246 @@ function sendProactiveMessage(text, char) {
   }
 }
 
-/* ==================== 语音通话 ==================== */
-var voiceCallActive = false;
-var voiceCallRecognition = null;
-var voiceCallTimer = null;
-var voiceCallSeconds = 0;
+/* ==================== 吃醋机制 ==================== */
 
-function startVoiceCall() {
-  var sr = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!sr) { alert("请使用 Chrome 或 Edge 浏览器"); return; }
-  var pName = document.getElementById("chatTitle").textContent || "AI";
-  var char = getCharById(currentCharId);
-  var avatar = (char && char.avatar) ? char.avatar : "💬";
-  document.getElementById("voiceCallOverlay").style.display = "flex";
-  document.getElementById("callAvatar").textContent = avatar;
-  document.getElementById("callName").textContent = pName;
-  document.getElementById("callStatus").textContent = "📞 呼叫中...";
-  document.getElementById("callTimer").textContent = "00:00";
-  document.getElementById("callSpeaker").style.color = "rgba(255,255,255,.3)";
-  var tdiv = document.getElementById("callTranscript");
-  tdiv.innerHTML = "<div style='text-align:center;color:rgba(255,255,255,.3);font-size:12px;padding:30px 0;'>正在连接...</div>";
-  voiceCallActive = true;
-  voiceCallSeconds = 0;
-  setTimeout(function() {
-    if (!voiceCallActive) return;
-    document.getElementById("callStatus").textContent = "🔊 通话中";
-    document.getElementById("callSpeaker").style.color = "rgba(255,255,255,.6)";
-    tdiv.innerHTML = "";
-    voiceCallTimer = setInterval(function() {
-      voiceCallSeconds++;
-      var m = String(Math.floor(voiceCallSeconds / 60)).padStart(2, "0");
-      var s = String(voiceCallSeconds % 60).padStart(2, "0");
-      document.getElementById("callTimer").textContent = m + ":" + s;
-    }, 1000);
-    startVoiceCallRecognition();
-  }, 1200);
-}
+// 向指定角色推送一条 AI 消息（写 chatData + 渲染 + 通知）
+function pushCharMessage(charId, text) {
+  if (!chatData[charId]) chatData[charId] = [];
+  chatData[charId].push({ role: 'ai', text: text, time: Date.now() });
+  lsSet('chatData', chatData);
 
-function startVoiceCallRecognition() {
-  if (!voiceCallActive) return;
-  var sr = window.SpeechRecognition || window.webkitSpeechRecognition;
-  voiceCallRecognition = new sr();
-  voiceCallRecognition.lang = "zh-CN";
-  voiceCallRecognition.continuous = true;
-  voiceCallRecognition.interimResults = true;
-  voiceCallRecognition.maxAlternatives = 1;
-  var finalText = "";
-  voiceCallRecognition.onresult = function(e) {
-    var interim = "";
-    for (var i = e.resultIndex; i < e.results.length; i++) {
-      var t = e.results[i][0].transcript;
-      if (e.results[i].isFinal) { finalText += t; }
-      else { interim += t; }
-    }
-    if (finalText) {
-      var txt = finalText; finalText = "";
-      addCallTranscript("user", txt);
-      generateCallReply(txt);
-    }
-  };
-  voiceCallRecognition.onerror = function(e) {
-    if (e.error === "no-speech" || e.error === "aborted") return;
-    addCallTranscript("system", "[识别出错]");
-  };
-  voiceCallRecognition.onend = function() {
-    if (!voiceCallActive) return;
-    try { voiceCallRecognition.start(); } catch(ex) {}
-  };
-  try { voiceCallRecognition.start(); }
-  catch(ex) { addCallTranscript("system", "[语音启动失败]"); }
-}
-
-function addCallTranscript(role, text) {
-  var tdiv = document.getElementById("callTranscript");
-  if (!tdiv) return;
-  if (role === "user") {
-    var d = document.createElement("div");
-    d.style.cssText = "text-align:right;margin:6px 0;";
-    d.innerHTML = "<div style='display:inline-block;background:rgba(102,126,234,.5);color:#fff;padding:8px 14px;border-radius:16px 16px 4px 16px;font-size:14px;line-height:1.5;max-width:80%;text-align:left;'>" + escHtml(text) + "</div>";
-    tdiv.appendChild(d);
-    document.getElementById("callSpeaker").style.color = "#667eea";
-    setTimeout(function() { if (voiceCallActive) document.getElementById("callSpeaker").style.color = "rgba(255,255,255,.6)"; }, 500);
-  } else if (role === "ai") {
-    var d2 = document.createElement("div");
-    d2.style.cssText = "text-align:left;margin:6px 0;";
-    d2.innerHTML = "<div style='display:inline-block;background:rgba(255,255,255,.12);color:rgba(255,255,255,.9);padding:8px 14px;border-radius:16px 16px 16px 4px;font-size:14px;line-height:1.5;max-width:80%;'>" + escHtml(text) + "</div>";
-    tdiv.appendChild(d2);
-    try { if (window.speechSynthesis) { window.speechSynthesis.cancel(); var u = new SpeechSynthesisUtterance(text); u.lang = "zh-CN"; u.rate = 1.0; window.speechSynthesis.speak(u); } } catch(ex) {}
-  } else {
-    var d3 = document.createElement("div");
-    d3.style.cssText = "text-align:center;margin:4px 0;";
-    d3.innerHTML = "<span style='font-size:11px;color:rgba(255,255,255,.3);'>" + escHtml(text) + "</span>";
-    tdiv.appendChild(d3);
+  // 关键：正在该角色聊天页时同步 chatMessages，否则新消息不显示
+  if (charId === currentCharId) {
+    chatMessages = getCurrentChat();
+    if (currentPage === 'page-chat') renderChat();
   }
-  tdiv.scrollTop = tdiv.scrollHeight;
+
+  var char = getCharById(charId);
+  var shouldNotify = settings && settings.notifications &&
+    (document.hidden || document.visibilityState === 'hidden' || currentPage !== 'page-chat');
+  if (shouldNotify && 'Notification' in window && Notification.permission === 'granted') {
+    try { new Notification((char?.name || '角色') + ' 发来消息', { body: text, icon: '/icon-192.png' }); } catch(e) {}
+  }
+
+  // 不是当前角色时，在聊天里加系统提示
+  if (charId !== currentCharId && typeof addChatSystem === 'function') {
+    addChatSystem('💬 ' + (char?.name || '角色') + '：' + text);
+  }
 }
 
-function generateCallReply(userText) {
-  var char = getCharById(currentCharId);
-  if (!char) return;
-  var story = (char.story || "").toLowerCase();
-  var isT = /傲娇|毒舌|暴躁|刻薄|冷淡/.test(story);
-  var isG = /温柔|温暖|亲切|可爱|软/.test(story);
+// 用户与非骆云影角色互动时，骆云影有概率吃醋（嘴硬酸话）
+function tryJealousyTrigger(userText, interactCharId) {
+  if (!settings || !settings.proactiveMsg) return; // 主动消息总开关
+  if (settings.charPrivacy) return;                 // 角色隐私开启 → 不吃醋
+  if (!interactCharId || interactCharId === 'luo') return;
+  if (!characters.some(c => c.id === 'luo')) return;
+  var other = getCharById(interactCharId);
+  if (!other) return;
+  var otherName = other.name || '他';
+
+  // 冷却 4 小时 + 每日上限 2
+  var todayStr = new Date().toISOString().split('T')[0];
+  var cd = lsGet('jealousyCooldown', {});
+  if (Date.now() - (cd.luo || 0) < 4 * 60 * 60 * 1000) return;
+  var daily = lsGet('jealousyDaily', {});
+  if ((daily[todayStr] || 0) >= 2) return;
+
+  // 按该角色本日消息数调概率：今天聊得少更容易吃醋
+  var dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
+  var todayMsgs = (chatData[interactCharId] || []).filter(function(m) {
+    return m.role === 'user' && m.time >= dayStart.getTime();
+  }).length;
+  var p = todayMsgs <= 3 ? 0.25 : 0.15;
+  if (Math.random() >= p) return;
+
+  generateJealousyMessage(otherName);
+  cd.luo = Date.now();
+  lsSet('jealousyCooldown', cd);
+  daily[todayStr] = (daily[todayStr] || 0) + 1;
+  lsSet('jealousyDaily', daily);
+}
+
+async function generateJealousyMessage(otherName) {
+  var luo = getCharById('luo');
+  if (!luo) return;
   if (apiConfig && apiConfig.apiKey) {
-    var prompt = "你是" + char.name + "。" + (char.story ? "性格背景：" + char.story : "") + "\n这是语音通话，用户说：" + userText + "\n请你用一句话简短回复（10-20字），像在打电话一样自然。不要加任何动作描写或表情符号。";
-    callLLMApi(prompt).then(function(text) {
-      if (text && voiceCallActive) {
-        addCallTranscript("ai", text);
-        chatMessages.push({ role:"ai", text: text, time: Date.now() });
-        saveChatData();
-        if (currentPage === "page-chat") renderChat();
-      }
-    }).catch(function() { fallbackCallReply(userText, isT, isG); });
-  } else { fallbackCallReply(userText, isT, isG); }
+    var reply = await callLightLlm(
+      '你是' + luo.name + '。' + (luo.story ? '你的性格/背景：' + luo.story : '') +
+      '\n你的恋人刚才在和' + otherName + '聊天，你有点吃醋但死鸭子嘴硬。给她发一条消息：表面冷淡/嫌弃，但要让她感觉出你在意。1-2句话，嘴硬声线，不要动作描写，不要emoji，不要直接说吃醋。',
+      '我刚才和' + otherName + '聊了会天'
+    );
+    if (reply) { pushCharMessage('luo', reply); return; }
+  }
+  var templates = [
+    '……哦，和' + otherName + '聊得挺欢。随你。',
+    '啧，没打扰你和' + otherName + '吧。',
+    '……行吧。你去找' + otherName + '聊，正好我清静。',
+    '哼。你和' + otherName + '倒是有话说。'
+  ];
+  pushCharMessage('luo', templates[Math.floor(Math.random() * templates.length)]);
 }
 
-function fallbackCallReply(userText, isT, isG) {
-  var templates = [];
-  if (/累|烦|难过|不开心/.test(userText)) {
-    templates = isT ? ["累了就歇着。"] : isG ? ["辛苦了，好好休息呀"] : ["注意休息。"];
-  } else if (/吃|饭|饿/.test(userText)) {
-    templates = isT ? ["又吃，胖死你。"] : isG ? ["要好好吃饭哦"] : ["嗯。"];
-  } else if (/睡|觉|困/.test(userText)) {
-    templates = isT ? ["那还不去睡。"] : isG ? ["晚安，好梦~"] : ["睡吧。"];
-  } else if (/想|爱|喜欢/.test(userText)) {
-    templates = isT ? ["\u2026\u2026嗯。"] : isG ? ["我也想你呀"] : ["知道了。"];
-  } else { templates = isT ? ["然后呢。"] : isG ? ["这样啊，然后呢？"] : ["接着说。"]; }
-  var reply = templates[Math.floor(Math.random() * templates.length)];
-  if (voiceCallActive) {
-    addCallTranscript("ai", reply);
-    chatMessages.push({ role:"ai", text: reply, time: Date.now() });
-    saveChatData();
-    if (currentPage === "page-chat") renderChat();
+/* ==================== 内心日记 ==================== */
+// 数据结构：{ charId: [entry] }，entry = { date:'YYYY-MM-DD', charId, content, mood?, createdAt }
+// 只存在 innerDiary 里，绝不被 buildChatContext / callLLMApi 读取（私密）
+let innerDiary = lsGet('innerDiary', {});
+
+function getInnerDiary(charId) {
+  return innerDiary[charId] || [];
+}
+
+function saveInnerDiaryEntry(charId, entry) {
+  if (!innerDiary[charId]) innerDiary[charId] = [];
+  var arr = innerDiary[charId];
+  var idx = arr.findIndex(function(e) { return e.date === entry.date; });
+  if (idx >= 0) arr[idx] = entry; else arr.push(entry);
+  if (arr.length > 90) arr = arr.slice(-90);
+  innerDiary[charId] = arr;
+  lsSet('innerDiary', innerDiary);
+}
+
+// 当天已有则直接返回，否则懒生成
+async function ensureInnerDiary(charId, dateStr) {
+  var ds = dateStr || new Date().toISOString().split('T')[0];
+  var arr = getInnerDiary(charId);
+  var existing = arr.filter(function(e) { return e.date === ds; })[0];
+  if (existing) return existing;
+  var entry = await generateInnerDiary(charId);
+  if (entry) saveInnerDiaryEntry(charId, entry);
+  return entry;
+}
+
+// AI 生成今天的内心日记
+async function generateInnerDiary(charId) {
+  var pName = getCharById(charId)?.name || '小伴';
+  var pers = lsGet('persona_' + charId, null);
+  var story = pers?.story || getCharById(charId)?.story || '';
+  var topics = (typeof _getChatTopics === 'function') ? _getChatTopics(charId) : [];
+  var topicText = topics.length > 0 ? topics.join('、') : '日常';
+
+  if (apiConfig && apiConfig.apiKey) {
+    var reply = await callLightLlm(
+      '你是' + pName + '。' + (story ? '你的性格/背景：' + story : '') +
+      '\n今天和她的对话围绕：' + topicText + '。写一篇只给自己看的「今日心事」，第一人称，用你的声音（嘴硬、口是心非、说反话，关心都藏起来）。' +
+      '\n要求：\n- 挑一件今天相关的小物件当载体（台灯/奶茶/伞/耳机/窗灯之类）\n- 4-7句散文，像叹气一样自然地收尾\n- 绝不用「日记」二字，不用emoji，不用markdown，不用动作描写，不肉麻直球',
+      '今天发生的事，用你的口吻记下来'
+    );
+    if (reply && reply.length > 10) {
+      return { date: new Date().toISOString().split('T')[0], charId, content: reply, createdAt: Date.now() };
+    }
+  }
+  return _fallbackInnerDiary(charId);
+}
+
+// 本地规则生成（嘴硬声线 + 物件传情）
+function _fallbackInnerDiary(charId) {
+  var pers = lsGet('persona_' + charId, null);
+  var story = (pers?.story || getCharById(charId)?.story || '').toLowerCase();
+  var isTsundere = /傲娇|毒舌|暴躁|刻薄|冷淡/.test(story);
+
+  var charMsgs = chatData[charId] || [];
+  var userTexts = charMsgs.filter(function(m) { return m.role === 'user'; }).map(function(m) { return m.text; }).join(' ');
+
+  var mood = '平常';
+  var moodLine = '今天也聊了几句。没什么特别的。';
+  if (/累|困|熬夜|失眠|辛苦/.test(userTexts)) { mood = '她累了'; moodLine = '又熬到这么晚，说了八百遍不听。'; }
+  else if (/难过|伤心|哭|不开心|焦虑|压力|emo/.test(userTexts)) { mood = '她不太好'; moodLine = '她今天好像不太开心。问她，她只说没事。……算了，她想说的时候会说。'; }
+  else if (/开心|高兴|快乐|好玩|好棒/.test(userTexts)) { mood = '她挺高兴'; moodLine = '她今天挺高兴的，隔着屏幕都能感觉到。……哼，跟我有什么关系。'; }
+  else if (/生气|闹|脾气/.test(userTexts)) { mood = '她有点上火'; moodLine = '她今天好像有点上火。啧，估计不是冲我。……希望不是冲我。'; }
+  else if (/吃|饭|奶茶|咖啡|喝/.test(userTexts)) { mood = '她吃了好吃的'; moodLine = '她今天吃了好吃的。……什么味道，我也不问。反正她开心就行。'; }
+  else if (/学习|考试|作业|论文|六级/.test(userTexts)) { mood = '她在学习'; moodLine = '她今天在学习。挺认真的。……啧，别太拼了，笨。'; }
+
+  var obj = _pickDiaryObject(userTexts);
+  var dateStr = new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' });
+
+  var diary = isTsundere
+    ? dateStr + '，' + moodLine + '\n\n' + obj.line + '\n\n……也就记一下。省得明天忘了。'
+    : dateStr + '，' + moodLine + '\n\n' + obj.line + '\n\n想记住今天。怕忘了。';
+
+  return { date: new Date().toISOString().split('T')[0], charId, content: diary, mood: mood, createdAt: Date.now() };
+}
+
+// 物件池：嘴硬声线里的物件传情
+function _pickDiaryObject(userTexts) {
+  var pool = [
+    { match: /雨|下雨|伞/, line: '那把伞还挂在门口。……也不知道她淋着没有。反正我不会去送。' },
+    { match: /夜|晚|睡|熬夜/, line: '台灯还亮着。她那边应该也还亮着。……随她吧。' },
+    { match: /奶茶|咖啡|喝|甜/, line: '那杯奶茶的空杯子还在桌上。……她喝得挺开心。啧。' },
+    { match: /累|困|学习|工作/, line: '耳机里还剩半首歌。……想听完，又怕她突然发消息。' },
+    { match: /想|爱|喜欢|梦/, line: '窗外那盏灯一直亮着。……和她家的灯有点像。' }
+  ];
+  for (var i = 0; i < pool.length; i++) {
+    if (pool[i].match.test(userTexts)) return pool[i];
+  }
+  return { line: '窗外的灯还亮着。……今天也在。' };
+}
+
+// 暗号检测
+function detectInnerDiaryRequest(text) {
+  return /你心里在想什么|你心里想什么|内心日记|心里话/.test(text);
+}
+
+// 读日记时的口吻包装（嘴硬，不露痕迹地翻开）
+function buildDiaryRecitation(entry) {
+  return '……你怎么知道要问这个。\n\n' + (entry.content || '') + '\n\n……反正就这些。看完了别说出去。';
+}
+
+/* ==================== 查找聊天记录 ==================== */
+function openChatSearch() {
+  document.getElementById('chatSearchOverlay').style.display = 'flex';
+  const inp = document.getElementById('chatSearchInput');
+  inp.value = '';
+  inp.focus();
+  doChatSearch('');
+}
+
+function closeChatSearch() {
+  document.getElementById('chatSearchOverlay').style.display = 'none';
+}
+
+function doChatSearch(keyword) {
+  const container = document.getElementById('chatSearchResults');
+  if (!container) return;
+  container.innerHTML = '';
+  const kw = (keyword || '').trim().toLowerCase();
+  if (!kw) {
+    container.innerHTML = '<div style="text-align:center;color:#aaa;font-size:13px;padding:20px;">输入关键词搜索聊天内容</div>';
+    return;
+  }
+  const msgs = chatMessages.filter(m => m.role !== 'system' && m.text && m.text.toLowerCase().includes(kw));
+  if (msgs.length === 0) {
+    container.innerHTML = '<div style="text-align:center;color:#aaa;font-size:13px;padding:20px;">没有找到相关内容</div>';
+    return;
+  }
+  const shown = msgs.slice(-50);
+  shown.forEach((m) => {
+    const d = new Date(m.time);
+    const t = d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+    const el = document.createElement('div');
+    el.className = 'chat-search-item';
+    el.innerHTML = '<div class="csi-role">' + (m.role === 'user' ? '我' : escHtml(personaData.name || 'AI')) + ' · ' + t + '</div>' +
+      '<div class="csi-text">' + escHtml(m.text.substring(0, 60)) + '</div>';
+    el.onclick = () => jumpToChatMsg(m);
+    container.appendChild(el);
+  });
+}
+
+function jumpToChatMsg(targetMsg) {
+  closeChatSearch();
+  const container = document.getElementById('chatMessages');
+  if (!container) return;
+  const items = container.querySelectorAll('.chat-msg');
+  let idx = -1;
+  for (let i = 0; i < items.length; i++) {
+    if (items[i].textContent.indexOf(targetMsg.text) !== -1) { idx = i; break; }
+  }
+  if (idx >= 0) {
+    items[idx].scrollIntoView({ block: 'center' });
+    items[idx].style.transition = 'background .6s';
+    items[idx].style.background = '#FFF6D5';
+    setTimeout(() => { items[idx].style.background = ''; }, 1600);
+  } else {
+    container.scrollTop = container.scrollHeight;
   }
 }
 
-function endVoiceCall() {
-  voiceCallActive = false;
-  if (voiceCallRecognition) { try { voiceCallRecognition.stop(); } catch(ex) {} voiceCallRecognition = null; }
-  if (voiceCallTimer) { clearInterval(voiceCallTimer); voiceCallTimer = null; }
-  try { window.speechSynthesis.cancel(); } catch(ex) {}
-  document.getElementById("voiceCallOverlay").style.display = "none";
-  if (voiceCallSeconds > 3) {
-    var m = Math.floor(voiceCallSeconds / 60);
-    var s = voiceCallSeconds % 60;
-    var dur = (m > 0 ? m + "分" : "") + s + "秒";
-    var name = document.getElementById("chatTitle").textContent || "AI";
-    addChatSystem("📞 与 " + name + " 的通话结束（" + dur + "）");
-  }
-}
