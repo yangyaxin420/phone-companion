@@ -801,6 +801,9 @@ async function generateMultiReplies(text, count, length) {
     const _multiActionsBan = (settings && settings.disableActions)
       ? `\n4. 【严禁】绝对不要使用任何动作描写（包括但不限于：*微笑*、*叹气*、*摸头*、*脸红*、*低头*、*耸肩*等），只说纯文字`
       : `\n4. 不要动作描写`;
+    const _multiAiCtrl = (settings && settings.aiControl)
+      ? `\n\n你被授权操纵手机：需要时可使用标记 [TASK:任务]、[SCHEDULE:事项|日期|时间]、[ALARM:标签|HH:MM]、[EXPENSE:金额|类别]、[MOMENT:内容]，执行后聊天里会显示提示。只在用户明确需要时用，不要滥用`
+      : `\n\n你没有操纵手机的权限，只能纯聊天，绝对禁止生成任何 [TASK]/[SCHEDULE]/[ALARM]/[EXPENSE]/[MOMENT] 标记`;
     const sysPrompt = systemPrompt + personaPart + contextBlock +
       `\n\n你现在是${pName}。` +
       `\n用户给你发了一条消息，你需要生成${count}条不同的回复供用户选择。` +
@@ -808,7 +811,7 @@ async function generateMultiReplies(text, count, length) {
       `\n要求：
 1. 每条回复${lengthHint}，每一条都要不一样
 2. 从不同角度回应：认真回应、吐槽、关心、反问、调侃……换着花样来
-3. 每条回复之间要有明显区别，不要只是换几个词` + _multiActionsBan + `
+3. 每条回复之间要有明显区别，不要只是换几个词` + _multiActionsBan + `\n` + _multiAiCtrl + `
 5. 用 --- 分隔每条回复（不要加序号）`;
 
     try {
@@ -1157,6 +1160,17 @@ async function callLLMApi(userText) {
   const _actionsPrompt = (settings && settings.disableActions)
     ? `\n\n🔴 【重要规则】绝对禁止使用任何动作描写！\n以下写法全部禁止：\n- *微笑* *叹气* *摸头* *拥抱* *拍肩* *脸红* *低头* *抬头* *转身* *摇头* *点头* *耸肩* *摊手* *眯眼* *勾唇* *挑眉*\n- 任何用 * * 或（ ）包裹的动作、表情、神态描写\n- 任何对语气、语速、体态的描述\n- 回答时只说纯粹的语言文字，像微信聊天一样，不要有任何动作描写`
     : '';
+
+  // AI操纵手机权限（aiControl 开启才注入操作标记，否则明确禁止）
+  const _aiControlPrompt = (settings && settings.aiControl)
+    ? `\n\n【你被授权操纵手机 — 在回复中使用这些标记，我会自动执行并在聊天里显示提示】
+- [TASK:任务内容] 添加任务（可每行一个）
+- [SCHEDULE:事项|日期|时间] 添加日程
+- [ALARM:标签|HH:MM] 设定闹钟，如 [ALARM:起床|07:00]
+- [EXPENSE:金额|类别] 记账，如 [EXPENSE:25.5|餐饮]
+- [MOMENT:朋友圈内容] 用你的名义发一条朋友圈
+只在用户明确请求或明显需要时使用，不要滥用，正常聊天就行`
+    : `\n\n🔴 【重要规则】你没有操纵手机的权限！绝对不能生成任何 [TASK]、[SCHEDULE]、[ALARM]、[EXPENSE]、[MOMENT] 这样的操作标记，只能纯聊天。`;
   const fullSystemPrompt = systemPrompt + personaPart + worldBookPart + contextBlock + antiRepeatHint + `\n\n你的名字叫${pName}。回复规则：
 1. 回复简短，几句话就行，说清楚你想表达的东西
 2. 绝对不要用动作描写（如*微笑*、*拥抱*、*拍肩*），只说纯文字${_actionsPrompt}
@@ -1164,10 +1178,7 @@ async function callLLMApi(userText) {
 4. 【最重要的规则】不要重复自己说过的话！每次回复必须有新内容、新角度。如果你发现想说的和之前说过的一样，立刻换一个方向
 5. 看一遍上面「你最近说过的话」，确保这次说的和那些都不一样
 
-【你可以执行的操作 — 在回复中用特殊标记】
-- 添加任务：在回复中包含 [TASK:任务内容] 即可自动添加到用户的任务清单
-- 添加多个任务：每行一个 [TASK:xxx]
-- 你可以主动提及当前环境信息，比如天气变了提醒带伞、任务多的时候鼓励、经期前关心等。`;
+${_aiControlPrompt}`;
 
   // 排除最后一条用户消息（已作为 userText 单独传入），避免重复
   const msgsForApi = chatMessages.length > 0 && chatMessages[chatMessages.length - 1].role === 'user'
@@ -1292,11 +1303,23 @@ function parseAiActions(reply) {
   while ((match = alarmRegex.exec(reply)) !== null) {
     actions.push({ type: 'alarm', label: match[1].trim(), time: match[2].trim() });
   }
-  display = display.replace(taskRegex, '').replace(schedRegex, '').replace(alarmRegex, '').replace(/\n{3,}/g, '\n\n').trim();
+  const expenseRegex = /\[EXPENSE:(.*?)\]/g;
+  while ((match = expenseRegex.exec(reply)) !== null) {
+    actions.push({ type: 'expense', content: match[1].trim() });
+  }
+  const momentRegex = /\[MOMENT:(.*?)\]/g;
+  while ((match = momentRegex.exec(reply)) !== null) {
+    actions.push({ type: 'moment', content: match[1].trim() });
+  }
+  display = display.replace(taskRegex, '').replace(schedRegex, '').replace(alarmRegex, '').replace(expenseRegex, '').replace(momentRegex, '').replace(/\n{3,}/g, '\n\n').trim();
   return { display, actions };
 }
 
 function executeAiActions(actions) {
+  if (!(settings && settings.aiControl)) {
+    if (actions.length > 0) addChatSystem('🔒 AI操纵手机权限未开启，已忽略操作请求');
+    return;
+  }
   const pName = personaData.name || '小伴';
   actions.forEach(a => {
     if (a.type === 'task') {
@@ -1310,6 +1333,31 @@ function executeAiActions(actions) {
       const sDate = parts[1] || '';
       const sTime = parts[2] || '';
       if (sText) addSchedulePreview([{ text: sText, date: sDate, time: sTime }]);
+    } else if (a.type === 'alarm') {
+      const time = (a.time || '').trim();
+      const label = (a.label || '').trim();
+      if (/^\d{1,2}:\d{2}$/.test(time)) {
+        alarms.push({ time: time, label: label || 'AI设定', on: true });
+        lsSet('alarms', alarms);
+        renderAlarms();
+        addChatSystem(`⏰ ${pName}帮你设了 ${time} 的闹钟${label ? '（' + label + '）' : ''}`);
+      }
+    } else if (a.type === 'expense') {
+      const parts = a.content.split('|').map(s => s.trim());
+      const amount = parseFloat(parts[0]);
+      const category = parts[1] || '其他';
+      if (amount > 0 && amount < 999999) {
+        const records = getExpRecords();
+        records.push({ id: Date.now() + '_' + Math.random().toString(36).slice(2,6), amount: amount, type: 'expense', category: category, note: 'AI记账', date: new Date().toISOString().split('T')[0] });
+        saveExpRecords(records);
+        renderExpense();
+        addChatSystem(`💰 ${pName}帮你记了 ${category} ${amount.toFixed(2)} 元`);
+      }
+    } else if (a.type === 'moment') {
+      if (a.content) {
+        addMoment(pName, a.content);
+        addChatSystem(`📸 ${pName}发了一条朋友圈：${a.content.substring(0,20)}`);
+      }
     }
   });
 }
@@ -1334,25 +1382,26 @@ function generateLocalReply(text) {
     const greetings = [`嗨～我是${pName}，有什么想聊的吗？`,`你好呀！${pName}在呢～`,`嗨！今天怎么样？`];
     return greetings[Math.floor(Math.random()*greetings.length)];
   }
-  if (/任务|备忘|待办|todo/.test(t)) {
-    const undone = tasks.filter(x=>!x.done).length;
-    return undone > 0 ? `你有 ${undone} 个未完成的任务哦～要不要去看看？` : `所有任务都完成啦！真棒 🎉`;
-  }
   if (/添加任务|新建任务|提醒我/.test(t)) {
     const taskText = t.replace(/添加任务|新建任务|提醒我/g,'').trim();
-    if (taskText) {
+    if (taskText && settings && settings.aiControl) {
       tasks.push({ text:taskText, done:false });
       lsSet('tasks', tasks);
       renderSchedule();
       return `好的，已经帮你添加了任务：${taskText} ✓`;
     }
-    return `想添加什么任务？直接告诉我就好～`;
+    return taskText ? `你说得对，不过我得先拿到「操纵手机」的权限才能动手～` : `想添加什么任务？直接告诉我就好～`;
+  }
+  if (/任务|备忘|待办|todo/.test(t)) {
+    const undone = tasks.filter(x=>!x.done).length;
+    return undone > 0 ? `你有 ${undone} 个未完成的任务哦～要不要去看看？` : `所有任务都完成啦！真棒 🎉`;
   }
   if (/花了|买了|吃了|喝了|用了|付了|支出|消费/.test(t) && /\d+/.test(t)) {
     const amountMatch = t.match(/(\d+)(\.\d+)?/);
     if (amountMatch) {
       const amount = parseFloat(amountMatch[0]);
       if (amount > 0 && amount < 999999) {
+        if (!(settings && settings.aiControl)) return `嗯，${amount.toFixed(2)} 元…要先给我「操纵手机」的权限，我才能帮你记账。`;
         let category = "其他";
         if (/吃|饭|食堂|外卖|餐|喝|饮|咖啡|奶茶/.test(t)) category = "餐饮";
         else if (/买|购物|衣服|鞋|包|网购/.test(t)) category = "购物";
@@ -1373,6 +1422,7 @@ function generateLocalReply(text) {
     if (amountMatch) {
       const amount = parseFloat(amountMatch[0]);
       if (amount > 0 && amount < 999999) {
+        if (!(settings && settings.aiControl)) return `这笔 ${amount.toFixed(2)} 元的进账先不记啦，等你给我「操纵手机」的权限～`;
         let category = "其他收入";
         if (/工资|薪水/.test(t)) category = "工资";
         else if (/兼职|副业/.test(t)) category = "兼职";
@@ -1391,10 +1441,13 @@ function generateLocalReply(text) {
       const h = timeMatch[1].padStart(2,'0');
       const m = timeMatch[2];
       const time = h+':'+m;
-      alarms.push({ time, label:'聊天设定', on:true });
-      lsSet('alarms', alarms);
-      renderAlarms();
-      return `好的，已经设定了 ${time} 的闹钟 ⏰`;
+      if (settings && settings.aiControl) {
+        alarms.push({ time, label:'聊天设定', on:true });
+        lsSet('alarms', alarms);
+        renderAlarms();
+        return `好的，已经设定了 ${time} 的闹钟 ⏰`;
+      }
+      return `想设闹钟的话，得先给我「操纵手机」的权限哦～`;
     }
     return `想设定几点的闹钟？比如"7:30提醒我"～`;
   }

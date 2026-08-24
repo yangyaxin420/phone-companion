@@ -1,12 +1,13 @@
 /* ==================== 设置页 ==================== */
-const APP_VERSION = "v4.0.2 (2026.08.24)";
+const APP_VERSION = "v4.1.0 (2026.08.24)";
 
 const DEFAULT_SETTINGS = {
   proactiveMsg: true,
   autoMoments: true,
   notifications: true,
   charPrivacy: false,
-  disableActions: true
+  disableActions: true,
+  aiControl: false
 };
 
 let settings = lsGet('settings', DEFAULT_SETTINGS);
@@ -15,7 +16,7 @@ function loadSettings() {
   var verEl = document.getElementById('appVersionDisplay');
   if (verEl && typeof APP_VERSION !== 'undefined') verEl.textContent = APP_VERSION;
   settings = lsGet('settings', DEFAULT_SETTINGS);
-  const toggles = ['proactiveMsg','autoMoments','notifications','charPrivacy','disableActions'];
+  const toggles = ['proactiveMsg','autoMoments','notifications','charPrivacy','disableActions','aiControl'];
   toggles.forEach(function(key) {
     const el = document.getElementById('setting' + key.charAt(0).toUpperCase() + key.slice(1));
     if (el) {
@@ -43,7 +44,8 @@ function toggleSetting(el, key) {
     autoMoments: 'AI自动发朋友圈',
     notifications: '通知',
     charPrivacy: '角色隐私',
-    disableActions: '禁止动作描写'
+    disableActions: '禁止动作描写',
+    aiControl: '允许AI操纵手机'
   };
   addChatSystem((isOn ? '✅ ' : '❌ ') + labels[key] + (isOn ? '已开启' : '已关闭'));
 }

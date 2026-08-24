@@ -9,9 +9,9 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="theme-color" content="#F8FAFC">
-<meta name="app-version" content="v4.0.2 (2026.08.24)">
+<meta name="app-version" content="v4.1.0 (2026.08.24)">
 <title>我的手机</title>
-<link rel="stylesheet" href="css/style.css?v=13">
+<link rel="stylesheet" href="css/style.css?v=14">
 </head>
 <body>
 
@@ -550,6 +550,19 @@
         </div>
       </div>
 
+      <!-- 允许AI操纵手机 -->
+      <div class="settings-card">
+        <div class="settings-row">
+          <div class="settings-row-left">
+            <div class="settings-row-title">🤖 允许AI操纵手机</div>
+            <div class="settings-row-desc">开启后骆云影能帮你加任务、定闹钟、记账、发朋友圈</div>
+          </div>
+          <div class="ios-toggle" id="settingAiControl" onclick="toggleSetting(this,'aiControl')">
+            <div class="ios-toggle-slider"></div>
+          </div>
+        </div>
+      </div>
+
       <div style="height:1px;background:#eee;margin:4px 0;"></div>
 
       <!-- API配置 -->
@@ -683,19 +696,19 @@
 </div><!-- phone-frame -->
 
 <!-- script moved to external files -->
-<script src="js/utils.js?v=13"></script>
-<script src="js/app.js?v=13"></script>
-<script src="js/weather.js?v=13"></script>
-<script src="js/tasks.js?v=13"></script>
-<script src="js/expense.js?v=13"></script>
-<script src="js/chat.js?v=13"></script>
-<script src="js/secret.js?v=13"></script>
-<script src="js/moments.js?v=13"></script>
-<script src="js/persona.js?v=13"></script>
-<script src="js/daily.js?v=13"></script>
-<script src="js/tide.js?v=13"></script>
-<script src="js/companion.js?v=13"></script>
-<script src="js/settings.js?v=13"></script>
+<script src="js/utils.js?v=14"></script>
+<script src="js/app.js?v=14"></script>
+<script src="js/weather.js?v=14"></script>
+<script src="js/tasks.js?v=14"></script>
+<script src="js/expense.js?v=14"></script>
+<script src="js/chat.js?v=14"></script>
+<script src="js/secret.js?v=14"></script>
+<script src="js/moments.js?v=14"></script>
+<script src="js/persona.js?v=14"></script>
+<script src="js/daily.js?v=14"></script>
+<script src="js/tide.js?v=14"></script>
+<script src="js/companion.js?v=14"></script>
+<script src="js/settings.js?v=14"></script>
 <script>
 /* ==================== 初始化 ==================== */
 function init() {
