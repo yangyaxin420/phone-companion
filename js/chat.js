@@ -1793,6 +1793,11 @@ function _todayDateLabel() {
   return new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' });
 }
 
+// 去掉日记内容开头的日期标签（旧版会把「8月24日，」写进正文，导致两天内容比对不出重复）
+function _diaryStripDate(text) {
+  return String(text || '').replace(/^\s*\d{1,2}月\d{1,2}日[，,]?\s*/, '');
+}
+
 // 日期种子：同一天恒定，隔天必变（用于轮换模板，避免两天写一样）
 function _diarySeed(dateStr) {
   var n = 0;
@@ -1866,7 +1871,7 @@ function _fallbackInnerDiary(charId) {
     ? ['……也就记一下。省得明天忘了。', '……记完了。就这样。', '……不写多点，怕哪天想起来查无此条。']
     : ['想记住今天。怕忘了。', '……大概会记得很久。', '今天也，挺好的。'];
 
-  var diary = _todayDateLabel() + '，' + moodLine + '\n\n' + objLine + '\n\n' + endLines[seed % endLines.length];
+  var diary = moodLine + '\n\n' + objLine + '\n\n' + endLines[seed % endLines.length];
 
   return { date: dateStr, charId, content: diary, mood: mood, createdAt: Date.now() };
 }
@@ -1904,7 +1909,7 @@ function detectInnerDiaryRequest(text) {
 
 // 读日记时的口吻包装（嘴硬，不露痕迹地翻开）
 function buildDiaryRecitation(entry) {
-  return '……你怎么知道要问这个。\n\n' + (entry.content || '') + '\n\n……反正就这些。看完了别说出去。';
+  return '……你怎么知道要问这个。\n\n' + _diaryStripDate(entry.content) + '\n\n……反正就这些。看完了别说出去。';
 }
 
 /* ==================== 查找聊天记录 ==================== */

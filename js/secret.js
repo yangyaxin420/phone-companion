@@ -642,7 +642,7 @@ function showSecretNotes() {
     if (diaryArr[dii].date === todayStr) todayEntry = diaryArr[dii];
     else if (diaryArr[dii].date < todayStr && (!prevEntry || diaryArr[dii].date > prevEntry.date)) prevEntry = diaryArr[dii];
   }
-  var needDiary = charMsgs.length > 0 && (!todayEntry || (todayEntry.content && prevEntry && todayEntry.content === prevEntry.content));
+  var needDiary = charMsgs.length > 0 && (!todayEntry || (_diaryStripDate(todayEntry.content) && prevEntry && _diaryStripDate(todayEntry.content) === _diaryStripDate(prevEntry.content)));
   if (needDiary && !window._diaryBusy) {
     window._diaryBusy = true;
     setTimeout(async function() {
@@ -663,13 +663,15 @@ function _diaryEntriesHtml(arr) {
   var html = '';
   var lastContent = '';
   arr.slice(-5).reverse().forEach(function(e) {
+    // 剥掉正文开头的日期再比对/展示（旧版会把「8月24日，」写进正文）
+    var content = _diaryStripDate(e.content);
     // 跳过连续重复的日记（旧版 bug 会连续两天写一样的内容）
-    if (e.content && e.content === lastContent) return;
-    lastContent = e.content;
+    if (content && content === lastContent) return;
+    lastContent = content;
     var timeStr = e.date ? e.date.replace(/-/g, '.').slice(5) : '';
     html += '<div style="font-size:13px;color:#555;padding:8px 0;border-bottom:1px solid #f5f5f5;line-height:1.7;white-space:pre-line;">' +
       '<span style="color:#bbb;font-size:10px;">' + escHtml(timeStr) + (e.mood ? ' · ' + escHtml(e.mood) : '') + '</span><br>' +
-      escHtml(e.content) + '</div>';
+      escHtml(content) + '</div>';
   });
   return html;
 }
