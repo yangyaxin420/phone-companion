@@ -1772,15 +1772,47 @@ function saveInnerDiaryEntry(charId, entry) {
   lsSet('innerDiary', innerDiary);
 }
 
-// 当天已有则直接返回，否则懒生成
-async function ensureInnerDiary(charId, dateStr) {
+// 当天已有则直接返回，否则懒生成；force=true 强制重写（用于旧版重复日记）
+async function ensureInnerDiary(charId, dateStr, force) {
   var ds = dateStr || new Date().toISOString().split('T')[0];
   var arr = getInnerDiary(charId);
   var existing = arr.filter(function(e) { return e.date === ds; })[0];
-  if (existing) return existing;
+  if (existing && !force) return existing;
   var entry = await generateInnerDiary(charId);
   if (entry) saveInnerDiaryEntry(charId, entry);
   return entry;
+}
+
+// —— 内心日记：日期相关的工具 ——
+function _isSameDay(ts, d) {
+  var t = new Date(ts);
+  return t.getFullYear() === d.getFullYear() && t.getMonth() === d.getMonth() && t.getDate() === d.getDate();
+}
+
+function _todayDateLabel() {
+  return new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' });
+}
+
+// 日期种子：同一天恒定，隔天必变（用于轮换模板，避免两天写一样）
+function _diarySeed(dateStr) {
+  var n = 0;
+  for (var i = 0; i < dateStr.length; i++) n = (n * 31 + dateStr.charCodeAt(i)) % 100000;
+  return n;
+}
+
+// 今天（或最近）她说的话，供日记取材 —— 只取当天，避免旧关键词天天重复命中
+function _todayDiaryUserText(charId) {
+  var charMsgs = chatData[charId] || [];
+  var now = new Date();
+  var dayMsgs = charMsgs.filter(function(m) {
+    return m.role === 'user' && m.time && _isSameDay(m.time, now);
+  });
+  if (dayMsgs.length > 0) {
+    return dayMsgs.map(function(m) { return m.text; }).join(' ').slice(-200);
+  }
+  // 今天还没聊，用最近几句补，别让日记空着
+  var recent = charMsgs.filter(function(m) { return m.role === 'user'; }).slice(-6);
+  return recent.map(function(m) { return m.text; }).join(' ').slice(-200);
 }
 
 // AI 生成今天的内心日记
@@ -1790,13 +1822,17 @@ async function generateInnerDiary(charId) {
   var story = pers?.story || getCharById(charId)?.story || '';
   var topics = (typeof _getChatTopics === 'function') ? _getChatTopics(charId) : [];
   var topicText = topics.length > 0 ? topics.join('、') : '日常';
+  var todayText = _todayDiaryUserText(charId);
 
   if (apiConfig && apiConfig.apiKey) {
     var reply = await callLightLlm(
       '你是' + pName + '。' + (story ? '你的性格/背景：' + story : '') +
-      '\n今天和她的对话围绕：' + topicText + '。写一篇只给自己看的「今日心事」，第一人称，用你的声音（嘴硬、口是心非、说反话，关心都藏起来）。' +
-      '\n要求：\n- 挑一件今天相关的小物件当载体（台灯/奶茶/伞/耳机/窗灯之类）\n- 4-7句散文，像叹气一样自然地收尾\n- 绝不用「日记」二字，不用emoji，不用markdown，不用动作描写，不肉麻直球',
-      '今天发生的事，用你的口吻记下来'
+      '\n今天是' + _todayDateLabel() + '。你们聊的话题：' + topicText +
+      (todayText ? '。今天她跟你说过的话（摘录）：' + todayText : '') +
+      '。写一篇只给自己看的「今日心事」，第一人称，用你的声音（嘴硬、口是心非、说反话，关心都藏起来），把她说的话里的你叫「我」、把她叫「她」。' +
+      '\n要求：\n- 挑一件今天相关的小物件当载体（台灯/奶茶/伞/耳机/窗灯之类）\n- 4-7句散文，像叹气一样自然地收尾\n- 必须写今天新发生的事，别重复以前写过的话\n- 绝不用「日记」二字，不用emoji，不用markdown，不用动作描写，不肉麻直球',
+      '今天发生的事，用你的口吻记下来',
+      200, 1.1
     );
     if (reply && reply.length > 10) {
       return { date: new Date().toISOString().split('T')[0], charId, content: reply, createdAt: Date.now() };
@@ -1805,47 +1841,60 @@ async function generateInnerDiary(charId) {
   return _fallbackInnerDiary(charId);
 }
 
-// 本地规则生成（嘴硬声线 + 物件传情）
+// 本地规则生成（嘴硬声线 + 物件传情，按日期轮换，两天不会一样）
 function _fallbackInnerDiary(charId) {
   var pers = lsGet('persona_' + charId, null);
   var story = (pers?.story || getCharById(charId)?.story || '').toLowerCase();
   var isTsundere = /傲娇|毒舌|暴躁|刻薄|冷淡/.test(story);
+  var dateStr = new Date().toISOString().split('T')[0];
+  var seed = _diarySeed(dateStr);
 
-  var charMsgs = chatData[charId] || [];
-  var userTexts = charMsgs.filter(function(m) { return m.role === 'user'; }).map(function(m) { return m.text; }).join(' ');
+  var userTexts = _todayDiaryUserText(charId);
 
   var mood = '平常';
-  var moodLine = '今天也聊了几句。没什么特别的。';
-  if (/累|困|熬夜|失眠|辛苦/.test(userTexts)) { mood = '她累了'; moodLine = '又熬到这么晚，说了八百遍不听。'; }
-  else if (/难过|伤心|哭|不开心|焦虑|压力|emo/.test(userTexts)) { mood = '她不太好'; moodLine = '她今天好像不太开心。问她，她只说没事。……算了，她想说的时候会说。'; }
-  else if (/开心|高兴|快乐|好玩|好棒/.test(userTexts)) { mood = '她挺高兴'; moodLine = '她今天挺高兴的，隔着屏幕都能感觉到。……哼，跟我有什么关系。'; }
-  else if (/生气|闹|脾气/.test(userTexts)) { mood = '她有点上火'; moodLine = '她今天好像有点上火。啧，估计不是冲我。……希望不是冲我。'; }
-  else if (/吃|饭|奶茶|咖啡|喝/.test(userTexts)) { mood = '她吃了好吃的'; moodLine = '她今天吃了好吃的。……什么味道，我也不问。反正她开心就行。'; }
-  else if (/学习|考试|作业|论文|六级/.test(userTexts)) { mood = '她在学习'; moodLine = '她今天在学习。挺认真的。……啧，别太拼了，笨。'; }
+  var moodLines = ['今天也聊了几句。没什么特别的。', '今天聊得不多。风平浪静。'];
+  if (/累|困|熬夜|失眠|辛苦/.test(userTexts)) { mood = '她累了'; moodLines = ['又熬到这么晚，说了八百遍不听。', '她说困，还不肯睡。我有什么办法。']; }
+  else if (/难过|伤心|哭|不开心|焦虑|压力|emo/.test(userTexts)) { mood = '她不太好'; moodLines = ['她今天好像不太开心。问她，她只说没事。……算了，她想说的时候会说。', '她今天话很少。不对劲。……不问了，问了也是「没事」。']; }
+  else if (/开心|高兴|快乐|好玩|好棒/.test(userTexts)) { mood = '她挺高兴'; moodLines = ['她今天挺高兴的，隔着屏幕都能感觉到。……哼，跟我有什么关系。', '她今天话多，肯定遇到好事了。……行吧，高兴就好。']; }
+  else if (/生气|闹|脾气/.test(userTexts)) { mood = '她有点上火'; moodLines = ['她今天好像有点上火。啧，估计不是冲我。……希望不是冲我。', '她今天口气有点冲。……算了，谁还没个烦的时候。']; }
+  else if (/吃|饭|奶茶|咖啡|喝/.test(userTexts)) { mood = '她吃了好吃的'; moodLines = ['她今天吃了好吃的。……什么味道，我也不问。反正她开心就行。', '她今天又说吃的。……记下了，哪天路过给她带一份，不说原因。']; }
+  else if (/学习|考试|作业|论文|六级/.test(userTexts)) { mood = '她在学习'; moodLines = ['她今天在学习。挺认真的。……啧，别太拼了，笨。', '她今天泡在书里。……也没找我。……挺好。专心就好。']; }
 
-  var obj = _pickDiaryObject(userTexts);
-  var dateStr = new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' });
+  var moodLine = moodLines[seed % moodLines.length];
+  var objLine = _pickDiaryObject(userTexts, seed);
+  var endLines = isTsundere
+    ? ['……也就记一下。省得明天忘了。', '……记完了。就这样。', '……不写多点，怕哪天想起来查无此条。']
+    : ['想记住今天。怕忘了。', '……大概会记得很久。', '今天也，挺好的。'];
 
-  var diary = isTsundere
-    ? dateStr + '，' + moodLine + '\n\n' + obj.line + '\n\n……也就记一下。省得明天忘了。'
-    : dateStr + '，' + moodLine + '\n\n' + obj.line + '\n\n想记住今天。怕忘了。';
+  var diary = _todayDateLabel() + '，' + moodLine + '\n\n' + objLine + '\n\n' + endLines[seed % endLines.length];
 
-  return { date: new Date().toISOString().split('T')[0], charId, content: diary, mood: mood, createdAt: Date.now() };
+  return { date: dateStr, charId, content: diary, mood: mood, createdAt: Date.now() };
 }
 
-// 物件池：嘴硬声线里的物件传情
-function _pickDiaryObject(userTexts) {
+// 物件池：嘴硬声线里的物件传情（每天轮换，两天不会一样）
+function _pickDiaryObject(userTexts, seed) {
   var pool = [
-    { match: /雨|下雨|伞/, line: '那把伞还挂在门口。……也不知道她淋着没有。反正我不会去送。' },
-    { match: /夜|晚|睡|熬夜/, line: '台灯还亮着。她那边应该也还亮着。……随她吧。' },
-    { match: /奶茶|咖啡|喝|甜/, line: '那杯奶茶的空杯子还在桌上。……她喝得挺开心。啧。' },
-    { match: /累|困|学习|工作/, line: '耳机里还剩半首歌。……想听完，又怕她突然发消息。' },
-    { match: /想|爱|喜欢|梦/, line: '窗外那盏灯一直亮着。……和她家的灯有点像。' }
+    { match: /雨|下雨|伞/, lines: ['那把伞还挂在门口。……也不知道她淋着没有。反正我不会去送。', '雨下了又停。我盯着那把伞看了很久。……她到底带伞没有。'] },
+    { match: /夜|晚|睡|熬夜/, lines: ['台灯还亮着。她那边应该也还亮着。……随她吧。', '灯关了又开。睡不着。……她那边，大概也亮着。'] },
+    { match: /奶茶|咖啡|喝|甜/, lines: ['那杯奶茶的空杯子还在桌上。……她喝得挺开心。啧。', '今天的咖啡没加糖。……她倒是天天喝甜的。哼。'] },
+    { match: /累|困|学习|工作/, lines: ['耳机里还剩半首歌。……想听完，又怕她突然发消息。', '书摊在桌上，没合。……她今天大概也这样。'] },
+    { match: /想|爱|喜欢|梦/, lines: ['窗外那盏灯一直亮着。……和她家的灯有点像。', '今天风往这边吹。……忽然就想起她了。啧，关风什么事。'] }
   ];
+  var matches = [];
   for (var i = 0; i < pool.length; i++) {
-    if (pool[i].match.test(userTexts)) return pool[i];
+    if (pool[i].match.test(userTexts)) matches.push(pool[i]);
   }
-  return { line: '窗外的灯还亮着。……今天也在。' };
+  if (matches.length === 0) {
+    var defaultLines = [
+      '窗外的灯还亮着。……今天也在。',
+      '手机一直没响。……挺好。安静。',
+      '泡了杯茶，凉了也没喝。……在想今天的她。',
+      '在窗边站了一会儿。……风有点凉。她那边呢。'
+    ];
+    return defaultLines[seed % defaultLines.length];
+  }
+  var pick = matches[seed % matches.length];
+  return pick.lines[Math.floor(seed / matches.length) % pick.lines.length];
 }
 
 // 暗号检测

@@ -432,7 +432,7 @@ function showSecretNotes() {
   // === 性格化笔记标题 ===
   var headerIcon = isTsundere ? '📓' : isGentle ? '🌸' : '📋';
   var headerNote = isTsundere ? '（不是我想记，是怕忘了）' : isGentle ? '悄悄记录一些小事 ♡' : '';
-  var h = '<div style="font-size:11px;color:#bbb;padding:0 0 10px;">' + headerIcon + ' ' + charName + '的记事本 ' + headerNote + '</div>';
+  var h = '<div style="font-size:11px;color:#bbb;padding:0 0 10px;">' + headerIcon + ' 我的记事本 ' + headerNote + '</div>';
 
   // === 性格化观察函数 ===
   function getPersonalityObservation(type, extra) {
@@ -508,8 +508,8 @@ function showSecretNotes() {
     h += '<div class="secret-note-card" style="background:' + cardBg + ';">';
     h += '<div class="sn-time" style="color:' + cardColor + ';">📋 今日聊天摘要</div>';
     h += '<div style="font-size:12px;color:#555;line-height:1.8;">';
-    h += '今天和 ' + charName + ' 聊了 <strong>' + todayMsgs.length + '</strong> 条消息';
-    h += '（你 ' + userTodayMsgs.length + ' 条 · ' + charName + ' ' + aiTodayMsgs.length + ' 条）';
+    h += '今天她来找我说了 <strong>' + todayMsgs.length + '</strong> 条';
+    h += '（她说 ' + userTodayMsgs.length + ' 条 · 我回 ' + aiTodayMsgs.length + ' 条）';
     var firstMsg = todayMsgs[0];
     var lastMsg = todayMsgs[todayMsgs.length-1];
     if (firstMsg && firstMsg.time) {
@@ -526,6 +526,14 @@ function showSecretNotes() {
     h += '<br><span style="font-size:11px;color:#999;">' + getPersonalityObservation('default', todayMsgs.length > 5 ? 'many' : 'few') + '</span>';
     h += '</div></div>';
   }
+
+  // === 内心日记（已并入记事本） ===
+  var diaryArr = getInnerDiary(secretCharId) || [];
+  var diaryTitle = isTsundere ? '📖 内心日记（自己写的，别念出来）' : isGentle ? '📖 我的内心日记 ♡' : '📖 内心日记';
+  h += '<div class="secret-note-card">';
+  h += '<div class="sn-time">' + diaryTitle + '</div>';
+  h += _diaryEntriesHtml(diaryArr);
+  h += '</div>';
 
   // === 本周概况（性格化） ===
   if (weekMsgs.length > 0) {
@@ -570,7 +578,7 @@ function showSecretNotes() {
         escHtml(n.summary) + '</div>';
     });
   } else {
-    h += '<div style="font-size:12px;color:#bbb;padding:10px 0;text-align:center;">聊天几次后会自动生成记忆笔记<br><span style="font-size:11px;">AI会默默记住关于你的事</span></div>';
+    h += '<div style="font-size:12px;color:#bbb;padding:10px 0;text-align:center;">多聊几天，我会默默记住<br><span style="font-size:11px;">关于她的事，都收着呢</span></div>';
   }
   h += '</div>';
 
@@ -600,7 +608,7 @@ function showSecretNotes() {
     }
 
     h += '<div class="secret-note-card" style="background:' + thoughtBg + ';">';
-    h += '<div class="sn-time" style="color:' + thoughtColor + ';">' + thoughtEmoji + ' ' + charName + '在想</div>';
+    h += '<div class="sn-time" style="color:' + thoughtColor + ';">' + thoughtEmoji + ' 我在想</div>';
     h += '<div style="font-size:13px;color:#555;line-height:1.7;font-style:italic;">"' + observation + '"</div></div>';
   }
 
@@ -623,42 +631,67 @@ function showSecretNotes() {
       window._genMemoBusy = false;
     }, 500);
   }
+
+  // 确保今天有内心日记（懒生成，写完不重复）
+  // 今天已有但和前一天一模一样（旧版 bug 留下的重复）→ 也要强制重写
+  // 没聊过天时跳过，避免白调 AI
+  var todayStr = new Date().toISOString().split('T')[0];
+  var todayEntry = null;
+  var prevEntry = null;
+  for (var dii = 0; dii < diaryArr.length; dii++) {
+    if (diaryArr[dii].date === todayStr) todayEntry = diaryArr[dii];
+    else if (diaryArr[dii].date < todayStr && (!prevEntry || diaryArr[dii].date > prevEntry.date)) prevEntry = diaryArr[dii];
+  }
+  var needDiary = charMsgs.length > 0 && (!todayEntry || (todayEntry.content && prevEntry && todayEntry.content === prevEntry.content));
+  if (needDiary && !window._diaryBusy) {
+    window._diaryBusy = true;
+    setTimeout(async function() {
+      try {
+        await ensureInnerDiary(secretCharId, todayStr, true);
+        _refreshInnerDiaryCard();
+      } catch(e) {}
+      window._diaryBusy = false;
+    }, 400);
+  }
 }
 
-/* ---- 内心日记：查看角色每天的日记 ---- */
-async function showSecretInnerDiary() {
-  document.getElementById('secretDesk').style.display = 'none';
-  document.getElementById('secretContent').style.display = 'block';
-  document.getElementById('secretBackBtn').style.display = 'inline';
-  document.getElementById('secretTitle').textContent = '📖 内心日记';
-  const pName = getSecretCharName();
-  document.getElementById('secretAiName').textContent = pName;
-  const container = document.getElementById('secretContent');
-
-  // 当天没有则懒生成（防并发）
-  var arr = getInnerDiary(secretCharId);
-  var todayStr = new Date().toISOString().split('T')[0];
-  if (!arr.some(function(e) { return e.date === todayStr; }) && !window._diaryBusy) {
-    window._diaryBusy = true;
-    try {
-      await ensureInnerDiary(secretCharId, todayStr);
-    } catch(e) {}
-    window._diaryBusy = false;
-    arr = getInnerDiary(secretCharId);
+/* ---- 内心日记：在记事本里展示条目（第一人称） ---- */
+function _diaryEntriesHtml(arr) {
+  if (!arr || arr.length === 0) {
+    return '<div style="font-size:12px;color:#bbb;padding:10px 0;text-align:center;">聊聊天，让我记下每天的心事</div>';
   }
+  var html = '';
+  var lastContent = '';
+  arr.slice(-5).reverse().forEach(function(e) {
+    // 跳过连续重复的日记（旧版 bug 会连续两天写一样的内容）
+    if (e.content && e.content === lastContent) return;
+    lastContent = e.content;
+    var timeStr = e.date ? e.date.replace(/-/g, '.').slice(5) : '';
+    html += '<div style="font-size:13px;color:#555;padding:8px 0;border-bottom:1px solid #f5f5f5;line-height:1.7;white-space:pre-line;">' +
+      '<span style="color:#bbb;font-size:10px;">' + escHtml(timeStr) + (e.mood ? ' · ' + escHtml(e.mood) : '') + '</span><br>' +
+      escHtml(e.content) + '</div>';
+  });
+  return html;
+}
 
-  var h = '<div style="font-size:11px;color:#bbb;padding:0 0 10px;">📖 ' + pName + '的内心日记</div>';
-  if (arr.length === 0) {
-    h += '<div style="text-align:center;color:#aaa;font-size:14px;padding:40px 0;">还没有日记<br>聊聊天，让他记下今天的事</div>';
-  } else {
-    arr.slice().reverse().forEach(function(e) {
-      h += '<div class="secret-note-card" style="margin-bottom:10px;">' +
-        '<div class="sn-time" style="font-size:11px;color:#999;padding:8px 12px 2px;">' + escHtml(e.date) + (e.mood ? ' · ' + escHtml(e.mood) : '') + '</div>' +
-        '<div style="padding:6px 12px 12px;font-size:14px;line-height:1.8;color:#444;white-space:pre-line;">' + escHtml(e.content) + '</div>' +
-        '</div>';
-    });
+/* ---- 刷新记事本里的内心日记卡片（懒生成后原地更新，不重载整页） ---- */
+function _refreshInnerDiaryCard() {
+  var container = document.getElementById('secretContent');
+  if (!container) return;
+  var cards = container.querySelectorAll('.secret-note-card');
+  for (var ci = 0; ci < cards.length; ci++) {
+    var snTime = cards[ci].querySelector('.sn-time');
+    if (snTime && snTime.textContent.indexOf('内心日记') !== -1) {
+      var innerDivs = cards[ci].querySelectorAll('div');
+      for (var di = 0; di < innerDivs.length; di++) {
+        if (!innerDivs[di].classList.contains('sn-time') && innerDivs[di].parentNode === cards[ci]) {
+          innerDivs[di].innerHTML = _diaryEntriesHtml(getInnerDiary(secretCharId));
+          break;
+        }
+      }
+      break;
+    }
   }
-  container.innerHTML = h;
 }
 
 /* ---- 刷新当前页面的记忆笔记卡片（不重新加载整页） ---- */
@@ -687,7 +720,7 @@ function _refreshMemoryNotesCard() {
             escHtml(n.summary) + '</div>';
         });
       } else {
-        notesHtml = '<div style="font-size:12px;color:#bbb;padding:10px 0;text-align:center;">聊天几次后会自动生成记忆笔记<br><span style="font-size:11px;">AI会默默记住关于你的事</span></div>';
+        notesHtml = '<div style="font-size:12px;color:#bbb;padding:10px 0;text-align:center;">多聊几天，我会默默记住<br><span style="font-size:11px;">关于她的事，都收着呢</span></div>';
       }
       // 替换卡片内容区域（跳过标题行）
       var innerDivs = cards[ci].querySelectorAll('div');
