@@ -162,20 +162,32 @@ function trackNewMap(el, opts) {
   }
 }
 
-/* ---------- 定位 ---------- */
+/* ---------- 定位 ----------
+ * 有高德 key 时优先走「高德定位插件」：它先试浏览器 GPS，失败自动切高德服务定位(IP)——
+ * 国内无 Google 服务的安卓机(小米/华为/Edge等)也能拿到位置。没 key 才用裸浏览器定位。 */
 function getGeo() {
   return new Promise(function(resolve, reject) {
-    if (!navigator.geolocation) { reject(new Error('设备不支持定位')); return; }
-    // 先高精度快试；超时/失败后降级低精度重试（覆盖部分机型与网络环境）
-    function attempt(high, timeout, onFail) {
+    function rawGeo() {
+      if (!navigator.geolocation) { reject(new Error('设备不支持定位')); return; }
       navigator.geolocation.getCurrentPosition(
         function(pos) { resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }); },
-        function(err) { onFail(err); },
-        { enableHighAccuracy: high, timeout: timeout, maximumAge: 60000 }
+        function(err) { reject(err); },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
       );
     }
-    attempt(true, 12000, function() {
-      attempt(false, 25000, reject);
+    if (!amapCfg.jsKey) { rawGeo(); return; }
+    ensureAmap().then(function(ok) {
+      if (!ok) { rawGeo(); return; }
+      AMap.plugin('AMap.Geolocation', function() {
+        const g = new AMap.Geolocation({
+          enableHighAccuracy: true, timeout: 15000, GeoLocationFirst: true, maximumAge: 60000, showCircle: false
+        });
+        g.getCurrentPosition(function(status, result) {
+          if (status === 'complete' && result && result.position) {
+            resolve({ lat: result.position.getLat(), lng: result.position.getLng() });
+          } else rawGeo();
+        });
+      });
     });
   });
 }
@@ -317,23 +329,22 @@ function showTrackPage() {
   const sb = document.getElementById('trackViewSumBtn'); if (sb) sb.classList.remove('on');
 
   const listEl = document.getElementById('trackList');
-  if (trackChecks.length === 0) {
-    if (listEl) listEl.innerHTML = '<div class="track-empty">还没有打卡记录<br><span>刷一下 NFC 贴纸，或点右上角「📌 打卡」</span></div>';
-    const mapEl = document.getElementById('trackMap');
-    if (mapEl) mapEl.innerHTML = '<div class="track-map-empty">📍 你的足迹地图会出现在这里</div>';
-    window.__trackMap = null;
-    return;
-  }
   if (listEl) renderTrackList();
+
+  // 地图永远先建好（这样「选点」在空地图上也能用），有记录才往上铺点
   ensureAmap().then(function(ok) {
     const mapEl = document.getElementById('trackMap');
     if (!mapEl) return;
-    if (!ok) { mapEl.innerHTML = '<div class="track-map-empty">🗺️ 未配置高德 key，去 ⚙设置页 填一下就能看地图</div>'; return; }
+    if (!ok) {
+      mapEl.innerHTML = '<div class="track-map-empty">🗺️ 未配置高德 key，去 ⚙设置页 填一下就能看地图</div>';
+      window.__trackMap = null;
+      return;
+    }
     mapEl.innerHTML = '';
     const map = trackNewMap(mapEl, { zoom: 11, resizeEnable: true });
-    if (!map) return;
+    if (!map) { window.__trackMap = null; return; }
     window.__trackMap = map;
-    renderTrackMap(map);
+    if (trackChecks.length > 0) renderTrackMap(map);
   });
 }
 
@@ -368,6 +379,10 @@ function renderTrackMap(map) {
 
 function renderTrackList() {
   const el = document.getElementById('trackList');
+  if (trackChecks.length === 0) {
+    el.innerHTML = '<div class="track-empty">还没有打卡记录<br><span>点右上角「📌 打卡」用定位记录当前位置，或「🗺 选点」在地图上点一下</span></div>';
+    return;
+  }
   const sorted = trackChecks.slice().sort(function(a,b){ return b.time - a.time; });
   el.innerHTML = '<div class="track-list-count">共 ' + trackChecks.length + ' 次打卡</div>' +
     sorted.map(function(c) {
@@ -409,16 +424,20 @@ function manualCheckin() { startNfcCheckin(); }
 function enterPickMode() {
   trackToast('📌 在地图上点一个位置，就会打卡');
   navigateTo('page-track');
-  setTimeout(function() {
-    ensureAmap().then(function(ok) {
-      if (!ok) { trackToast('⚠️ 未配置高德 key，先到 ⚙设置页 填一下'); return; }
-      const map = window.__trackMap;
-      if (!map) { trackToast('地图还没加载好，等一下再点'); return; }
+  // 轮询等地图真正就绪（最多 ~8 秒），起来了再进入选点
+  let tries = 0;
+  const timer = setInterval(function() {
+    tries++;
+    if (window.__trackMap) {
+      clearInterval(timer);
       trackPickMode = true;
-      map.on('click', onTrackMapPick);
+      window.__trackMap.on('click', onTrackMapPick);
       trackToast('👆 点击地图选择打卡位置');
-    });
-  }, 400);
+    } else if (tries >= 16) {
+      clearInterval(timer);
+      trackToast('⚠️ 地图没起来，去 ⚙设置页 检查高德 key 和域名绑定');
+    }
+  }, 500);
 }
 function onTrackMapPick(e) {
   const map = window.__trackMap;
