@@ -166,11 +166,17 @@ function trackNewMap(el, opts) {
 function getGeo() {
   return new Promise(function(resolve, reject) {
     if (!navigator.geolocation) { reject(new Error('设备不支持定位')); return; }
-    navigator.geolocation.getCurrentPosition(
-      function(pos) { resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }); },
-      function(err) { reject(err); },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
-    );
+    // 先高精度快试；超时/失败后降级低精度重试（覆盖部分机型与网络环境）
+    function attempt(high, timeout, onFail) {
+      navigator.geolocation.getCurrentPosition(
+        function(pos) { resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }); },
+        function(err) { onFail(err); },
+        { enableHighAccuracy: high, timeout: timeout, maximumAge: 60000 }
+      );
+    }
+    attempt(true, 12000, function() {
+      attempt(false, 25000, reject);
+    });
   });
 }
 
@@ -230,19 +236,21 @@ function startNfcCheckin() {
   getGeo().then(function(pos) {
     return ensureAmap().then(function() { doCheckin(pos.lat, pos.lng); });
   }).catch(function(err) {
+    const errBtns = [
+      { t:'再试一次', f:'startNfcCheckin', cls:'primary' },
+      { t:'🗺 手动选点', f:'goManualPick', cls:'' },
+      { t:'完成', f:'closeTrackOverlay', cls:'ghost' }
+    ];
     if (err && (err.code === 1 || (err.message && err.message.indexOf('denied') >= 0))) {
-      setTrackState('🚫', '定位被拒绝了', '请在浏览器设置里允许访问位置，或点「手动选点」在地图上选');
-      setTrackActions([{ t:'再试一次', f:'startNfcCheckin', cls:'primary' }, { t:'手动选点', f:'goManualPick', cls:'' }, { t:'完成', f:'closeTrackOverlay', cls:'ghost' }]);
+      setTrackState('🚫', '定位被拒绝了', '允许浏览器获取位置，或直接用「手动选点」在地图上选');
     } else if (err && err.code === 2) {
-      setTrackState('🌐', '定位失败', '信号不太好，换个地方再试试');
-      setTrackActions([{ t:'再试一次', f:'startNfcCheckin', cls:'primary' }, { t:'完成', f:'closeTrackOverlay', cls:'' }]);
+      setTrackState('🌐', '定位失败', '当前环境拿不到 GPS，试试「手动选点」');
     } else if (err && err.code === 3) {
-      setTrackState('⏱', '定位超时', '位置没确认到，再试一次？');
-      setTrackActions([{ t:'再试一次', f:'startNfcCheckin', cls:'primary' }, { t:'完成', f:'closeTrackOverlay', cls:'' }]);
+      setTrackState('⏱', '定位超时', '拿不到位置，建议用「手动选点」在地图上点一下');
     } else {
       setTrackState('❌', '打卡失败', (err && err.message) || '未知错误');
-      setTrackActions([{ t:'再试一次', f:'startNfcCheckin', cls:'primary' }, { t:'完成', f:'closeTrackOverlay', cls:'' }]);
     }
+    setTrackActions(errBtns);
   });
 }
 
