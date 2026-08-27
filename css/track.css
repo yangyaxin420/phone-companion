@@ -1,11 +1,21 @@
 /* ==================== 足迹 · NFC 打卡站 ==================== */
 
-/* 足迹页头部小按钮 */
-.track-hbtn{
-  font-size:12px;padding:5px 10px;border:1px solid #BAE6FD;border-radius:10px;
-  background:#fff;color:#555;cursor:pointer;font-weight:600;line-height:1.2;
+/* 足迹页工具栏（一行，纯文字按钮） */
+.track-toolbar{
+  display:flex;align-items:center;gap:8px;padding:10px 16px;
+  border-bottom:1px solid #E0F2FE;background:#F0F9FF;flex-shrink:0;
 }
-.track-hbtn.on{background:#0EA5E9;border-color:#0EA5E9;color:#fff;}
+.track-tbtn{
+  padding:8px 15px;border-radius:10px;border:1px solid #BAE6FD;background:#fff;
+  color:#333;font-size:13px;font-weight:600;cursor:pointer;line-height:1.2;
+}
+.track-tbtn:active{background:#E0F2FE;}
+.track-seg{display:flex;background:#E0F2FE;border-radius:10px;padding:2px;margin-left:auto;}
+.track-seg button{
+  padding:7px 14px;border:none;border-radius:8px;background:transparent;color:#8aa;
+  font-size:12px;font-weight:600;cursor:pointer;line-height:1.2;
+}
+.track-seg button.on{background:#fff;color:#0EA5E9;box-shadow:0 1px 3px rgba(14,165,233,.25);}
 
 .track-page{padding:12px 14px 24px;}
 
