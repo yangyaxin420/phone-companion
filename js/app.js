@@ -2,6 +2,7 @@
 const ICONS = [
   { id:'chat',     symbol:'▷', name:'聊天',  page:'page-conv-list' },
   { id:'daily',    symbol:'📋', name:'日报',  page:'page-daily' },
+  { id:'track',    symbol:'🧭', name:'足迹',  page:'page-track' },
   { id:'tasks',    symbol:'☑', name:'任务',  page:'page-tasks' },
   { id:'companion',symbol:'⟳', name:'专注',  page:'page-companion' },
   { id:'moments',  symbol:'○', name:'朋友圈',page:'page-moments' },
@@ -64,6 +65,7 @@ function navigateTo(pageId, skipAnim) {
   if (pageId === 'page-conv-list') renderConvList();
   if (pageId === 'page-secret') showSecretDesk();
   if (pageId === 'page-daily') showDaily();
+  if (pageId === 'page-track' && typeof showTrackPage === 'function') showTrackPage();
   if (pageId === 'page-expense') renderExpenseCats();
   if (pageId === 'page-persona') loadUserPersona();
   if (pageId === 'page-settings') loadSettings();

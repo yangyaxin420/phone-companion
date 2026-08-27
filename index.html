@@ -9,9 +9,10 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="theme-color" content="#F8FAFC">
-<meta name="app-version" content="v4.2.2 (2026.08.25)">
+<meta name="app-version" content="v4.3.0 (2026.08.27)">
 <title>我的手机</title>
-<link rel="stylesheet" href="css/style.css?v=18">
+<link rel="stylesheet" href="css/style.css?v=19">
+<link rel="stylesheet" href="css/track.css?v=19">
 </head>
 <body>
 
@@ -289,6 +290,25 @@
     </div>
     <div class="sub-page-body">
       <div class="moments-list" id="momentsList"></div>
+    </div>
+  </div>
+
+  <!-- ===== 足迹 ===== -->
+  <div class="page" id="page-track">
+    <div class="sub-page-header flex-between">
+      <span>🧭 足迹</span>
+      <div class="flex-gap6">
+        <button class="track-hbtn" onclick="manualCheckin()">📌 打卡</button>
+        <button class="track-hbtn on" id="trackViewListBtn" onclick="switchTrackView('list')">🗺 列表</button>
+        <button class="track-hbtn" id="trackViewSumBtn" onclick="switchTrackView('summary')">📊 年度</button>
+      </div>
+    </div>
+    <div class="track-page">
+      <div class="track-view" id="trackViewList">
+        <div class="track-map" id="trackMap"></div>
+        <div class="track-list" id="trackList"></div>
+      </div>
+      <div class="track-view" id="trackViewSummary" style="display:none;"></div>
     </div>
   </div>
 
@@ -574,6 +594,25 @@
         </div>
       </div>
 
+      <!-- 高德地图配置 -->
+      <div class="settings-card">
+        <div class="settings-section-title">🗺️ 高德地图（足迹打卡用）</div>
+        <div class="persona-field" style="margin-bottom:8px;">
+          <label>JS API Key</label>
+          <input type="password" id="amapJsKey" placeholder="console.amap.com 申请">
+        </div>
+        <div class="persona-field" style="margin-bottom:8px;">
+          <label>安全密钥 (jscode)</label>
+          <input type="password" id="amapJsCode" placeholder="key 详情里的安全密钥">
+        </div>
+        <div class="persona-field" style="margin-bottom:8px;">
+          <label>Web服务 Key（逆地理兜底）</label>
+          <input type="password" id="amapWebKey" placeholder="可选">
+        </div>
+        <button class="persona-save" onclick="saveAmapConfig()">💾 保存地图配置</button>
+        <div style="font-size:10px;color:#aaa;text-align:center;margin-top:6px;">💡 JS Key 需在应用里绑定域名 <b>yangyaxin420.github.io</b></div>
+      </div>
+
       <!-- 数据管理 -->
       <div class="settings-card">
         <div class="settings-section-title">💾 数据管理</div>
@@ -687,25 +726,37 @@
   </div>
 </div>
 
+<!-- NFC 打卡 overlay -->
+<div class="track-overlay" id="trackOverlay" style="display:none;" onclick="if(event.target===this)closeTrackOverlay()">
+  <div class="track-card">
+    <div class="track-state-icon" id="trackStateIcon">📍</div>
+    <div class="track-state-title" id="trackStateTitle">准备打卡…</div>
+    <div class="track-state-sub" id="trackStateSub"></div>
+    <div id="trackResultBox"></div>
+    <div class="track-actions" id="trackActions"></div>
+  </div>
+</div>
+
 
 </div><!-- phone-screen -->
 </div><!-- phone-frame -->
 
 <!-- script moved to external files -->
-<script src="js/utils.js?v=18"></script>
-    <script src="js/photo.js?v=18"></script>
-<script src="js/app.js?v=18"></script>
-<script src="js/weather.js?v=18"></script>
-<script src="js/tasks.js?v=18"></script>
-<script src="js/expense.js?v=18"></script>
-<script src="js/chat.js?v=18"></script>
-<script src="js/secret.js?v=18"></script>
-<script src="js/moments.js?v=18"></script>
-<script src="js/persona.js?v=18"></script>
-<script src="js/daily.js?v=18"></script>
-<script src="js/tide.js?v=18"></script>
-<script src="js/companion.js?v=18"></script>
-<script src="js/settings.js?v=18"></script>
+<script src="js/utils.js?v=19"></script>
+    <script src="js/photo.js?v=19"></script>
+<script src="js/app.js?v=19"></script>
+<script src="js/weather.js?v=19"></script>
+<script src="js/tasks.js?v=19"></script>
+<script src="js/expense.js?v=19"></script>
+<script src="js/chat.js?v=19"></script>
+<script src="js/secret.js?v=19"></script>
+<script src="js/moments.js?v=19"></script>
+<script src="js/persona.js?v=19"></script>
+<script src="js/daily.js?v=19"></script>
+<script src="js/tide.js?v=19"></script>
+<script src="js/companion.js?v=19"></script>
+<script src="js/settings.js?v=19"></script>
+<script src="js/track.js?v=19"></script>
 <script>
 /* ==================== 初始化 ==================== */
 function init() {
@@ -753,6 +804,8 @@ function init() {
   preloadEmojiImages();
   // 天气
   if (weatherCity) fetchWeather();
+  // NFC 足迹：?nfc=1 自动进入打卡
+  if (typeof initTrack === 'function') initTrack();
 }
 init();
  // 清理旧 Service Worker（解决缓存问题）

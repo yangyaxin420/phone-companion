@@ -1,5 +1,5 @@
 /* ==================== 设置页 ==================== */
-const APP_VERSION = "v4.2.2 (2026.08.25)";
+const APP_VERSION = "v4.3.0 (2026.08.27)";
 
 const DEFAULT_SETTINGS = {
   proactiveMsg: true,
@@ -29,6 +29,8 @@ function loadSettings() {
   if (apiKeyInput && apiConfig) {
     apiKeyInput.value = apiConfig.apiKey || '';
   }
+  // 加载高德地图配置（足迹用）
+  if (typeof loadAmapSettings === 'function') loadAmapSettings();
 }
 
 function toggleSetting(el, key) {
