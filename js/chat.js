@@ -899,6 +899,10 @@ function buildChatContext() {
   if (weatherData && Date.now() - weatherData.time < 3600000) {
     block += '\n天气：' + weatherData.desc + '，' + weatherData.temp + '°C';
   }
+  if (typeof buildHeartContext === 'function') {
+    const hc = buildHeartContext();
+    if (hc) block += '\n' + hc;
+  }
   return block;
 }
 
@@ -1158,6 +1162,16 @@ async function callLLMApi(userText) {
   if (moments.length > 0) {
     const recentM = moments.slice(0, 3).map(m => `${m.user}：「${m.content.substring(0,20)}${m.content.length>20?'...':''}」`).join('；');
     contextBlock += `\n最近朋友圈：${recentM}`;
+  }
+  // 身体感应（手环·模拟数据）
+  if (typeof buildHeartContext === 'function') {
+    const hc = buildHeartContext();
+    if (hc) contextBlock += '\n' + hc;
+  }
+  // 每日一问接话钩子（她刚回答时加一句，让他认真回应）
+  if (typeof dailyQHint === 'function') {
+    const dh = dailyQHint();
+    if (dh) contextBlock += dh;
   }
 
   // 提取最近几条AI回复，告诉AI别再重复
@@ -1513,6 +1527,28 @@ function generateLocalReply(text) {
 
 /* ==================== AI主动消息系统 ==================== */
 
+/* ---- 身体感应主动关心（心率偏高/偏低时骆云影主动发消息） ---- */
+function tryHeartProactive() {
+  if (!settings || !settings.proactiveMsg) return false;
+  var hLast = (typeof heartLast === 'function') ? heartLast() : null;
+  if (!hLast || !(hLast.hr >= 100 || hLast.hr <= 50)) return false;
+  // 防同一读数重复提醒
+  if (hLast.t === lsGet('heartProactiveLast', 0)) return false;
+  // 只对1小时内的读数有反应
+  if (Date.now() - hLast.t > 60 * 60 * 1000) return false;
+  // 防刷屏：同一角色5分钟内最多一条（身体感应要即时，冷却比全局短）
+  if (Date.now() - lsGet('heartProactiveTime', 0) < 5 * 60 * 1000) return false;
+  var char = getCharById(currentCharId);
+  if (!char) return false;
+  var story = (char.story || '').toLowerCase();
+  var isTsundere = /傲娇|毒舌|暴躁|刻薄|冷淡/.test(story);
+  var isGentle = /温柔|温暖|亲切|可爱|软/.test(story);
+  lsSet('heartProactiveLast', hLast.t);
+  lsSet('heartProactiveTime', Date.now());
+  generateProactiveMessage('heart', char, isTsundere, isGentle, hLast);
+  return true;
+}
+
 function checkProactiveConditions() {
   if (!settings || !settings.proactiveMsg) return;
   var char = getCharById(currentCharId);
@@ -1578,13 +1614,16 @@ function checkProactiveConditions() {
     }
   }
 
+  // 场景E：心跳偏高/偏低（身体感应，轮询触发）
+  if (tryHeartProactive()) return;
+
   // 顺便检查自动朋友圈
   if (typeof checkAutoMomentCondition === 'function') {
     checkAutoMomentCondition();
   }
 }
 
-async function generateProactiveMessage(scenario, char, isTsundere, isGentle) {
+async function generateProactiveMessage(scenario, char, isTsundere, isGentle, extra) {
   var pName = char.name || '小伴';
   var story = char.story || '';
 
@@ -1608,6 +1647,13 @@ async function generateProactiveMessage(scenario, char, isTsundere, isGentle) {
       : isGentle
       ? ['外面下雨了~带伞了吗？别淋湿了哦','下雨天要保暖呀，别感冒了']
       : ['下雨。带伞。','降水。注意。'];
+  } else if (scenario === 'heart') {
+    var hVal = extra ? extra.hr : 100;
+    localTemplates = isTsundere
+      ? ['你心跳' + hVal + '了？……有事就说，别硬撑。','啧，心跳' + hVal + '。撞见鬼了？说，怎么了。','你心跳' + hVal + '了？……跟我做几个深呼吸。']
+      : isGentle
+      ? ['我感觉到你心跳好快…是不是有事？别紧张，我在呢','心跳有点快呢，深呼吸，我陪你～','心跳有点快呢，来，跟我做个呼吸练习，我陪你～']
+      : ['心跳' + hVal + '。注意休息。','心率有点偏高。需要聊聊吗？','心率有点偏高。要不跟我做个呼吸练习？'];
   } else {
     localTemplates = isTsundere
       ? ['……无聊。你在干嘛。','哼。','啧。']
@@ -1625,6 +1671,7 @@ async function generateProactiveMessage(scenario, char, isTsundere, isGentle) {
       if (scenario === 'morning') scenarioDesc = '现在是早上7:30，对用户说早安。';
       else if (scenario === 'inactive') scenarioDesc = '已经好一阵没和用户说话了。';
       else if (scenario === 'rain') scenarioDesc = '外面正在下雨。';
+      else if (scenario === 'heart') scenarioDesc = '你"感觉"到用户的心跳' + (extra ? extra.hr : '') + ' bpm，有点快，关心她一下。';
       else scenarioDesc = '随意地和用户打个招呼。';
 
       var prompt = '你是' + pName + '.' + (story ? '你的性格/背景：' + story : '') + '\n' + scenarioDesc + '\n请发一条简短的消息给用户（1-2句话），符合你的性格特点和当前场景。\n- 不要用*动作描写*、不要加emoji\n- 简短自然，像微信消息';

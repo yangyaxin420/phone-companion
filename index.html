@@ -8,11 +8,11 @@
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
-<meta name="theme-color" content="#F8FAFC">
-<meta name="app-version" content="v4.3.3 (2026.08.27)">
+<meta name="theme-color" content="#ecf6f8">
+<meta name="app-version" content="v4.8.0 (2026.09.01)">
 <title>我的手机</title>
-<link rel="stylesheet" href="css/style.css?v=22">
-<link rel="stylesheet" href="css/track.css?v=22">
+<link rel="stylesheet" href="css/style.css?v=35">
+<link rel="stylesheet" href="css/track.css?v=35">
 </head>
 <body>
 
@@ -256,6 +256,7 @@
       <div class="chat-input-bar">
         <button class="emoji-btn" id="emojiToggle" onclick="toggleEmojiPanel()">😊</button>
         <button class="emoji-btn" id="diceToggle" onclick="toggleDiceMenu()" style="font-size:18px;">🎲</button>
+        <button class="emoji-btn" id="dailyQBtn" onclick="askDailyQuestion()" style="font-size:16px;" title="今日一问">💭</button>
         <div class="chat-dice-menu" id="diceMenu">
           <button onclick="sendDice()">🎲 掷骰子</button>
           <button onclick="sendLottery()">🎯 抽签</button>
@@ -486,6 +487,97 @@
         <div class="tide-mood-options" id="tideMoodOptions"></div>
         <button class="tide-btn tide-btn-secondary" style="width:100%;margin-top:8px;" onclick="document.getElementById('tideMoodPicker').style.display='none'">关闭</button>
       </div>
+    </div>
+  </div>
+
+  <!-- ===== 心跳（手环·模拟数据） ===== -->
+  <div class="page" id="page-heart">
+    <div class="sub-page-header flex-between">
+      <span>💓 心跳</span>
+      <span id="heartStatus" class="heart-badge">模拟数据</span>
+    </div>
+    <div class="heart-page">
+      <!-- 当前读数 -->
+      <div class="heart-card">
+        <div class="heart-halo"><div class="heart-beat" id="heartBeatAnim">💓</div></div>
+        <div class="heart-bpm"><span id="heartBpm">--</span><span class="heart-unit">bpm</span></div>
+        <div class="heart-temp-line"><span class="heart-temp" id="heartTemp">--°C</span><span class="heart-dot">·</span><span class="heart-updated" id="heartUpdated">--</span></div>
+        <div class="heart-state-desc" id="heartStateDesc"></div>
+      </div>
+      <!-- 操作 -->
+      <div class="heart-actions">
+        <button class="heart-measure" onclick="heartMeasureNow()">📡 测一次</button>
+        <button class="heart-toggle" id="heartToggleBtn" onclick="toggleHeartSampling()">自动采样：开</button>
+      </div>
+      <!-- 呼吸练习 + 手环预览 + 健康周报 -->
+      <div class="heart-actions-mini">
+        <button class="heart-breathe" id="heartBreatheBtn" onclick="startBreathing()">🌬 呼吸练习</button>
+        <button class="heart-band" onclick="openBandPreview()">⌚ 手环预览</button>
+        <button class="heart-report" id="healthReportBtn" onclick="generateHealthReport()">📋 健康周报</button>
+      </div>
+      <!-- 今日步数（模拟/手机计步） -->
+      <div class="steps-card">
+        <div class="steps-head">
+          <span>🚶 今日步数</span>
+          <span class="steps-mode" id="stepMode">○ 模拟</span>
+        </div>
+        <div class="steps-numline">
+          <span class="steps-num" id="stepCount">0</span>
+          <span class="steps-unit">步</span>
+          <span class="steps-target">/ 8000</span>
+        </div>
+        <div class="steps-track"><div class="steps-bar" id="stepBar"></div></div>
+        <div class="steps-foot">
+          <span class="steps-week">本周 <b id="stepWeekCount">0</b> 步</span>
+          <button class="steps-bump" onclick="stepsDemoBump()">🚶 走几步</button>
+        </div>
+      </div>
+      <div id="healthReportWrap" style="display:none;margin-top:12px;"></div>
+      <!-- 今日统计 -->
+      <div class="heart-stats">
+        <div class="heart-stat"><div class="heart-num" id="heartTodayCount">0</div><div class="hs-label">今日采样</div></div>
+        <div class="heart-stat"><div class="heart-num" id="heartAvgHr">--</div><div class="hs-label">平均</div></div>
+        <div class="heart-stat"><div class="heart-num" id="heartMaxHr">--</div><div class="hs-label">最高</div></div>
+      </div>
+      <!-- 趋势 -->
+      <div class="heart-section-title">📈 心率趋势</div>
+      <div class="heart-spark-wrap"><canvas id="heartSpark" width="300" height="90" style="width:100%;height:90px;"></canvas></div>
+      <!-- 历史（折叠，点开才显示） -->
+      <div class="heart-history-head" onclick="toggleHeartHistory()">
+        <span>🕐 最近记录</span>
+        <span class="heart-history-meta"><span id="heartHistoryCount">0</span> 条 <span class="heart-chevron" id="heartChevron">▾</span></span>
+      </div>
+      <div id="heartHistory" style="display:none;"></div>
+      <div style="font-size:10px;color:#ccc;text-align:center;padding:10px 0;">🧷 手环未连接 · 当前为模拟数据<br>等手环做好后，这里会换成真实数据</div>
+    </div>
+  </div>
+
+  <!-- ===== 手环屏幕预览 ===== -->
+  <div class="page" id="page-band">
+    <div class="sub-page-header">⌚ 手环屏幕预览</div>
+    <div class="band-page">
+      <div class="band-hint">手环 0.96" OLED 会显示的样子：时间 · 心形按心跳鼓动 · 心电图滚动 · 体温<br>硬件做好后，这颗小屏幕就这么跑</div>
+      <div class="band-oled">
+        <canvas id="bandEcg" width="128" height="64"></canvas>
+      </div>
+      <div class="band-status" id="bandStatus">○ 模拟数据</div>
+      <div class="band-btns">
+        <button class="heart-measure" onclick="bandReMeasure()">📡 模拟一次读数</button>
+        <button class="band-back" onclick="goBack()">返回</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 晚安故事 ===== -->
+  <div class="page" id="page-story">
+    <div class="sub-page-header">🌙 晚安故事</div>
+    <div class="sub-page-body" style="padding:14px 16px;overflow-y:auto;">
+      <div style="font-size:12px;color:#999;line-height:1.7;margin-bottom:12px;">
+        每晚，骆云影给你编一个睡前故事。<br>他会悄悄看你最近的日记和心情，织进故事里。
+      </div>
+      <button id="storyBtn" onclick="generateNightStory()" style="width:100%;padding:12px;border:none;border-radius:14px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;font-size:14px;font-weight:600;cursor:pointer;">🌙 今晚的故事</button>
+      <div id="storyResult" style="margin-top:14px;"></div>
+      <div id="storyList" style="margin-top:14px;"></div>
     </div>
   </div>
 
@@ -738,26 +830,50 @@
   </div>
 </div>
 
+<!-- 呼吸练习 overlay（4-7-8，骆云影陪你） -->
+<div class="breathe-overlay" id="breatheOverlay" style="display:none;">
+  <div class="breathe-box">
+    <div class="breathe-title" id="breatheTitle">骆云影陪你 4-7-8 呼吸</div>
+    <div class="breathe-circle" id="breatheCircle">
+      <div class="breathe-phase" id="breathePhase">吸气</div>
+      <div class="breathe-count" id="breatheCount">4</div>
+    </div>
+    <div class="breathe-rounds" id="breatheRounds">第 1 轮 / 共 4 轮</div>
+    <div class="breathe-done" id="breatheDone" style="display:none;">
+      <div class="breathe-done-text">做完啦 🧘 再测一次，看看心跳缓下来没</div>
+      <button class="heart-measure" onclick="breatheFinishAndMeasure()">📡 测一下现在的脉搏</button>
+    </div>
+    <button class="breathe-close" id="breatheCloseBtn" onclick="stopBreathing()">结束</button>
+  </div>
+</div>
+
 
 </div><!-- phone-screen -->
 </div><!-- phone-frame -->
 
 <!-- script moved to external files -->
-<script src="js/utils.js?v=22"></script>
-    <script src="js/photo.js?v=22"></script>
-<script src="js/app.js?v=22"></script>
-<script src="js/weather.js?v=22"></script>
-<script src="js/tasks.js?v=22"></script>
-<script src="js/expense.js?v=22"></script>
-<script src="js/chat.js?v=22"></script>
-<script src="js/secret.js?v=22"></script>
-<script src="js/moments.js?v=22"></script>
-<script src="js/persona.js?v=22"></script>
-<script src="js/daily.js?v=22"></script>
-<script src="js/tide.js?v=22"></script>
-<script src="js/companion.js?v=22"></script>
-<script src="js/settings.js?v=22"></script>
-<script src="js/track.js?v=22"></script>
+<script src="js/utils.js?v=35"></script>
+    <script src="js/photo.js?v=35"></script>
+<script src="js/app.js?v=35"></script>
+<script src="js/weather.js?v=35"></script>
+<script src="js/tasks.js?v=35"></script>
+<script src="js/expense.js?v=35"></script>
+<script src="js/chat.js?v=35"></script>
+<script src="js/question.js?v=35"></script>
+<script src="js/secret.js?v=35"></script>
+<script src="js/moments.js?v=35"></script>
+<script src="js/persona.js?v=35"></script>
+<script src="js/daily.js?v=35"></script>
+<script src="js/tide.js?v=35"></script>
+<script src="js/companion.js?v=35"></script>
+<script src="js/settings.js?v=35"></script>
+<script src="js/track.js?v=35"></script>
+<script src="js/heart.js?v=35"></script>
+<script src="js/steps.js?v=35"></script>
+<script src="js/report.js?v=35"></script>
+<script src="js/breathe.js?v=35"></script>
+<script src="js/band.js?v=35"></script>
+<script src="js/story.js?v=35"></script>
 <script>
 /* ==================== 初始化 ==================== */
 function init() {
@@ -807,6 +923,14 @@ function init() {
   if (weatherCity) fetchWeather();
   // NFC 足迹：?nfc=1 自动进入打卡
   if (typeof initTrack === 'function') initTrack();
+  // 心跳（手环·模拟数据）
+  if (typeof initHeart === 'function') initHeart();
+  // 步数（模拟/手机计步）
+  if (typeof initSteps === 'function') initSteps();
+  // ?heart=1 直接进心跳页（调试/快捷入口）
+  if (typeof URLSearchParams !== 'undefined' && new URLSearchParams(location.search).get('heart') === '1') {
+    navigateTo('page-heart', true);
+  }
 }
 init();
  // 清理旧 Service Worker（解决缓存问题）

@@ -9,6 +9,8 @@ const ICONS = [
   { id:'secret',   symbol:'◎', name:'Secret',page:'page-secret' },
   { id:'expense',  symbol:'￥', name:'记账',  page:'page-expense' },
   { id:'tide',     symbol:'☽', name:'潮汐',  page:'page-tide' },
+  { id:'heart',    symbol:'💓', name:'心跳',  page:'page-heart' },
+  { id:'story',    symbol:'🌙', name:'晚安',  page:'page-story' },
   { id:'persona',  symbol:'≡', name:'人设',  page:'page-persona' },
   { id:'settings', symbol:'⚙', name:'设置',  page:'page-settings' }
 ];
@@ -141,6 +143,8 @@ function updateChatContext() {
       else if (daysUntil < 0 && daysUntil >= -7) { tags.push('☽'); details.push('经期中'); }
     }
   }
+  const hLast = (typeof heartLast === 'function') ? heartLast() : null;
+  if (hLast) { tags.push('💓' + hLast.hr); details.push('心跳：' + hLast.hr + ' bpm · 体温 ' + hLast.temp.toFixed(1) + '°C'); }
   summary.textContent = tags.length > 0 ? tags.join(' ') : '无状态数据';
   detail.innerHTML = details.length > 0 ? details.join('<br>') : '暂无数据';
 }

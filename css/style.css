@@ -8,13 +8,13 @@ input,textarea,select{font:inherit;color:inherit;border:none;outline:none;backgr
 ul{list-style:none;}
 
 /* ==================== 2. 手机外壳 ==================== */
-.phone-frame{width:375px;height:700px;max-height:100dvh;border-radius:44px;background:#EFF6FF;position:relative;overflow:hidden;box-shadow:0 0 0 8px #222,0 0 40px rgba(0,0,0,.6),inset 0 0 2px rgba(255,255,255,.1);}
+.phone-frame{width:375px;height:700px;max-height:100dvh;border-radius:44px;background:#d0e6ee;position:relative;overflow:hidden;box-shadow:0 0 0 8px #222,0 0 40px rgba(0,0,0,.6),inset 0 0 2px rgba(255,255,255,.1);}
 .phone-screen{width:100%;height:100%;display:flex;flex-direction:column;position:relative;}
 
 /* 壁纸底纹 */
 .wallpaper{
   position:absolute;inset:0;pointer-events:none;z-index:0;
-  background:linear-gradient(170deg, #EFF6FF 0%, #DBEAFE 100%);
+  background:linear-gradient(170deg, #d0e6ee 0%, #ecf6f8 100%);
   background-size:cover;
 }
 
@@ -30,7 +30,7 @@ ul{list-style:none;}
 }
 
 /* ==================== 3. 状态栏 ==================== */
-.status-bar{position:relative;z-index:2;height:32px;padding:0 24px;display:flex;align-items:center;justify-content:space-between;font-size:11px;font-weight:500;color:#A0AEC0;flex-shrink:0;}
+.status-bar{position:relative;z-index:2;height:32px;padding:0 24px;display:flex;align-items:center;justify-content:space-between;font-size:11px;font-weight:500;color:#a6ccdd;flex-shrink:0;}
 .status-bar .sb-time{font-weight:600;}
 .status-bar .sb-icons{display:flex;gap:4px;font-size:10px;}
 
@@ -60,27 +60,27 @@ ul{list-style:none;}
 .anim-out-right{animation:slideOutRight .28s ease forwards}
 
 /* ==================== 6. 底部导航 ==================== */
-.bottom-nav{position:relative;z-index:2;height:52px;background:rgba(240,249,255,.8);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);display:flex;align-items:center;justify-content:space-around;padding:0 16px;flex-shrink:0;}
-.bottom-nav button{padding:4px 12px;border-radius:20px;transition:all .15s;opacity:.5;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:18px;background:none;border:none;cursor:pointer;color:#A0AEC0;}
+.bottom-nav{position:relative;z-index:2;height:52px;background:rgba(236,246,248,.85);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);display:flex;align-items:center;justify-content:space-around;padding:0 16px;flex-shrink:0;}
+.bottom-nav button{padding:4px 12px;border-radius:20px;transition:all .15s;opacity:.5;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:18px;background:none;border:none;cursor:pointer;color:#a6ccdd;}
 .bottom-nav button:active{transform:scale(.92);}
-.bottom-nav button.nav-enabled{opacity:1;color:#2D3748;}
+.bottom-nav button.nav-enabled{opacity:1;color:#4a7ba6;}
 .bottom-nav button.nav-disabled{opacity:.2;pointer-events:none;}
-.nav-label{font-size:9px;color:#A0AEC0;letter-spacing:.3px;}
+.nav-label{font-size:9px;color:#a6ccdd;letter-spacing:.3px;}
 
 /* ==================== 7. 主页 ==================== */
 .main-content{position:relative;z-index:1;flex:1;display:flex;flex-direction:column;padding:12px 16px 0;overflow-y:auto;}
 .greeting{padding:0 8px 10px;}
-.greeting .date{font-size:11px;color:#A0AEC0;font-weight:400;}
-.greeting .hello{font-size:18px;color:#2D3748;font-weight:600;margin-top:2px;}
-.greeting .hello span{color:#A0AEC0;font-weight:400;font-size:13px;}
+.greeting .date{font-size:11px;color:#a6ccdd;font-weight:400;}
+.greeting .hello{font-size:18px;color:#4a7ba6;font-weight:600;margin-top:2px;}
+.greeting .hello span{color:#a6ccdd;font-weight:400;font-size:13px;}
 
 /* 天气卡片 */
 .home-cards-row{display:flex;gap:10px;padding:0 8px 12px;}
-.weather-card{flex:2;min-width:0;padding:10px 12px;background:#FFFFFF;border-radius:14px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 1px 3px rgba(0,0,0,.05);cursor:pointer;transition:transform .1s;}
+.weather-card{flex:2;min-width:0;padding:10px 12px;background:#ecf6f8;border:1px solid #a6ccdd;border-radius:14px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 12px rgba(166,204,221,.35);cursor:pointer;transition:transform .1s;}
 .weather-card:active{transform:scale(.98);}
-.weather-info{font-size:11px;color:#A0AEC0;line-height:1.5;}
-.weather-info .temp{font-size:20px;font-weight:300;color:#2D3748;letter-spacing:-1px;}
-.weather-info .weather-detail{font-size:10px;color:#A0AEC0;margin-top:1px;}
+.weather-info{font-size:11px;color:#a6ccdd;line-height:1.5;}
+.weather-info .temp{font-size:20px;font-weight:300;color:#4a7ba6;letter-spacing:-1px;}
+.weather-info .weather-detail{font-size:10px;color:#a6ccdd;margin-top:1px;}
 .weather-icon{font-size:22px;}
 .weather-loading{font-size:11px;color:#A0AEC0;}
 
@@ -90,20 +90,20 @@ ul{list-style:none;}
 .app-item:active{transform:scale(.92);}
 .app-item.dragging{opacity:.4;}
 .app-item.drag-over .app-icon{border-color:#A0AEC0;box-shadow:0 0 0 2px rgba(160,174,192,.3);transform:scale(1.05);}
-.app-icon{width:52px;height:52px;background:#FFFFFF;border-radius:14px;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,.04);position:relative;transition:box-shadow .2s;}
-.app-item:hover .app-icon{box-shadow:0 2px 8px rgba(0,0,0,.06);}
-.app-badge{position:absolute;top:-4px;right:-4px;background:#A0AEC0;color:#fff;font-size:9px;min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 4px;font-weight:500;}
-.app-name{font-size:11px;color:#718096;text-align:center;line-height:1.3;}
+.app-icon{width:52px;height:52px;background:#ecf6f8;border:1px solid #a6ccdd;border-radius:14px;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(166,204,221,.3);position:relative;transition:box-shadow .2s;}
+.app-item:hover .app-icon{box-shadow:0 2px 10px rgba(166,204,221,.45);}
+.app-badge{position:absolute;top:-4px;right:-4px;background:#a6ccdd;color:#fff;font-size:9px;min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 4px;font-weight:500;}
+.app-name{font-size:11px;color:#a6ccdd;text-align:center;line-height:1.3;}
 
 /* 倒数日卡片 */
-.countdown-card{flex:1;min-width:0;background:#FFFFFF;border-radius:14px;padding:10px 12px;cursor:pointer;position:relative;overflow:hidden;transition:transform .1s;box-shadow:0 1px 3px rgba(0,0,0,.05);}
+.countdown-card{flex:1;min-width:0;background:#ecf6f8;border:1px solid #a6ccdd;border-radius:14px;padding:10px 12px;cursor:pointer;position:relative;overflow:hidden;transition:transform .1s;box-shadow:0 2px 12px rgba(166,204,221,.35);}
 .countdown-card:active{transform:scale(.98);}
 .countdown-card .cd-bg{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;opacity:.12;border-radius:14px;}
 .countdown-card .cd-content{position:relative;z-index:1;}
-.countdown-card .cd-event{font-size:12px;font-weight:500;color:#718096;margin-bottom:2px;}
-.countdown-card .cd-days{font-size:22px;font-weight:700;color:#2D3748;letter-spacing:-1px;}
-.countdown-card .cd-date{font-size:10px;color:#A0AEC0;margin-top:1px;}
-.countdown-card .cd-unit{font-size:14px;font-weight:400;color:#A0AEC0;margin-left:4px;}
+.countdown-card .cd-event{font-size:12px;font-weight:500;color:#a6ccdd;margin-bottom:2px;}
+.countdown-card .cd-days{font-size:22px;font-weight:700;color:#4a7ba6;letter-spacing:-1px;}
+.countdown-card .cd-date{font-size:10px;color:#a6ccdd;margin-top:1px;}
+.countdown-card .cd-unit{font-size:14px;font-weight:400;color:#a6ccdd;margin-left:4px;}
 
 /* 倒数日编辑 */
 .cd-edit{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;z-index:100;}
@@ -630,5 +630,79 @@ ul{list-style:none;}
 .secret-icon .si-symbol{box-shadow:0 1px 3px rgba(0,0,0,.05);}
 .settings-card{box-shadow:0 1px 3px rgba(0,0,0,.05);}
 .schedule-item,.expense-form{box-shadow:0 1px 3px rgba(0,0,0,.05);}
-.app-icon{box-shadow:0 1px 3px rgba(0,0,0,.05);}
+.app-icon{box-shadow:0 1px 4px rgba(166,204,221,.3);}
 #page-conv-list .conv-list .conv-item{box-shadow:0 1px 3px rgba(0,0,0,.04);}
+
+/* ==================== v4.4.0 心跳页（清新版） ==================== */
+.heart-page{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px;}
+.heart-badge{font-size:10px;color:#f472b6;background:#fdf2f8;border:1px solid #fbcfe8;padding:2px 10px;border-radius:20px;font-weight:600;}
+.heart-card{background:#fff;border-radius:20px;padding:26px 16px 20px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.04);}
+.heart-halo{width:96px;height:96px;margin:0 auto 10px;border-radius:50%;background:radial-gradient(circle at 50% 45%,#fff1f5,#ffe4ec);display:flex;align-items:center;justify-content:center;}
+.heart-beat{font-size:52px;line-height:1;animation:heartbeat 1s infinite ease-in-out;transform-origin:center;}
+@keyframes heartbeat{0%{transform:scale(1);}12%{transform:scale(1.16);}24%{transform:scale(1);}40%{transform:scale(1.06);}60%{transform:scale(1);}100%{transform:scale(1);}}
+.heart-bpm{font-size:44px;font-weight:200;color:#111;line-height:1.1;letter-spacing:-1px;}
+.heart-bpm .heart-unit{font-size:14px;font-weight:400;color:#cbd5e1;margin-left:6px;letter-spacing:0;}
+.heart-temp-line{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:6px;font-size:13px;color:#94a3b8;}
+.heart-temp{color:#be123c;font-weight:600;}
+.heart-dot{color:#e2e8f0;}
+.heart-updated{font-size:12px;}
+.heart-state-desc{display:inline-block;margin-top:12px;font-size:12px;color:#f472b6;background:#fff1f5;padding:4px 12px;border-radius:20px;font-weight:600;}
+.heart-actions{display:flex;gap:8px;}
+.heart-measure{flex:1.4;background:#1e1e1e;color:#F0F9FF;border:none;border-radius:14px;padding:12px;font-size:14px;font-weight:600;}
+.heart-toggle{flex:1;background:#f1f5f9;color:#475569;border:none;border-radius:14px;padding:12px;font-size:12px;font-weight:600;}
+.heart-stats{display:flex;gap:8px;}
+.heart-stat{flex:1;background:#fff;border-radius:16px;padding:14px 8px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.04);}
+.heart-stat .heart-num{font-size:20px;font-weight:600;color:#0f172a;}
+.hs-label{font-size:11px;color:#94a3b8;margin-top:3px;}
+.heart-section-title{font-size:13px;font-weight:600;color:#475569;margin-top:2px;}
+.heart-spark-wrap{background:#fff;border-radius:16px;padding:8px;box-shadow:0 1px 4px rgba(0,0,0,.04);}
+.heart-history-head{display:flex;justify-content:space-between;align-items:center;background:#fff;border-radius:16px;padding:12px 16px;font-size:13px;font-weight:600;color:#475569;box-shadow:0 1px 4px rgba(0,0,0,.04);cursor:pointer;}
+.heart-history-head:active{background:#f8fafc;}
+.heart-history-meta{font-size:12px;color:#94a3b8;font-weight:400;display:flex;align-items:center;gap:4px;}
+.heart-chevron{display:inline-block;transition:transform .2s;font-size:10px;}
+.heart-history-item{display:flex;justify-content:space-between;align-items:center;background:#fff;border-radius:12px;padding:10px 14px;margin-top:6px;box-shadow:0 1px 2px rgba(0,0,0,.03);}
+.heart-hi-time{font-size:12px;color:#94a3b8;}
+.heart-hi-hr{font-size:14px;font-weight:700;color:#be123c;}
+.heart-hi-temp{font-size:12px;color:#f472b6;}
+
+/* ---- 呼吸练习（4-7-8，骆云影陪你）+ 手环预览 ---- */
+.heart-actions-mini{display:flex;gap:8px;}
+.heart-breathe,.heart-band,.heart-report{flex:1;background:#eef6ff;color:#3b82f6;border:1px solid #dbeafe;border-radius:14px;padding:12px;font-size:13px;font-weight:600;cursor:pointer;}
+.heart-band{background:#f5f3ff;color:#7c3aed;border-color:#ede9fe;}
+.heart-report{background:#e6f2fa;color:#4a7ba6;border-color:#d0e6ee;}
+.heart-breathe.high{background:#fef2f2;color:#ef4444;border-color:#fecaca;animation:tpPulse 1.2s infinite;}
+.steps-card{background:#fff;border-radius:16px;padding:14px 16px;box-shadow:0 1px 4px rgba(0,0,0,.04);margin-top:12px;}
+.steps-head{display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:600;color:#4a7ba6;}
+.steps-mode{font-size:10px;color:#a6ccdd;font-weight:400;}
+.steps-numline{display:flex;align-items:baseline;gap:5px;margin-top:8px;}
+.steps-num{font-size:30px;font-weight:700;color:#4a7ba6;line-height:1;}
+.steps-unit{font-size:12px;color:#a6ccdd;}
+.steps-target{font-size:11px;color:#c3d6e4;}
+.steps-track{height:6px;background:#d0e6ee;border-radius:3px;overflow:hidden;margin-top:8px;}
+.steps-bar{height:100%;width:0;background:linear-gradient(90deg,#a6ccdd,#4a7ba6);border-radius:3px;transition:width .5s;}
+.steps-foot{display:flex;align-items:center;justify-content:space-between;margin-top:9px;}
+.steps-week{font-size:11px;color:#a6ccdd;}
+.steps-week b{color:#4a7ba6;}
+.steps-bump{font-size:11px;color:#4a7ba6;background:#eef4fb;border:1px solid #d0e6ee;border-radius:12px;padding:4px 12px;cursor:pointer;}
+.steps-bump:active{background:#dcebf5;}
+
+/* ---- 手环屏幕预览（海玻璃配色） ---- */
+.band-page{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:12px;align-items:center;background:linear-gradient(180deg,#ecf6f8,#d0e6ee);}
+.band-hint{font-size:12px;color:#6f94ab;text-align:center;line-height:1.7;}
+.band-oled{width:min(252px,86vw);aspect-ratio:2/1;background:#ecf6f8;border-radius:16px;box-shadow:0 0 0 2px #d0e6ee,0 8px 24px rgba(166,204,221,.35);overflow:hidden;}
+.band-oled canvas{width:100%;height:100%;display:block;}
+.band-status{font-size:11px;color:#6f94ab;text-align:center;}
+.band-btns{display:flex;gap:8px;width:100%;}
+.band-btns .heart-measure{flex:1.4;background:#a6ccdd;color:#ecf6f8;border:none;border-radius:14px;padding:12px;font-size:13px;font-weight:600;}
+.band-back{flex:1;background:#ecf6f8;color:#6f94ab;border:1px solid #d0e6ee;border-radius:14px;padding:12px;font-size:13px;font-weight:600;cursor:pointer;}
+.breathe-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(15,23,42,.55);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:9999;}
+.breathe-box{width:min(280px,86vw);background:#fff;border-radius:24px;padding:24px 18px 18px;text-align:center;box-shadow:0 12px 40px rgba(20,25,45,.3);}
+.breathe-title{font-size:14px;font-weight:600;color:#334155;margin-bottom:16px;}
+.breathe-circle{width:150px;height:150px;margin:0 auto 14px;border-radius:50%;background:radial-gradient(circle at 50% 40%,#fce7f3,#fbcfe8);box-shadow:0 0 34px rgba(236,72,153,.28);display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.breathe-phase{font-size:16px;font-weight:700;color:#be185d;}
+.breathe-count{font-size:32px;font-weight:300;color:#9d174d;line-height:1.1;}
+.breathe-rounds{font-size:12px;color:#94a3b8;margin-bottom:8px;}
+.breathe-done{margin:4px 0 10px;}
+.breathe-done-text{font-size:14px;font-weight:600;color:#be185d;margin-bottom:10px;}
+.breathe-close{margin-top:10px;background:#f1f5f9;color:#64748b;border:none;border-radius:12px;padding:9px 18px;font-size:13px;cursor:pointer;}
+.breathe-overlay .heart-measure{width:100%;margin-top:2px;}
