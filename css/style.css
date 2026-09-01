@@ -685,6 +685,7 @@ ul{list-style:none;}
 .steps-week b{color:#4a7ba6;}
 .steps-bump{font-size:11px;color:#4a7ba6;background:#eef4fb;border:1px solid #d0e6ee;border-radius:12px;padding:4px 12px;cursor:pointer;}
 .steps-bump:active{background:#dcebf5;}
+.steps-btns{display:flex;gap:6px;}
 
 /* ---- 手环屏幕预览（海玻璃配色） ---- */
 .band-page{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:12px;align-items:center;background:linear-gradient(180deg,#ecf6f8,#d0e6ee);}

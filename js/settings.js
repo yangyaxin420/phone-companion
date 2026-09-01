@@ -1,5 +1,5 @@
 /* ==================== 设置页 ==================== */
-const APP_VERSION = "v4.8.0 (2026.09.01)";
+const APP_VERSION = "v4.8.1 (2026.09.01)";
 
 const DEFAULT_SETTINGS = {
   proactiveMsg: true,
