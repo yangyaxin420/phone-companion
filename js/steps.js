@@ -95,24 +95,12 @@ function stepsDemoBump() {
 /* ---- 手机真实计步 ----
    网页拿不到系统健康里的总步数，只能自己用加速度传感器数。
    iOS 和安卓浏览器都要求「用户先点一下」才给传感器权限（不能页面一开就自动拿），
-   所以：加载时自动试一次（浏览器静默放行就能生效），
-   更重要的是「开始真实计步」按钮——在用户点击里再申请一次，授权后就真的数步子。 */
+   所以只有一条路：点「📱 开始真实计步」按钮，在点击手势里申请权限。
+   （不做自动申请——有的安卓浏览器会静默放行，导致模式偷偷变真实、按钮被藏掉，反而更乱） */
 function _listenDeviceMotion() {
   if (stepState.listening) return;
   stepState.listening = true;
   window.addEventListener('devicemotion', onStepMotion);
-}
-
-function enableStepCounter() {
-  try {
-    if (stepState.listening || stepState.mode === 'real') return;
-    if (typeof DeviceMotionEvent === 'undefined') return;
-    if (DeviceMotionEvent.requestPermission) {
-      DeviceMotionEvent.requestPermission().then(p => { if (p === 'granted') _listenDeviceMotion(); }).catch(() => {});
-    } else {
-      _listenDeviceMotion(); // 老安卓浏览器不弹窗，直接放行
-    }
-  } catch (e) { /* 某些浏览器授权接口会同步抛异常：无视，保持模拟 */ }
 }
 
 /* 按钮点击调用：在用户手势里申请权限，iOS/安卓才给 */
@@ -121,11 +109,17 @@ function requestRealSteps() {
   try {
     if (typeof DeviceMotionEvent === 'undefined') { addChatSystem('⚠️ 这个浏览器不支持运动传感器，先用模拟'); return; }
     if (DeviceMotionEvent.requestPermission) {
+      let settled = false;
+      const timer = setTimeout(() => { if (!settled) addChatSystem('⏳ 还在等系统弹窗…如果一直没弹，可能浏览器不兼容，先用模拟步数'); }, 2500);
       DeviceMotionEvent.requestPermission().then(p => {
+        settled = true; clearTimeout(timer);
         if (p !== 'granted') { addChatSystem('❌ 没授权传感器，先用模拟步数'); return; }
         _listenDeviceMotion();
         addChatSystem('✅ 传感器已授权，走两步试试，真实步数会记进来');
-      }).catch(() => { addChatSystem('❌ 授权失败，先用模拟步数'); });
+      }).catch(() => {
+        settled = true; clearTimeout(timer);
+        addChatSystem('❌ 授权失败，先用模拟步数');
+      });
     } else {
       _listenDeviceMotion();
       addChatSystem('✅ 已开始真实计步（浏览器直接放行），走两步看看');
@@ -173,7 +167,11 @@ function renderSteps() {
     if (modeEl) modeEl.textContent = stepState.mode === 'real' ? '📱 真实计步' : '○ 模拟';
     const isReal = stepState.mode === 'real';
     const realBtn = document.getElementById('stepsRealBtn');
-    if (realBtn) realBtn.style.display = isReal ? 'none' : 'inline-block';
+    if (realBtn) {
+      // 按钮永远可见：模拟时是可点的「开始」，真实时变成状态「真实计步中」
+      realBtn.textContent = isReal ? '📱 真实计步中 ✓' : '📱 开始真实计步';
+      realBtn.style.opacity = isReal ? '0.55' : '1';
+    }
     const bumpBtn = document.getElementById('stepsBumpBtn');
     if (bumpBtn) bumpBtn.style.display = isReal ? 'none' : 'inline-block';
   } catch (e) { console.error('renderSteps', e); }
@@ -185,8 +183,7 @@ function initSteps() {
     _seedToday();
     renderSteps();
     setInterval(stepTick, 60000);
-    // 移动端浏览器尝试开真实计步（授权失败/桌面预览自动留在模拟）
-    enableStepCounter();
+    // 不做自动申请真实计步：传感器权限必须用户点按钮才能拿（见 requestRealSteps）
   } catch (e) {
     console.error('initSteps', e);
     if (typeof addChatSystem === 'function') addChatSystem('⚠️ 步数加载报错：' + (e && e.message || e));
