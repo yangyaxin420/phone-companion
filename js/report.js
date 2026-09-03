@@ -19,7 +19,7 @@ function getWeekRange() {
 function collectWeekHealth() {
   const { startMs } = getWeekRange();
   const readings = (heartState.readings || []).filter(r => r.t >= startMs);
-  const stat = { count: readings.length, avgHr: null, maxHr: null, minHr: null, avgTemp: null, spikes: 0, lows: 0, days: 0, steps: 0, stepDays: 0, stepsBest: null };
+  const stat = { count: readings.length, avgHr: null, maxHr: null, minHr: null, avgTemp: null, spikes: 0, lows: 0, days: 0, steps: 0, stepDays: 0, stepsBest: null, sleepDays: 0, avgSleepMin: null, lateNights: 0, sleepBest: null };
   if (readings.length > 0) {
     const hrs = readings.map(r => r.hr);
     const temps = readings.map(r => r.temp);
@@ -43,15 +43,40 @@ function collectWeekHealth() {
       stat.stepsBest = { date: dayKeys[vals.indexOf(mx)], steps: mx };
     }
   }
+  // 睡眠：醒在这一周内的晚数（键是本地醒来日期，按 wakeUp 绝对时间过滤最稳）
+  if (typeof sleepData !== 'undefined' && sleepData) {
+    const weekEndMs = startMs + 7 * 86400000;
+    const sleepKeys = Object.keys(sleepData).filter(function(k) {
+      const r = sleepData[k];
+      return r && r.wakeUp >= startMs && r.wakeUp < weekEndMs;
+    });
+    stat.sleepDays = sleepKeys.length;
+    if (sleepKeys.length) {
+      const mins = sleepKeys.map(function(k) { return sleepData[k].sleepMin || 0; });
+      stat.avgSleepMin = Math.round(mins.reduce(function(a, b) { return a + b; }, 0) / mins.length);
+      stat.lateNights = sleepKeys.filter(function(k) {
+        const bd = new Date(sleepData[k].bed || 0);
+        const bMin = bd.getHours() * 60 + bd.getMinutes();
+        return bMin >= 30 && bMin <= 180;   // 凌晨 0:30 后才睡才算熬夜
+      }).length;
+      const mx = Math.max.apply(null, mins);
+      stat.sleepBest = { date: sleepKeys[mins.indexOf(mx)].slice(5), min: mx };
+    }
+  }
   return stat;
 }
 
 function buildReportPrompt(stat) {
-  return '采样 ' + stat.count + ' 次，覆盖 ' + stat.days + ' 天\n'
+  let s = '采样 ' + stat.count + ' 次，覆盖 ' + stat.days + ' 天\n'
     + '心率平均 ' + (stat.avgHr != null ? stat.avgHr : '--') + '，最高 ' + (stat.maxHr != null ? stat.maxHr : '--') + '，最低 ' + (stat.minHr != null ? stat.minHr : '--') + '\n'
     + '体温平均 ' + (stat.avgTemp || '--') + '°C\n'
     + '偏高(≥100) ' + stat.spikes + ' 次，偏低(≤50) ' + stat.lows + ' 次\n'
     + '本周步数 ' + (stat.steps || 0) + ' 步' + (stat.stepsBest ? '，最多一天 ' + stat.stepsBest.date.slice(5) + ' 走了 ' + stat.stepsBest.steps + ' 步' : '');
+  if (stat.sleepDays) {
+    const hh = stat.avgSleepMin != null ? (Math.floor(stat.avgSleepMin / 60) + '小时' + (stat.avgSleepMin % 60 ? stat.avgSleepMin % 60 + '分' : '')) : '--';
+    s += '\n睡眠：睡满 ' + stat.sleepDays + ' 晚 · 平均 ' + hh + (stat.lateNights ? ' · 晚于0:30睡 ' + stat.lateNights + ' 晚' : '') + (stat.sleepBest ? ' · 最长一夜 ' + stat.sleepBest.date + ' 睡 ' + Math.floor(stat.sleepBest.min / 60) + 'h' : '');
+  }
+  return s;
 }
 
 async function generateHealthReport() {
@@ -140,6 +165,14 @@ function localHealthReport(stat) {
     if (stat.steps < 28000) tips.push('这周才走了' + stat.steps + '步。活动太少，出去透透气。');
     else if (stat.steps >= 65000) tips.push('这周走了' + stat.steps + '步，挺能走的。注意别逞强。');
   }
+  if (stat.sleepDays && stat.avgSleepMin != null) {
+    const sh10 = Math.round(stat.avgSleepMin / 60 * 10) / 10;
+    if (stat.avgSleepMin < 390) {
+      tips.push('这周平均每晚睡' + sh10 + '小时' + (stat.lateNights ? '，有' + stat.lateNights + '晚拖到后半夜' : '') + '。别跟睡眠欠债。');
+    } else if (stat.avgSleepMin >= 450) {
+      tips.push('这周平均每晚睡' + sh10 + '小时，作息挺稳，继续保持。');
+    }
+  }
   tips.push('睡前把手机放远一点，早点睡。');
   if (tips.length < 2) tips.push('周末记得出去走走，别一直窝着。');
   return { summary, tips };
@@ -170,6 +203,10 @@ function healthReportCardHTML(item) {
     ['体温', s.avgTemp ? s.avgTemp + '°' : '--'],
     ['步数', s.steps ? s.steps.toLocaleString() : '--']
   ];
+  if (s.sleepDays) {
+    const sh = s.avgSleepMin != null ? (Math.floor(s.avgSleepMin / 60) + 'h' + (s.avgSleepMin % 60 ? s.avgSleepMin % 60 + 'm' : '')) : '';
+    chips.push(['睡眠', s.sleepDays + '晚' + (sh ? '·' + sh : '')]);
+  }
   let html = '<div style="background:#fff;border-radius:16px;padding:16px;box-shadow:0 2px 10px rgba(0,0,0,.05);">';
   html += '<div style="font-size:12px;color:#999;margin-bottom:8px;">📋 健康周报 · ' + (item.startStr || '').slice(5) + ' – ' + (item.endStr || '').slice(5) + '</div>';
   html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">' +

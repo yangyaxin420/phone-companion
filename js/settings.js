@@ -1,5 +1,5 @@
 /* ==================== 设置页 ==================== */
-const APP_VERSION = "v4.9.0 (2026.09.03)";
+const APP_VERSION = "v5.0.0 (2026.09.03)";
 
 const DEFAULT_SETTINGS = {
   proactiveMsg: true,
@@ -7,7 +7,8 @@ const DEFAULT_SETTINGS = {
   notifications: true,
   charPrivacy: false,
   disableActions: true,
-  aiControl: false
+  aiControl: false,
+  sleepGuard: true
 };
 
 let settings = lsGet('settings', DEFAULT_SETTINGS);
@@ -16,7 +17,7 @@ function loadSettings() {
   var verEl = document.getElementById('appVersionDisplay');
   if (verEl && typeof APP_VERSION !== 'undefined') verEl.textContent = APP_VERSION;
   settings = lsGet('settings', DEFAULT_SETTINGS);
-  const toggles = ['proactiveMsg','autoMoments','notifications','charPrivacy','disableActions','aiControl'];
+  const toggles = ['proactiveMsg','autoMoments','notifications','charPrivacy','disableActions','aiControl','sleepGuard'];
   toggles.forEach(function(key) {
     const el = document.getElementById('setting' + key.charAt(0).toUpperCase() + key.slice(1));
     if (el) {
@@ -47,7 +48,8 @@ function toggleSetting(el, key) {
     notifications: '通知',
     charPrivacy: '角色隐私',
     disableActions: '禁止动作描写',
-    aiControl: '允许AI操纵手机'
+    aiControl: '允许AI操纵手机',
+    sleepGuard: '睡眠陪伴'
   };
   addChatSystem((isOn ? '✅ ' : '❌ ') + labels[key] + (isOn ? '已开启' : '已关闭'));
 }

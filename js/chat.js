@@ -903,6 +903,10 @@ function buildChatContext() {
     const hc = buildHeartContext();
     if (hc) block += '\n' + hc;
   }
+  if (typeof buildSleepContext === 'function') {
+    const sc = buildSleepContext();
+    if (sc) block += '\n' + sc;
+  }
   return block;
 }
 
@@ -1159,6 +1163,11 @@ async function callLLMApi(userText) {
   if (typeof buildHeartContext === 'function') {
     const hc = buildHeartContext();
     if (hc) contextBlock += '\n' + hc;
+  }
+  // 睡眠感应（昨晚睡得怎样）
+  if (typeof buildSleepContext === 'function') {
+    const sc = buildSleepContext();
+    if (sc) contextBlock += '\n' + sc;
   }
   // 每日一问接话钩子（她刚回答时加一句，让他认真回应）
   if (typeof dailyQHint === 'function') {
@@ -1543,6 +1552,23 @@ function checkProactiveConditions() {
   var min = now.getMinutes();
   var todayStr = now.toISOString().split('T')[0];
 
+  // 场景S：晨间睡眠关心（昨晚有数据才发；放在晨间问候前，让位给「睡得好吗」）
+  var sleepGuard = settings && settings.sleepGuard !== false;
+  if (sleepGuard && typeof sleepLastNight === 'function' && typeof sleepLastNightKey === 'function') {
+    var sleepRec = sleepLastNight();
+    var sleepWakeKey = sleepLastNightKey();
+    var minsFromMid = hour * 60 + min;
+    if (sleepRec && sleepRec.wake === sleepWakeKey && minsFromMid >= 300 && minsFromMid <= 750 &&
+        Date.now() - sleepRec.wakeUp < 40 * 3600000) {
+      var greetedSleep = lsGet('sleepGreeted_' + sleepWakeKey, false);
+      if (!greetedSleep) {
+        generateProactiveMessage('sleep', char, isTsundere, isGentle, sleepRec);
+        lsSet('sleepGreeted_' + sleepWakeKey, true);
+        return;
+      }
+    }
+  }
+
   // 场景A：早晨问候 (7:25-7:35)
   if (hour === 7 && min >= 25 && min <= 35) {
     var greeted = lsGet('greeted_' + currentCharId, '');
@@ -1626,6 +1652,20 @@ async function generateProactiveMessage(scenario, char, isTsundere, isGentle, ex
       : isGentle
       ? ['我感觉到你心跳好快…是不是有事？别紧张，我在呢','心跳有点快呢，深呼吸，我陪你～','心跳有点快呢，来，跟我做个呼吸练习，我陪你～']
       : ['心跳' + hVal + '。注意休息。','心率有点偏高。需要聊聊吗？','心率有点偏高。要不跟我做个呼吸练习？'];
+  } else if (scenario === 'sleep') {
+    var _dur = extra && extra.sleepMin ? (Math.floor(extra.sleepMin / 60) + '小时' + (extra.sleepMin % 60 ? extra.sleepMin % 60 + '分' : '')) : '整晚';
+    var _qTxt = extra && extra.quality === 'good' ? '睡得很沉' : (extra && extra.quality === 'ok' ? '睡得还行' : '没睡够');
+    localTemplates = isTsundere
+      ? ['早。你睡了' + _dur + '，还行。','醒得挺早？昨晚' + _qTxt + '。今天别又熬夜。','啧，昨晚' + _qTxt + '。就这吧，别拖到半夜。']
+      : isGentle
+      ? ['早呀~你昨晚睡了' + _dur + '，' + _qTxt + '呢，今天也要精神满满','早，感觉你昨晚' + _qTxt + '，我就放心点了～','睡够' + _dur + '就好，今天开开心心的']
+      : ['睡了' + _dur + '。醒得早，注意休息。','昨晚' + _qTxt + '。今天安排好作息。'];
+  } else if (scenario === 'goodnight') {
+    localTemplates = isTsundere
+      ? ['……睡吧。灯关了吗？','哼，晚安。不许熬夜，明早见。','睡你的觉去，别玩手机了。']
+      : isGentle
+      ? ['晚安~盖好被子，今晚也梦到我','睡吧睡吧，我守着夜，你只管好好睡','晚安哦，明早我第一句话就跟你说']
+      : ['晚安。','早点睡。明早见。'];
   } else {
     localTemplates = isTsundere
       ? ['……无聊。你在干嘛。','哼。','啧。']
@@ -1644,6 +1684,8 @@ async function generateProactiveMessage(scenario, char, isTsundere, isGentle, ex
       else if (scenario === 'inactive') scenarioDesc = '已经好一阵没和用户说话了。';
       else if (scenario === 'rain') scenarioDesc = '外面正在下雨。';
       else if (scenario === 'heart') scenarioDesc = '你"感觉"到用户的心跳' + (extra ? extra.hr : '') + ' bpm，有点快，关心她一下。';
+      else if (scenario === 'sleep') scenarioDesc = '你刚"感觉"到她睡醒了，昨晚睡了约 ' + (extra && extra.sleepMin ? Math.floor(extra.sleepMin / 60) + ' 小时' : '一晚') + (extra && extra.quality ? (extra.quality === 'good' ? '，睡得很沉' : extra.quality === 'ok' ? '，睡得还行' : '，没睡够') : '') + '。自然地问她昨晚睡得好不好。';
+      else if (scenario === 'goodnight') scenarioDesc = '用户要去睡了，温柔送她入睡，让她安心睡。';
       else scenarioDesc = '随意地和用户打个招呼。';
 
       var prompt = '你是' + pName + '.' + (story ? '你的性格/背景：' + story : '') + '\n' + scenarioDesc + '\n请发一条简短的消息给用户（1-2句话），符合你的性格特点和当前场景。\n- 不要用*动作描写*、不要加emoji\n- 简短自然，像微信消息';

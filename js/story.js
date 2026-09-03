@@ -19,6 +19,10 @@ function buildStoryMaterial() {
   if (typeof moments !== 'undefined' && moments && moments.length > 0) {
     lines.push('最近朋友圈：' + moments.slice(0, 2).map(m => m.content.substring(0, 30)).join('；'));
   }
+  if (typeof sleepLastNightText === 'function') {
+    const sl = sleepLastNightText();
+    if (sl) lines.push(sl);
+  }
   return lines.join('\n');
 }
 

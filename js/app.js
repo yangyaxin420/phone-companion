@@ -11,6 +11,7 @@ const ICONS = [
   { id:'tide',     symbol:'☽', name:'潮汐',  page:'page-tide' },
   { id:'heart',    symbol:'💓', name:'心跳',  page:'page-heart' },
   { id:'story',    symbol:'🌙', name:'晚安',  page:'page-story' },
+  { id:'sleep',    symbol:'💤', name:'睡眠',  page:'page-sleep' },
   { id:'persona',  symbol:'≡', name:'人设',  page:'page-persona' },
   { id:'settings', symbol:'⚙', name:'设置',  page:'page-settings' }
 ];
@@ -73,6 +74,7 @@ function navigateTo(pageId, skipAnim) {
   if (pageId === 'page-settings') loadSettings();
   if (pageId === 'page-moments' && typeof renderMoments === 'function') renderMoments();
   if (pageId === 'page-story' && typeof renderStoryList === 'function') renderStoryList();
+  if (pageId === 'page-sleep' && typeof renderSleep === 'function') renderSleep();
   const emojiPanel = document.getElementById('emojiPanel');
   if (emojiPanel) emojiPanel.classList.remove('show');
   updateNav();
