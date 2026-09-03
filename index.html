@@ -9,10 +9,10 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="theme-color" content="#ecf6f8">
-<meta name="app-version" content="v4.8.2 (2026.09.01)">
+<meta name="app-version" content="v4.9.0 (2026.09.03)">
 <title>我的手机</title>
-<link rel="stylesheet" href="css/style.css?v=37">
-<link rel="stylesheet" href="css/track.css?v=37">
+<link rel="stylesheet" href="css/style.css?v=38">
+<link rel="stylesheet" href="css/track.css?v=38">
 </head>
 <body>
 
@@ -72,19 +72,6 @@
     <div class="task-add-bar" style="padding:10px 16px;border-top:1px solid #E0F2FE;background:#F0F9FF;">
       <input type="text" id="taskInput" placeholder="添加日程..." onkeydown="if(event.key==='Enter')addTask()" class="flex-1">
       <button onclick="addTask()" style="background:#1e1e1e;color:#f8f8f8;border-radius:12px;padding:10px 18px;font-weight:600;font-size:14px;">添加</button>
-    </div>
-  </div>
-
-  <!-- ===== 闹钟 ===== -->
-  <div class="page" id="page-alarm">
-    <div class="sub-page-header">闹钟</div>
-    <div class="sub-page-body">
-      <div class="alarm-list" id="alarmList"></div>
-    </div>
-    <div class="alarm-add-bar" style="padding:10px 16px;">
-      <input type="time" id="alarmTimeInput" value="07:00">
-      <input type="text" id="alarmLabelInput" placeholder="标签">
-      <button onclick="addAlarm()">添加</button>
     </div>
   </div>
 
@@ -667,7 +654,7 @@
         <div class="settings-row">
           <div class="settings-row-left">
             <div class="settings-row-title">🤖 允许AI操纵手机</div>
-            <div class="settings-row-desc">开启后骆云影能帮你加任务、定闹钟、记账、发朋友圈</div>
+            <div class="settings-row-desc">开启后骆云影能帮你加任务、记账、发朋友圈</div>
           </div>
           <div class="ios-toggle" id="settingAiControl" onclick="toggleSetting(this,'aiControl')">
             <div class="ios-toggle-slider"></div>
@@ -753,16 +740,6 @@
       <button class="cd-btn-cancel" onclick="closeCdEdit()">取消</button>
       <button class="cd-btn-save" onclick="saveCdEdit()">保存</button>
     </div>
-  </div>
-</div>
-
-<!-- 闹钟弹窗 -->
-<div class="alarm-modal" id="alarmModal">
-  <div class="alarm-modal-box">
-    <div class="am-title">⏰ 闹钟响啦！</div>
-    <div class="am-time" id="amTime">07:00</div>
-    <div class="am-label" id="amLabel">起床</div>
-    <button onclick="dismissAlarm()">关闭</button>
   </div>
 </div>
 
@@ -855,31 +832,33 @@
 </div><!-- phone-frame -->
 
 <!-- script moved to external files -->
-<script src="js/utils.js?v=37"></script>
-    <script src="js/photo.js?v=37"></script>
-<script src="js/app.js?v=37"></script>
-<script src="js/weather.js?v=37"></script>
-<script src="js/tasks.js?v=37"></script>
-<script src="js/expense.js?v=37"></script>
-<script src="js/chat.js?v=37"></script>
-<script src="js/question.js?v=37"></script>
-<script src="js/secret.js?v=37"></script>
-<script src="js/moments.js?v=37"></script>
-<script src="js/persona.js?v=37"></script>
-<script src="js/daily.js?v=37"></script>
-<script src="js/tide.js?v=37"></script>
-<script src="js/companion.js?v=37"></script>
-<script src="js/settings.js?v=37"></script>
-<script src="js/track.js?v=37"></script>
-<script src="js/heart.js?v=37"></script>
-<script src="js/steps.js?v=37"></script>
-<script src="js/report.js?v=37"></script>
-<script src="js/breathe.js?v=37"></script>
-<script src="js/band.js?v=37"></script>
-<script src="js/story.js?v=37"></script>
+<script src="js/utils.js?v=38"></script>
+    <script src="js/photo.js?v=38"></script>
+<script src="js/app.js?v=38"></script>
+<script src="js/weather.js?v=38"></script>
+<script src="js/tasks.js?v=38"></script>
+<script src="js/expense.js?v=38"></script>
+<script src="js/chat.js?v=38"></script>
+<script src="js/question.js?v=38"></script>
+<script src="js/secret.js?v=38"></script>
+<script src="js/moments.js?v=38"></script>
+<script src="js/persona.js?v=38"></script>
+<script src="js/daily.js?v=38"></script>
+<script src="js/tide.js?v=38"></script>
+<script src="js/companion.js?v=38"></script>
+<script src="js/settings.js?v=38"></script>
+<script src="js/track.js?v=38"></script>
+<script src="js/heart.js?v=38"></script>
+<script src="js/steps.js?v=38"></script>
+<script src="js/report.js?v=38"></script>
+<script src="js/breathe.js?v=38"></script>
+<script src="js/band.js?v=38"></script>
+<script src="js/story.js?v=38"></script>
 <script>
 /* ==================== 初始化 ==================== */
 function init() {
+  // 清理历史闹钟数据（闹钟功能已彻底移除）
+  try { localStorage.removeItem('phone_alarms'); } catch(e) {}
   // 主页日期
   var now = new Date();
   document.getElementById('homeDate').textContent = now.getFullYear() + '年' + (now.getMonth()+1) + '月' + now.getDate() + '日';
@@ -896,7 +875,6 @@ function init() {
   renderSecretCharSwitcher();
   updateCountdown();
   renderSchedule();
-  renderAlarms();
   renderCompanionActs();
   initTide();
   initMood();
@@ -905,8 +883,6 @@ function init() {
   renderCompRecords();
   // 设置
   loadSettings();
-  // 闹钟检查
-  alarmCheckInterval = setInterval(checkAlarms, 30000);
   // 更新上下文
   setInterval(updateChatContext, 30000);
   updateChatContext();
@@ -936,12 +912,12 @@ function init() {
   }
 }
 init();
- // 清理旧 Service Worker（解决缓存问题）
-  if ('caches' in window) { try { caches.keys().then(function(ks) { ks.forEach(function(k) { caches.delete(k); }); }).catch(function(){}); } catch(e){} }
+ // 注册 Service Worker（PWA 可安装必需；sw.js 是网络优先策略，不会缓存旧内容）
   if ('serviceWorker' in navigator) {
-    try { navigator.serviceWorker.getRegistrations().then(function(rs) { rs.forEach(function(r) { r.unregister(); }); }).catch(function(){}); } catch(e){}
+    window.addEventListener('load', function() {
+      navigator.serviceWorker.register('sw.js').catch(function(e) { console.warn('SW注册失败', e); });
+    });
   }
-  // 不注册新 Service Worker，避免缓存问题
   requestNotificationPermission();
 </script>
 </body>

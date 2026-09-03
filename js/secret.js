@@ -535,53 +535,6 @@ function showSecretNotes() {
   h += _diaryEntriesHtml(diaryArr);
   h += '</div>';
 
-  // === 本周概况（性格化） ===
-  if (weekMsgs.length > 0) {
-    var weekUserMsgs = weekMsgs.filter(function(m) { return m.role === 'user'; });
-    var daysActive = new Set();
-    weekMsgs.forEach(function(m) { if (m.time) daysActive.add(new Date(m.time).toISOString().split('T')[0]); });
-    h += '<div class="secret-note-card">';
-    var weekTitle = isTsundere ? '📊 这周（记录一下）' : isGentle ? '📊 这周的小记录 ♡' : '📊 本周记录';
-    h += '<div class="sn-time">' + weekTitle + '</div>';
-    h += '<div style="font-size:12px;color:#555;line-height:1.8;">';
-    h += '共 ' + weekMsgs.length + ' 条 · ' + daysActive.size + ' 天';
-    var weekUserTexts = weekUserMsgs.map(function(m) { return m.text; }).join(' ');
-    if (/累|烦|难过|emo|压力/.test(weekUserTexts)) {
-      h += '<br>' + getPersonalityObservation('情绪', 'week_tired');
-    }
-    if (/吃|饭|食堂|外卖/.test(weekUserTexts)) {
-      h += '<br>' + getPersonalityObservation('饮食', 'week_eat');
-    }
-    if (/晚|熬夜|失眠|困/.test(weekUserTexts)) {
-      h += '<br>' + getPersonalityObservation('作息', 'week_sleep');
-    }
-    if (/考|试|学习|作业|论文/.test(weekUserTexts)) {
-      h += '<br>' + getPersonalityObservation('学习', 'week_study');
-    }
-    h += '</div></div>';
-  }
-
-  // === AI记忆笔记（自动总结，无需手动） ===
-  var charNotes = [];
-  if (typeof memoryNotes !== 'undefined' && memoryNotes.length > 0) {
-    charNotes = memoryNotes.filter(function(n) { return n.charId === secretCharId; }).slice(-10).reverse();
-  }
-  var memTitle = isTsundere ? '🧠 记住的事（啧）' : isGentle ? '🧠 关于她的小笔记 ♡' : '🧠 记忆笔记';
-  h += '<div class="secret-note-card">';
-  h += '<div class="sn-time">' + memTitle + '</div>';
-  if (charNotes.length > 0) {
-    charNotes.forEach(function(n) {
-      var d = new Date(n.createdAt);
-      var timeStr = d.getMonth()+1 + '月' + d.getDate() + '日';
-      h += '<div style="font-size:13px;color:#555;padding:8px 0;border-bottom:1px solid #f5f5f5;line-height:1.7;">' +
-        '<span style="color:#bbb;font-size:10px;">' + timeStr + '</span><br>' +
-        escHtml(n.summary) + '</div>';
-    });
-  } else {
-    h += '<div style="font-size:12px;color:#bbb;padding:10px 0;text-align:center;">多聊几天，我会默默记住<br><span style="font-size:11px;">关于她的事，都收着呢</span></div>';
-  }
-  h += '</div>';
-
   // === 角色心声（性格化） ===
   if (topicKeywords.length > 0 || todayMsgs.length > 0) {
     var thoughtBg = isTsundere ? 'linear-gradient(135deg,#f5f5f5,#ececec)' : isGentle ? 'linear-gradient(135deg,#fff8f0,#fff4e6)' : 'linear-gradient(135deg,#f8f9ff,#eef1ff)';
@@ -618,23 +571,9 @@ function showSecretNotes() {
 
   container.innerHTML = h;
 
-  // 进入记事本时自动生成记忆笔记（强制刷新，仅当没有正在生成的请求）
-  if (typeof generateMemoryNote === 'function' && typeof memoryNotes !== 'undefined' && !window._genMemoBusy) {
-    window._genMemoBusy = true;
-    setTimeout(async function() {
-      try {
-        const newNote = await generateMemoryNote(secretCharId, true);
-        if (newNote) {
-          _refreshMemoryNotesCard();
-        }
-      } catch(e) {}
-      window._genMemoBusy = false;
-    }, 500);
-  }
-
-  // 确保今天有内心日记（懒生成，写完不重复）
-  // 今天已有但和前一天一模一样（旧版 bug 留下的重复）→ 也要强制重写
-  // 没聊过天时跳过，避免白调 AI
+  // 确保今天有内心日记：当天没写才懒生成一次；当天已有不再反复重写
+  //（旧版 bug 会留下"今天和昨天一字一样"的重复——只允许首次打开时修一次，
+  //  且用 diaryForceFix_日期 记 flag，之后同一天不再自动重写，杜绝重复生成）
   var todayStr = new Date().toISOString().split('T')[0];
   var todayEntry = null;
   var prevEntry = null;
@@ -642,13 +581,19 @@ function showSecretNotes() {
     if (diaryArr[dii].date === todayStr) todayEntry = diaryArr[dii];
     else if (diaryArr[dii].date < todayStr && (!prevEntry || diaryArr[dii].date > prevEntry.date)) prevEntry = diaryArr[dii];
   }
-  var needDiary = charMsgs.length > 0 && (!todayEntry || (_diaryStripDate(todayEntry.content) && prevEntry && _diaryStripDate(todayEntry.content) === _diaryStripDate(prevEntry.content)));
-  if (needDiary && !window._diaryBusy) {
+  var fixKey = 'diaryForceFix_' + todayStr;
+  var sameAsPrev = !!todayEntry && !!prevEntry &&
+    !!_diaryStripDate(todayEntry.content) &&
+    _diaryStripDate(todayEntry.content) === _diaryStripDate(prevEntry.content);
+  var needDiary = charMsgs.length > 0 && !todayEntry;
+  var needFix = charMsgs.length > 0 && sameAsPrev && !lsGet(fixKey, false);
+  if ((needDiary || needFix) && !window._diaryBusy) {
     window._diaryBusy = true;
     setTimeout(async function() {
       try {
         await ensureInnerDiary(secretCharId, todayStr, true);
         _refreshInnerDiaryCard();
+        if (needFix) lsSet(fixKey, true);
       } catch(e) {}
       window._diaryBusy = false;
     }, 400);

@@ -201,6 +201,9 @@ async function luoPostRelatedMoment(userContent) {
   var pName = luoPers?.name || luo.name || '骆云影';
   var story = luoPers?.story || luo.story || '';
 
+  // 每天最多一条（自动 + 聊天 + 回应式都算）
+  if (momentPostedToday(pName)) return;
+
   var content = null;
   if (apiConfig && apiConfig.apiKey) {
     var reply = await callLightLlm(
@@ -453,29 +456,74 @@ function checkRecentAiMoments(pName) {
   return moments.some(m => m.user === pName && m.time > oneHourAgo);
 }
 
-/* ---- AI自动发朋友圈（由主动消息轮询触发） ---- */
-function checkAutoMomentCondition() {
-  if (!settings || !settings.autoMoments) return;
+/* ---- 今日是否已发（每天最多 1 条，自动 + 聊天触发共用） ---- */
+function momentPostedToday(pName) {
   var todayStr = new Date().toISOString().split('T')[0];
-  var dailyCount = lsGet('autoMomentDailyCount', {});
-  if (!dailyCount[todayStr]) dailyCount[todayStr] = {};
-
-  characters.forEach(function(char) {
-    var charDaily = dailyCount[todayStr][char.id] || 0;
-    if (charDaily >= 3) return;
-
-    var timestamps = lsGet('autoMomentTimestamps', {});
-    var lastTime = timestamps[char.id] || 0;
-    if (Date.now() - lastTime < 4 * 60 * 60 * 1000) return;
-
-    var charMsgs = chatData[char.id] || [];
-    if (charMsgs.length === 0 && Math.random() > 0.1) return;
-
-    generateAutoMoment(char, todayStr, dailyCount);
+  return moments.some(function(m) {
+    return m.user === pName && m.time && new Date(m.time).toISOString().split('T')[0] === todayStr;
   });
 }
 
-async function generateAutoMoment(char, todayStr, dailyCount) {
+/* ---- 自动发圈配图：最近相册照片 → 自定义 emoji 图 → 情景 emoji ---- */
+async function pickMomentPhoto() {
+  var album = (typeof getAlbumPhotos === 'function') ? getAlbumPhotos() : [];
+  if (album.length > 0) {
+    var recent = album.slice().sort(function(a, b) { return (b.time || 0) - (a.time || 0); }).slice(0, 5);
+    if (Math.random() < 0.8) {
+      return recent[Math.floor(Math.random() * recent.length)].src;
+    }
+  }
+  if (typeof customImgEmojis !== 'undefined' && customImgEmojis.length > 0 && Math.random() < 0.8) {
+    var pick = customImgEmojis[Math.floor(Math.random() * customImgEmojis.length)];
+    if (typeof getEmojiImgURL === 'function') {
+      var url = await getEmojiImgURL(pick.id);
+      if (url) return url;
+    }
+  }
+  return sceneEmojiPhoto();
+}
+
+/* ---- 没有可用图时画一个情景 emoji 当配图（128px canvas） ---- */
+function sceneEmojiPhoto() {
+  try {
+    var h = new Date().getHours();
+    var emoji = '☀️';
+    var hasW = typeof weatherData !== 'undefined' && weatherData && Date.now() - weatherData.time < 3600000;
+    if (hasW) {
+      var desc = weatherData.desc || '';
+      if (weatherData.code >= 61 || desc.indexOf('雨') !== -1) emoji = '🌧️';
+      else if (desc.indexOf('雪') !== -1) emoji = '❄️';
+      else if (desc.indexOf('雾') !== -1) emoji = '🌫️';
+      else if (desc.indexOf('晴') !== -1) emoji = h < 12 ? '🌤️' : '☀️';
+      else emoji = '☁️';
+    } else {
+      emoji = h < 5 ? '🌌' : h < 9 ? '🌅' : h < 12 ? '🌤️' : h < 14 ? '☀️' : h < 18 ? '🕐' : '🌙';
+    }
+    var c = document.createElement('canvas');
+    c.width = 128; c.height = 128;
+    var x = c.getContext('2d');
+    x.fillStyle = '#eaf3f6';
+    x.fillRect(0, 0, 128, 128);
+    x.font = '80px serif';
+    x.textAlign = 'center';
+    x.textBaseline = 'middle';
+    x.fillText(emoji, 64, 70);
+    return c.toDataURL('image/png');
+  } catch(e) { return null; }
+}
+
+/* ---- AI自动发朋友圈（由主动消息轮询触发，每天每角色最多 1 条） ---- */
+function checkAutoMomentCondition() {
+  if (!settings || !settings.autoMoments) return;
+  characters.forEach(function(char) {
+    if (momentPostedToday(char.name)) return;   // 每天最多一条
+    var charMsgs = chatData[char.id] || [];
+    if (charMsgs.length === 0 && Math.random() > 0.1) return;
+    generateAutoMoment(char);
+  });
+}
+
+async function generateAutoMoment(char) {
   var pName = char.name || '小伴';
   var story = char.story || '';
   var charSp = lsGet('sp_' + char.id, char.systemPrompt || '');
@@ -486,21 +534,34 @@ async function generateAutoMoment(char, todayStr, dailyCount) {
     try {
       var contextInfo = '当前时间：' + new Date().toLocaleString('zh-CN');
       if (weatherData && Date.now() - weatherData.time < 3600000) {
-        contextInfo += '\n天气：' + weatherData.desc + '，' + weatherData.temp + '°C';
+        contextInfo += '\n天气：' + weatherData.desc + '，' + weatherData.temp + '°C（湿度' + weatherData.humidity + '%）';
+      }
+      // 今日心情
+      if (typeof moodData !== 'undefined' && moodData) {
+        var todayISO = new Date().toISOString().split('T')[0];
+        if (moodData[todayISO]) contextInfo += '\n她今天心情：' + moodData[todayISO].emoji + moodData[todayISO].label;
+      }
+      // 当天倒数日
+      if (typeof cdData !== 'undefined' && cdData && cdData.event) {
+        contextInfo += '\n纪念日：' + cdData.event;
       }
       // 用户最近动态联动：骆云影有感而发
       var lastUM = lsGet('lastUserMoment', null);
       if (lastUM && Date.now() - lastUM.time < 24 * 60 * 60 * 1000 && char.id === 'luo') {
         contextInfo += '\n用户最近发了条动态：「' + lastUM.content.substring(0, 20) + '」你可以有感而发回应一下（不要@她，就自然地提一嘴）。';
       }
-      var sysPrompt = '你是' + pName + '，要发一条朋友圈。' +
+      // 避免重复自己上一条
+      var myLast = null;
+      for (var mj = 0; mj < moments.length; mj++) {
+        if (moments[mj].user === pName) { myLast = moments[mj]; break; }
+      }
+      if (myLast && myLast.content) {
+        contextInfo += '\n你上一条朋友圈是：「' + myLast.content.substring(0, 40) + '」——这次别再发相似的了。';
+      }
+      var sysPrompt = '你是' + pName + '，今天想发一条朋友圈（一天就这一条，要值得发）。' +
         (charStory ? '\n你的性格/背景：' + charStory : '') +
         (charSp ? '\n你的说话风格：' + charSp : '') +
-        '\n\n要求：\n- 像真人发朋友圈：写日常碎碎念，有细节、有情绪、不喊口号、不说教\n- 内容必须有实质信息，不能只发符号或语气词\n- 符合你的人设和性格\n- 根据当前环境写1-2句话，简短自然\n- 不要用引号，不要加emoji\n- 字数控制在20字以内';
-
-      if (checkRecentAiMoments(pName)) {
-        contextInfo += '\n\n注意：你刚才已经发过动态了，这次发的内容不要重复。';
-      }
+        '\n\n要求：\n- 像真人发朋友圈：记录当下真实的一刻，有画面、有细节、有情绪，不喊口号、不说教\n- 别写"今天也是美好的一天""又是充实的一天"这种空话，越具体越像真的\n- 可以带上此刻的天气/心情/在吃的东西/在忙的事\n- 写1-3句，读起来自然，别太工整，别用引号，别用emoji\n- 符合你的人设和性格，别跟上一条发过的重复\n- 内容必须有实质信息，不能只发符号或语气词';
 
       var resp = await fetch(apiConfig.baseUrl.replace(/\/+$/, '') + '/chat/completions', {
         method: 'POST',
@@ -508,28 +569,16 @@ async function generateAutoMoment(char, todayStr, dailyCount) {
         body: JSON.stringify({ model: apiConfig.model || 'deepseek-v4-flash', messages: [
           { role: 'system', content: sysPrompt },
           { role: 'user', content: contextInfo }
-        ], max_tokens: 64, temperature: 0.9 })
+        ], max_tokens: 220, temperature: 0.95 })
       });
       if (resp.ok) {
         var data = await resp.json();
         var content = data.choices?.[0]?.message?.content?.trim();
         if (isValidAiReply(content)) {
-          var photo = null;
-          // 相册有照片 → 优先随机一张相册照片；否则回退自定义 emoji 图
-          var albumPhotos = (typeof getAlbumPhotos === 'function') ? getAlbumPhotos() : [];
-          if (albumPhotos.length > 0 && Math.random() < 0.35) {
-            photo = albumPhotos[Math.floor(Math.random() * albumPhotos.length)].src;
-          } else if (typeof customImgEmojis !== 'undefined' && customImgEmojis.length > 0 && Math.random() < 0.3) {
-            var pick = customImgEmojis[Math.floor(Math.random() * customImgEmojis.length)];
-            if (typeof getEmojiImgURL === 'function') {
-              var url = await getEmojiImgURL(pick.id);
-              if (url) photo = url;
-            }
-          }
+          var photo = await pickMomentPhoto();
           moments.unshift({ user: pName, content: content, time: Date.now(), likes: 0, liked: false, comments: [], photo: photo });
           lsSet('moments', moments);
           renderMoments();
-          updateAutoMomentCount(todayStr, char.id, dailyCount);
           return;
         }
       }
@@ -600,34 +649,8 @@ async function generateAutoMoment(char, todayStr, dailyCount) {
   }
 
   var content = templates[Math.floor(Math.random() * templates.length)];
-  moments.unshift({ user: pName, content: content, time: Date.now(), likes: 0, liked: false, comments: [], photo: null });
+  var photo = await pickMomentPhoto();
+  moments.unshift({ user: pName, content: content, time: Date.now(), likes: 0, liked: false, comments: [], photo: photo });
   lsSet('moments', moments);
   renderMoments();
-  updateAutoMomentCount(todayStr, char.id, dailyCount);
-}
-
-function updateAutoMomentCount(todayStr, charId, dailyCount) {
-  if (!dailyCount[todayStr]) dailyCount[todayStr] = {};
-  dailyCount[todayStr][charId] = (dailyCount[todayStr][charId] || 0) + 1;
-  lsSet('autoMomentDailyCount', dailyCount);
-
-  var timestamps = lsGet('autoMomentTimestamps', {});
-  timestamps[charId] = Date.now();
-  lsSet('autoMomentTimestamps', timestamps);
-}
-function playAlarmSound() {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.frequency.value = 880;
-    osc.type = 'sine';
-    gain.gain.value = 0.3;
-    osc.start();
-    setTimeout(() => { osc.frequency.value = 660; }, 200);
-    setTimeout(() => { osc.frequency.value = 880; }, 400);
-    setTimeout(() => { osc.stop(); ctx.close(); }, 700);
-  } catch(e) {}
 }

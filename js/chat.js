@@ -817,8 +817,8 @@ async function generateMultiReplies(text, count, length) {
       ? `\n4. 【严禁】绝对不要使用任何动作描写（包括但不限于：*微笑*、*叹气*、*摸头*、*脸红*、*低头*、*耸肩*等），只说纯文字`
       : `\n4. 不要动作描写`;
     const _multiAiCtrl = (settings && settings.aiControl)
-      ? `\n\n你被授权操纵手机：需要时可使用标记 [TASK:任务]、[SCHEDULE:事项|日期|时间]、[ALARM:标签|HH:MM]、[EXPENSE:金额|类别]、[MOMENT:内容]，执行后聊天里会显示提示。只在用户明确需要时用，不要滥用`
-      : `\n\n你没有操纵手机的权限，只能纯聊天，绝对禁止生成任何 [TASK]/[SCHEDULE]/[ALARM]/[EXPENSE]/[MOMENT] 标记`;
+      ? `\n\n你被授权操纵手机：需要时可使用标记 [TASK:任务]、[SCHEDULE:事项|日期|时间]、[EXPENSE:金额|类别]、[MOMENT:内容]，执行后聊天里会显示提示。只在用户明确需要时用，不要滥用`
+      : `\n\n你没有操纵手机的权限，只能纯聊天，绝对禁止生成任何 [TASK]/[SCHEDULE]/[EXPENSE]/[MOMENT] 标记`;
     const sysPrompt = systemPrompt + personaPart + contextBlock +
       `\n\n你现在是${pName}。` +
       `\n用户给你发了一条消息，你需要生成${count}条不同的回复供用户选择。` +
@@ -1027,10 +1027,6 @@ async function sendChat() {
       renderChat();
     }
 
-    // 后台自动生成记忆笔记（不阻塞聊天）
-    if (apiConfig && apiConfig.apiKey) {
-      generateMemoryNote(currentCharId).catch(function(){});
-    }
   } catch(e) {
     typing.classList.remove('show');
     const fallback = generateLocalReply(text);
@@ -1112,10 +1108,6 @@ async function callLLMApi(userText) {
       contextBlock += `（未完成：${undoneList}）`;
     }
   }
-  const activeAlarms = alarms.filter(a => a.on);
-  if (activeAlarms.length > 0) {
-    contextBlock += `\n已设闹钟：${activeAlarms.map(a => a.time + (a.label ? '('+a.label+')' : '')).join('、')}`;
-  }
   if (compState.running) {
     const mins = Math.floor(compState.seconds / 60);
     const secs = compState.seconds % 60;
@@ -1195,11 +1187,10 @@ async function callLLMApi(userText) {
     ? `\n\n【你被授权操纵手机 — 在回复中使用这些标记，我会自动执行并在聊天里显示提示】
 - [TASK:任务内容] 添加任务（可每行一个）
 - [SCHEDULE:事项|日期|时间] 添加日程
-- [ALARM:标签|HH:MM] 设定闹钟，如 [ALARM:起床|07:00]
 - [EXPENSE:金额|类别] 记账，如 [EXPENSE:25.5|餐饮]
 - [MOMENT:朋友圈内容] 用你的名义发一条朋友圈
 只在用户明确请求或明显需要时使用，不要滥用，正常聊天就行`
-    : `\n\n🔴 【重要规则】你没有操纵手机的权限！绝对不能生成任何 [TASK]、[SCHEDULE]、[ALARM]、[EXPENSE]、[MOMENT] 这样的操作标记，只能纯聊天。`;
+    : `\n\n🔴 【重要规则】你没有操纵手机的权限！绝对不能生成任何 [TASK]、[SCHEDULE]、[EXPENSE]、[MOMENT] 这样的操作标记，只能纯聊天。`;
   const fullSystemPrompt = systemPrompt + personaPart + worldBookPart + contextBlock + antiRepeatHint + `\n\n你的名字叫${pName}。回复规则：
 1. 回复简短，几句话就行，说清楚你想表达的东西
 2. 绝对不要用动作描写（如*微笑*、*拥抱*、*拍肩*），只说纯文字${_actionsPrompt}
@@ -1328,10 +1319,6 @@ function parseAiActions(reply) {
   while ((match = schedRegex.exec(reply)) !== null) {
     actions.push({ type: 'schedule', content: match[1].trim() });
   }
-  const alarmRegex = /\[ALARM:(.*?)\|(\d{1,2}:\d{2})\]/g;
-  while ((match = alarmRegex.exec(reply)) !== null) {
-    actions.push({ type: 'alarm', label: match[1].trim(), time: match[2].trim() });
-  }
   const expenseRegex = /\[EXPENSE:(.*?)\]/g;
   while ((match = expenseRegex.exec(reply)) !== null) {
     actions.push({ type: 'expense', content: match[1].trim() });
@@ -1340,7 +1327,7 @@ function parseAiActions(reply) {
   while ((match = momentRegex.exec(reply)) !== null) {
     actions.push({ type: 'moment', content: match[1].trim() });
   }
-  display = display.replace(taskRegex, '').replace(schedRegex, '').replace(alarmRegex, '').replace(expenseRegex, '').replace(momentRegex, '').replace(/\n{3,}/g, '\n\n').trim();
+  display = display.replace(taskRegex, '').replace(schedRegex, '').replace(expenseRegex, '').replace(momentRegex, '').replace(/\n{3,}/g, '\n\n').trim();
   return { display, actions };
 }
 
@@ -1362,15 +1349,6 @@ function executeAiActions(actions) {
       const sDate = parts[1] || '';
       const sTime = parts[2] || '';
       if (sText) addSchedulePreview([{ text: sText, date: sDate, time: sTime }]);
-    } else if (a.type === 'alarm') {
-      const time = (a.time || '').trim();
-      const label = (a.label || '').trim();
-      if (/^\d{1,2}:\d{2}$/.test(time)) {
-        alarms.push({ time: time, label: label || 'AI设定', on: true });
-        lsSet('alarms', alarms);
-        renderAlarms();
-        addChatSystem(`⏰ ${pName}帮你设了 ${time} 的闹钟${label ? '（' + label + '）' : ''}`);
-      }
     } else if (a.type === 'expense') {
       const parts = a.content.split('|').map(s => s.trim());
       const amount = parseFloat(parts[0]);
@@ -1384,8 +1362,12 @@ function executeAiActions(actions) {
       }
     } else if (a.type === 'moment') {
       if (a.content) {
-        addMoment(pName, a.content);
-        addChatSystem(`📸 ${pName}发了一条朋友圈：${a.content.substring(0,20)}`);
+        if (typeof momentPostedToday === 'function' && momentPostedToday(pName)) {
+          addChatSystem('📸 今天已经发过一条朋友圈了，攒到明天再发吧。');
+        } else {
+          addMoment(pName, a.content);
+          addChatSystem(`📸 ${pName}发了一条朋友圈：${a.content.substring(0,20)}`);
+        }
       }
     }
   });
@@ -1464,21 +1446,11 @@ function generateLocalReply(text) {
       }
     }
   }
-  if (/闹钟|提醒|叫醒|定时/.test(t)) {
-    const timeMatch = t.match(/(\d{1,2}):?(\d{2})/);
-    if (timeMatch) {
-      const h = timeMatch[1].padStart(2,'0');
-      const m = timeMatch[2];
-      const time = h+':'+m;
-      if (settings && settings.aiControl) {
-        alarms.push({ time, label:'聊天设定', on:true });
-        lsSet('alarms', alarms);
-        renderAlarms();
-        return `好的，已经设定了 ${time} 的闹钟 ⏰`;
-      }
-      return `想设闹钟的话，得先给我「操纵手机」的权限哦～`;
-    }
-    return `想设定几点的闹钟？比如"7:30提醒我"～`;
+  if (/闹钟|叫醒|定时/.test(t)) {
+    return `闹钟功能停掉了。要是有重要的事，告诉我几点，我帮你记成任务到点提醒你。`;
+  }
+  if (/提醒/.test(t)) {
+    return `重要的事我帮你记进任务清单，会一直替你盯着，不会忘。`;
   }
   if (/陪伴|一起|专注/.test(t)) {
     if (compState.running) {

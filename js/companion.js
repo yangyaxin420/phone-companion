@@ -207,6 +207,24 @@ function resetRingtone() {
   document.getElementById('ringtoneStatus').textContent = '默认铃声';
 }
 
+/* 专注结束提示音（由原 playAlarmSound 迁移而来，仅专注提醒用） */
+function playBeep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = 880;
+    osc.type = 'sine';
+    gain.gain.value = 0.3;
+    osc.start();
+    setTimeout(() => { osc.frequency.value = 660; }, 200);
+    setTimeout(() => { osc.frequency.value = 880; }, 400);
+    setTimeout(() => { osc.stop(); ctx.close(); }, 700);
+  } catch(e) {}
+}
+
 function playCompCompleteSound() {
   if (compState.ringtoneData) {
     try {
@@ -214,7 +232,7 @@ function playCompCompleteSound() {
       audio.play().catch(e => {});
     } catch(e) {}
   } else {
-    playAlarmSound(); // 使用默认闹钟音效
+    playBeep(); // 默认提示音
   }
 }
 

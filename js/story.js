@@ -32,18 +32,34 @@ async function generateNightStory() {
   const material = buildStoryMaterial();
   try {
     let story;
+    let isFallback = false;
     if (apiConfig && apiConfig.apiKey) {
       story = await callNightStoryAI(material);
     } else {
       await new Promise(r => setTimeout(r, 600));
       story = localNightStory(material);
+      isFallback = true;
+    }
+    // AI 没接上 / 内容无效 → 自动换旧故事本的，保证每次都有故事
+    if (!story || !story.story || !story.title) {
+      await new Promise(r => setTimeout(r, 400));
+      story = localNightStory(material);
+      isFallback = true;
     }
     saveNightStory(story);
-    renderStoryCard(story);
+    renderStoryCard(story, isFallback);
     renderStoryList();
   } catch (e) {
-    console.error(e);
-    if (resultEl) resultEl.innerHTML = '<div style="text-align:center;padding:30px;color:#e55;font-size:13px;">❌ ' + (e.message || '生成失败') + '</div>';
+    // 无论如何都要给一篇故事，绝不让晞晞空手
+    console.warn('晚安故事AI异常，用本地故事兜底:', e);
+    try {
+      const fb = localNightStory(material);
+      saveNightStory(fb);
+      renderStoryCard(fb, true);
+      renderStoryList();
+    } catch (e2) {
+      if (resultEl) resultEl.innerHTML = '<div style="text-align:center;padding:30px;color:#e55;font-size:13px;">❌ ' + (e.message || '生成失败') + '</div>';
+    }
   } finally {
     _storySending = false;
     if (btn) { btn.disabled = false; btn.textContent = '🌙 今晚的故事'; }
@@ -68,8 +84,9 @@ async function callNightStoryAI(material) {
 她最近的日子：
 ${material || '（今天没什么特别的）'}
 
-最后一步，严格按照下面格式返回，只输出一个JSON对象，不要任何解释、不要markdown代码块、不要把正文写在JSON外面：
-{"title":"3-8个字的标题","story":"完整故事正文"}`;
+讲完故事后，把标题和正文整理成一个JSON对象返回：
+{"title":"3-8个字的标题","story":"完整故事正文"}
+（可以只输出这个JSON，我会自己解析；故事正文用完整的人话，不要漏字）`;
   const apiUrl = (apiConfig.baseUrl || 'https://api.deepseek.com').replace(/\/+$/, '') + '/chat/completions';
   const resp = await fetch(apiUrl, {
     method: 'POST',
@@ -78,9 +95,9 @@ ${material || '（今天没什么特别的）'}
       model: apiConfig.model || 'deepseek-v4-flash',
       messages: [
         { role: 'system', content: sp },
-        { role: 'user', content: '按最后一步要求，把故事用JSON返回。' }
+        { role: 'user', content: '把今晚的故事用JSON返回。' }
       ],
-      temperature: 0.85, max_tokens: 1024
+      temperature: 0.85, max_tokens: 1400
     })
   });
   if (!resp.ok) throw new Error('API错误(' + resp.status + ')');
@@ -103,7 +120,7 @@ ${material || '（今天没什么特别的）'}
     if (title.length > 8) title = title.slice(0, 8);
     return { title: title || '一个故事', story: text };
   }
-  throw new Error('AI没讲出来，再试试');
+  return null; // 没讲出来 → 交给上层用本地故事兜底
 }
 
 /* 没有 API Key 时的本地小故事兜底（有情节有人物） */
@@ -137,11 +154,11 @@ function saveNightStory(story) {
   return item;
 }
 
-function renderStoryCard(item) {
+function renderStoryCard(item, isFallback) {
   const el = document.getElementById('storyResult');
   if (!el) return;
   el.innerHTML = '<div style="background:#fff;border-radius:16px;padding:18px;box-shadow:0 2px 12px rgba(0,0,0,.06);">' +
-    '<div style="font-size:12px;color:#999;margin-bottom:6px;">🌙 骆云影 · ' + item.date + '</div>' +
+    '<div style="font-size:12px;color:#999;margin-bottom:6px;">🌙 骆云影 · ' + item.date + (isFallback ? ' <span style="color:#ccc;">（AI 没接上，先讲旧故事本的）</span>' : '') + '</div>' +
     '<div style="font-size:16px;font-weight:700;color:#334;margin-bottom:10px;">' + escHtml(item.title) + '</div>' +
     '<div style="font-size:14px;line-height:1.8;color:#555;white-space:pre-wrap;">' + escHtml(item.story) + '</div>' +
     '</div>';

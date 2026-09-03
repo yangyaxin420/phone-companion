@@ -1,5 +1,5 @@
-const CACHE = 'phone-v26';
-const SW_VERSION = 26;
+const CACHE = 'phone-v27';
+const SW_VERSION = 27;
 
 self.addEventListener('install', e => {
   console.log('[SW] Install v' + SW_VERSION);
@@ -18,13 +18,18 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  // 网络优先，缓存兜底（不再只从缓存读）
+  // 只处理同源 GET（页面静态资源），网络优先、缓存兜底；
+  // API(POST/跨域：deepseek/高德/天气)一律放行不缓存
+  const reqUrl = new URL(e.request.url);
+  if (e.request.method !== 'GET' || reqUrl.origin !== location.origin) return;
   e.respondWith(
     fetch(e.request).then(r => {
-      const clone = r.clone();
-      caches.open(CACHE).then(c => c.put(e.request, clone));
+      if (r && r.ok) {
+        const clone = r.clone();
+        caches.open(CACHE).then(c => c.put(e.request, clone));
+      }
       return r;
-    }).catch(() => caches.match(e.request))
+    }).catch(() => caches.match(e.request, { ignoreSearch: true }))
   );
 });
 

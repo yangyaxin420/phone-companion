@@ -71,6 +71,8 @@ function navigateTo(pageId, skipAnim) {
   if (pageId === 'page-expense') renderExpenseCats();
   if (pageId === 'page-persona') loadUserPersona();
   if (pageId === 'page-settings') loadSettings();
+  if (pageId === 'page-moments' && typeof renderMoments === 'function') renderMoments();
+  if (pageId === 'page-story' && typeof renderStoryList === 'function') renderStoryList();
   const emojiPanel = document.getElementById('emojiPanel');
   if (emojiPanel) emojiPanel.classList.remove('show');
   updateNav();
@@ -130,8 +132,6 @@ function updateChatContext() {
   }
   const undone = tasks.filter(t => !t.done).length;
   if (undone > 0) { tags.push(`☐${undone}`); details.push(`待办：${undone}个未完成`); }
-  const activeAlarms = alarms.filter(a => a.on);
-  if (activeAlarms.length > 0) { tags.push(`⏰${activeAlarms.length}`); details.push(`闹钟：${activeAlarms.map(a=>a.time).join('、')}`); }
   if (compState.running) { tags.push('⟳'); details.push(`专注：${compState.activity}`); }
   const todayStr = new Date().toISOString().split('T')[0];
   if (moodData[todayStr]) { tags.push(`${moodData[todayStr].emoji}`); details.push(`今日心情：${moodData[todayStr].label}`); }
