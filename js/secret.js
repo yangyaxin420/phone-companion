@@ -812,9 +812,8 @@ function showSecretAlbum() {
   const container = document.getElementById("secretContent");
   const pName = getSecretCharName();
 
-  // 优先用AI生成的数据，否则用性格动态池
-  const data = getSecretForChar(secretCharId);
-  var photos = (data && data.album) ? data.album : getPersonalityAlbum(pName, secretCharId);
+  // v5.4.0：每次点开都重新随机一轮（性格池+聊天记忆注入），图不固定
+  var photos = getPersonalityAlbum(pName, secretCharId);
 
   var totalText = photos.length + Math.floor(Math.random() * 10) + '张照片';
   let h = '<div style="font-size:12px;color:#999;padding:0 0 8px;">' + escHtml(pName) + '的相册 · ' + totalText + '</div>';

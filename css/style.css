@@ -227,8 +227,6 @@ ul{list-style:none;}
 .moment-comment-item:hover .moment-reply-btn{display:inline;}
 .moment-reply-btn:active{color:#BAE6FD;}
 .moment-comment-item b{color:#1e1e1e;}
-.moment-photo{margin-top:6px;border-radius:8px;overflow:hidden;}
-.moment-photo img{width:100%;max-height:200px;object-fit:cover;}
 .moment-like{display:flex;align-items:center;gap:4px;cursor:pointer;font-size:13px;color:#888;transition:color .15s;}
 .moment-like.liked{color:#e55;}
 .moment-like:active{transform:scale(.92);}

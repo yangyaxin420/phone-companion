@@ -1,5 +1,11 @@
 /* ==================== 11. 朋友圈 ==================== */
 let moments = lsGet('moments', []);
+// 迁移：清理历史动态里的配图字段（v5.4.0 起朋友圈不再配图）
+var _momHasPhoto = moments.some(function(_m) { return !!_m.photo; });
+if (_momHasPhoto) {
+  moments.forEach(function(_m) { delete _m.photo; });
+  lsSet('moments', moments);
+}
 
 function showMomentEditor() {
   const content = prompt('发布新动态：');
@@ -10,8 +16,8 @@ function showMomentEditor() {
   }
 }
 
-function addMoment(user, content, photo) {
-  const m = { user, content, time: Date.now(), likes: 0, liked: false, comments: [], photo: photo || null };
+function addMoment(user, content) {
+  const m = { user, content, time: Date.now(), likes: 0, liked: false, comments: [] };
   moments.unshift(m);
   lsSet('moments', moments);
   // 记录用户最近的动态，供骆云影发圈呼应
@@ -216,7 +222,7 @@ async function luoPostRelatedMoment(userContent) {
   if (!content) content = _fallbackRelatedMoment(userContent);
   if (!content) return;
 
-  moments.unshift({ user: pName, content: content, time: Date.now(), likes: 0, liked: false, comments: [], photo: null });
+  moments.unshift({ user: pName, content: content, time: Date.now(), likes: 0, liked: false, comments: [] });
   lsSet('moments', moments);
   renderMoments();
 }
@@ -242,7 +248,6 @@ function renderMoments() {
         </div>`
       ).join('') + '</div>';
     }
-    const photoHtml = m.photo ? `<div class="moment-photo"><img src="${m.photo}"></div>` : '';
     el.innerHTML = `
       <div class="moment-header">
         <div style="display:flex;align-items:center;gap:8px;">
@@ -251,7 +256,6 @@ function renderMoments() {
         <div class="moment-time">${timeStr}</div>
       </div>
       <div class="moment-content">${escHtml(m.content)}</div>
-      ${photoHtml}
       <div class="moment-actions">
         <div class="moment-like ${m.liked?'liked':''}" onclick="toggleLike(${i})">
           ${m.liked?'❤️':'🤍'} ${m.likes||0}
@@ -404,13 +408,7 @@ async function addAiMoment() {
         const data = await resp.json();
         const content = data.choices?.[0]?.message?.content?.trim();
         if (isValidAiReply(content)) {
-          let photo = null;
-          if (customImgEmojis.length > 0 && Math.random() < 0.3) {
-            const pick = customImgEmojis[Math.floor(Math.random() * customImgEmojis.length)];
-            const url = await getEmojiImgURL(pick.id);
-            if (url) photo = url;
-          }
-          moments.unshift({ user: pName, content, time: Date.now(), likes: 0, liked: false, comments: [], photo });
+          moments.unshift({ user: pName, content, time: Date.now(), likes: 0, liked: false, comments: [] });
           lsSet('moments', moments);
           renderMoments();
           return;
@@ -445,7 +443,7 @@ async function addAiMoment() {
     else templates.push('今天天气不错。');
   }
   var content = templates[Math.floor(Math.random()*templates.length)];
-  moments.unshift({ user: pName, content: content, time: Date.now(), likes: 0, liked: false, comments: [], photo: null });
+  moments.unshift({ user: pName, content: content, time: Date.now(), likes: 0, liked: false, comments: [] });
   lsSet('moments', moments);
   renderMoments();
 }
@@ -462,54 +460,6 @@ function momentPostedToday(pName) {
   return moments.some(function(m) {
     return m.user === pName && m.time && new Date(m.time).toISOString().split('T')[0] === todayStr;
   });
-}
-
-/* ---- 自动发圈配图：最近相册照片 → 自定义 emoji 图 → 情景 emoji ---- */
-async function pickMomentPhoto() {
-  var album = (typeof getAlbumPhotos === 'function') ? getAlbumPhotos() : [];
-  if (album.length > 0) {
-    var recent = album.slice().sort(function(a, b) { return (b.time || 0) - (a.time || 0); }).slice(0, 5);
-    if (Math.random() < 0.8) {
-      return recent[Math.floor(Math.random() * recent.length)].src;
-    }
-  }
-  if (typeof customImgEmojis !== 'undefined' && customImgEmojis.length > 0 && Math.random() < 0.8) {
-    var pick = customImgEmojis[Math.floor(Math.random() * customImgEmojis.length)];
-    if (typeof getEmojiImgURL === 'function') {
-      var url = await getEmojiImgURL(pick.id);
-      if (url) return url;
-    }
-  }
-  return sceneEmojiPhoto();
-}
-
-/* ---- 没有可用图时画一个情景 emoji 当配图（128px canvas） ---- */
-function sceneEmojiPhoto() {
-  try {
-    var h = new Date().getHours();
-    var emoji = '☀️';
-    var hasW = typeof weatherData !== 'undefined' && weatherData && Date.now() - weatherData.time < 3600000;
-    if (hasW) {
-      var desc = weatherData.desc || '';
-      if (weatherData.code >= 61 || desc.indexOf('雨') !== -1) emoji = '🌧️';
-      else if (desc.indexOf('雪') !== -1) emoji = '❄️';
-      else if (desc.indexOf('雾') !== -1) emoji = '🌫️';
-      else if (desc.indexOf('晴') !== -1) emoji = h < 12 ? '🌤️' : '☀️';
-      else emoji = '☁️';
-    } else {
-      emoji = h < 5 ? '🌌' : h < 9 ? '🌅' : h < 12 ? '🌤️' : h < 14 ? '☀️' : h < 18 ? '🕐' : '🌙';
-    }
-    var c = document.createElement('canvas');
-    c.width = 128; c.height = 128;
-    var x = c.getContext('2d');
-    x.fillStyle = '#eaf3f6';
-    x.fillRect(0, 0, 128, 128);
-    x.font = '80px serif';
-    x.textAlign = 'center';
-    x.textBaseline = 'middle';
-    x.fillText(emoji, 64, 70);
-    return c.toDataURL('image/png');
-  } catch(e) { return null; }
 }
 
 /* ---- AI自动发朋友圈（由主动消息轮询触发，每天每角色最多 1 条） ---- */
@@ -575,8 +525,7 @@ async function generateAutoMoment(char) {
         var data = await resp.json();
         var content = data.choices?.[0]?.message?.content?.trim();
         if (isValidAiReply(content)) {
-          var photo = await pickMomentPhoto();
-          moments.unshift({ user: pName, content: content, time: Date.now(), likes: 0, liked: false, comments: [], photo: photo });
+          moments.unshift({ user: pName, content: content, time: Date.now(), likes: 0, liked: false, comments: [] });
           lsSet('moments', moments);
           renderMoments();
           return;
@@ -649,8 +598,7 @@ async function generateAutoMoment(char) {
   }
 
   var content = templates[Math.floor(Math.random() * templates.length)];
-  var photo = await pickMomentPhoto();
-  moments.unshift({ user: pName, content: content, time: Date.now(), likes: 0, liked: false, comments: [], photo: photo });
+  moments.unshift({ user: pName, content: content, time: Date.now(), likes: 0, liked: false, comments: [] });
   lsSet('moments', moments);
   renderMoments();
 }
