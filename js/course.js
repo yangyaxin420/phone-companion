@@ -577,19 +577,109 @@ function courseCheckReminders() {
   } catch (e) { console.error('courseCheckReminders', e); }
 }
 
+/* ==================== 主页「今日课表+值班」widget ==================== */
+// 自动更新：切天/值班进行中/回到主页都由 initCourse 的轮询+可见性+app.js 跳转钩子触发
+function renderTodaySchedule() {
+  try {
+    const el = document.getElementById('todayScheduleCard');
+    if (!el) return;
+    if (!courseData) courseEnsure();
+    const now = new Date();
+    const day = courseDayNum(now);
+    const week = courseWeekNumber(now);
+    const open = week >= 1;
+    const tk = courseDateKey(now);
+    const mon = courseMonday(now);
+    const dd = new Date(mon); dd.setDate(mon.getDate() + day - 1);
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    const nowKey = (day - 1) * 1440 + nowMin;
+
+    // 今天课程（未开学只显示开学倒数）
+    const classes = [];
+    if (open) {
+      (courseData.items || []).forEach(function(it) { if (it.day === day && courseActiveWeek(it, week)) classes.push(it); });
+      classes.sort(function(a, b) { return a.s - b.s; });
+    }
+    // 今天值班：每周固定(星期匹配) + 一次性(日期匹配)
+    const shifts = [];
+    (courseData.dutyWeekly || []).forEach(function(w) { if (w.day === day) shifts.push({ t0: w.t0, t1: w.t1, loc: w.loc, name: w.name }); });
+    (courseData.duties || []).forEach(function(x) { if (x.date === tk) shifts.push({ t0: x.t0, t1: x.t1, loc: x.loc, name: x.name }); });
+    shifts.sort(function(a, b) { return _cHhMm(a.t0) - _cHhMm(b.t0); });
+
+    let h = '<div class="today-top"><span class="today-title">📅 今天 · ' + COURSE_WEEK_CN[day - 1] + '</span>' +
+      '<span class="today-sub">' + (dd.getMonth() + 1) + '月' + dd.getDate() + '日' + (open ? ' · 第' + week + '周 ' + (courseIsOdd(week) ? '单' : '双') : ' · 还没开学') + '</span></div>';
+
+    // 课
+    if (classes.length) {
+      h += '<div class="today-block"><div class="today-block-t">📖 课</div>' + classes.map(function(it) {
+        return '<div class="today-row"><span class="t-badge">' + it.s + (it.e > it.s ? '-' + it.e : '') + '节</span><span>' + _cEsc(it.name) + '</span>' + (it.room ? '<span class="t-loc">' + _cEsc(it.room) + '</span>' : '') + '</div>';
+      }).join('') + '</div>';
+    } else if (!open) {
+      h += '<div class="today-empty">' + (courseData.semesterStart ? '离 ' + courseData.semesterStart + ' 开学，先歇着～' : '还没排课表') + '</div>';
+    } else {
+      h += '<div class="today-empty">今天没课，好好歇着</div>';
+    }
+
+    // 值班
+    if (shifts.length) {
+      h += '<div class="today-block duty-block"><div class="today-block-t">🗓 值班</div>' + shifts.map(function(s) {
+        const live = nowMin >= _cHhMm(s.t0) && nowMin <= (s.t1 ? _cHhMm(s.t1) : _cHhMm(s.t0) + 60);
+        return '<div class="today-row duty"><span class="t-badge">' + (s.t0 || '') + (s.t1 ? '-' + s.t1 : '') + '</span><span>' + _cEsc(s.name || '值班') + '</span>' +
+          (s.loc ? '<span class="t-loc">' + _cEsc(s.loc) + '</span>' : '') +
+          (live ? '<span class="today-now-tag">进行中</span>' : '') + '</div>';
+      }).join('') + '</div>';
+    }
+
+    // 最近一班（未来 7 天内的固定班/单次，取最近）
+    let best = null;
+    for (let od = 0; od <= 6; od++) {
+      const wd = ((day - 1 + od) % 7) + 1;
+      const dk = courseDateKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() + od));
+      (courseData.dutyWeekly || []).forEach(function(r) {
+        if (r.day !== wd) return;
+        const k = od * 1440 + _cHhMm(r.t0);
+        if (k <= nowKey) return;
+        if (!best || k < best.k) best = { k: k, off: od, wd: wd, t0: r.t0, t1: r.t1, loc: r.loc };
+      });
+      (courseData.duties || []).forEach(function(x) {
+        if (x.date !== dk) return;
+        const k = od * 1440 + _cHhMm(x.t0);
+        if (k <= nowKey) return;
+        if (!best || k < best.k) best = { k: k, off: od, wd: wd, t0: x.t0, t1: x.t1, loc: x.loc };
+      });
+    }
+    if (best) {
+      const when = best.off === 0 ? '今天' : COURSE_WEEK_CN[best.wd - 1];
+      h += '<div class="today-next">下一班：' + when + ' ' + (best.t0 || '') + (best.t1 ? '-' + best.t1 : '') + (best.loc ? ' · ' + _cEsc(best.loc) : '') + '</div>';
+    }
+
+    el.innerHTML = h;
+    el.style.display = 'block';
+  } catch (e) { console.error('renderTodaySchedule', e); }
+}
+
 /* ==================== 初始化 ==================== */
 function initCourse() {
   try {
     courseEnsure();
     renderCourse();
+    renderTodaySchedule();
     setInterval(function() {
-      // 只在课表页可见时重绘（否则每60s刷新会打断横向滚动/阅读）；提醒照常后台跑
+      // 课表页可见才整表重绘（避免打断滚动）；主页「今日」组件与提醒照常刷新
       if (!document.hidden && typeof currentPage !== 'undefined' && currentPage === 'page-course') renderCourse();
+      if (typeof renderTodaySchedule === 'function') renderTodaySchedule();
       if (typeof courseCheckReminders === 'function') courseCheckReminders();
     }, 60000);
-    setTimeout(function() { if (typeof courseCheckReminders === 'function') courseCheckReminders(); }, 30000);
+    setTimeout(function() {
+      if (typeof renderTodaySchedule === 'function') renderTodaySchedule();
+      if (typeof courseCheckReminders === 'function') courseCheckReminders();
+    }, 30000);
     document.addEventListener('visibilitychange', function() {
-      if (!document.hidden) { renderCourse(); if (typeof courseCheckReminders === 'function') courseCheckReminders(); }
+      if (!document.hidden) {
+        renderCourse();
+        if (typeof renderTodaySchedule === 'function') renderTodaySchedule();
+        if (typeof courseCheckReminders === 'function') courseCheckReminders();
+      }
     });
   } catch (e) {
     console.error('initCourse', e);

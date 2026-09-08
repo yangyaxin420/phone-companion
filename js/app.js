@@ -77,6 +77,7 @@ function navigateTo(pageId, skipAnim) {
   if (pageId === 'page-story' && typeof renderStoryList === 'function') renderStoryList();
   if (pageId === 'page-sleep' && typeof renderSleep === 'function') renderSleep();
   if (pageId === 'page-course' && typeof renderCourse === 'function') renderCourse();
+  if (pageId === 'page-main' && typeof renderTodaySchedule === 'function') renderTodaySchedule();
   const emojiPanel = document.getElementById('emojiPanel');
   if (emojiPanel) emojiPanel.classList.remove('show');
   updateNav();
@@ -109,6 +110,7 @@ function goHome() {
     newEl.classList.remove('anim-in-left');
   }, 300);
   currentPage = 'page-main';
+  if (typeof renderTodaySchedule === 'function') renderTodaySchedule();
   updateNav();
 }
 

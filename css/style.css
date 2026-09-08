@@ -730,3 +730,20 @@ ul{list-style:none;}
 .duty-live .duty-tag{background:#3f8f6b;}
 .duty-today .duty-tag{background:#c96a2b;}
 .duty-x{flex:none;background:none;border:none;color:#d9a6a0;font-size:14px;cursor:pointer;padding:2px;}
+
+/* 主页「今日课表+值班」widget（course.js renderTodaySchedule） */
+.today-card{background:#fff;border:1px solid #e4f0f5;border-radius:16px;padding:10px 12px;margin:0 2px 4px;box-shadow:0 2px 12px rgba(166,204,221,.25);}
+.today-top{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;}
+.today-title{font-size:14px;font-weight:700;color:#3a5a6e;}
+.today-sub{font-size:10px;color:#a6c2d2;}
+.today-block{margin-top:7px;padding:6px 8px 4px;border-radius:10px;background:#f5fafd;}
+.today-block.duty-block{background:#fdf6ec;}
+.today-block-t{font-size:10px;color:#8fb1c6;font-weight:600;margin-bottom:1px;}
+.duty-block .today-block-t{color:#c9a26a;}
+.today-row{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px;color:#3a5a6e;line-height:1.5;}
+.today-row .t-badge{font-size:11px;color:#fff;background:#5b87a2;border-radius:6px;padding:1px 6px;flex:none;font-weight:600;white-space:nowrap;}
+.today-row.duty .t-badge{background:#e8a13c;}
+.today-row .t-loc{margin-left:auto;font-size:11px;color:#8fb1c6;white-space:nowrap;}
+.today-empty{font-size:12px;color:#b9cfdc;padding:4px 0 6px;}
+.today-next{margin-top:7px;font-size:11px;color:#7c9cb1;padding:5px 8px;background:#eef7fb;border-radius:9px;}
+.today-now-tag{display:inline-block;font-size:9px;color:#d97c46;border:1px solid #f2c9a8;background:#fdf2e7;border-radius:999px;padding:0 6px;line-height:1.6;margin-left:6px;flex:none;}
