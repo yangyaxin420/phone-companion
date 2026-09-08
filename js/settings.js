@@ -1,5 +1,5 @@
 /* ==================== 设置页 ==================== */
-const APP_VERSION = "v5.0.0 (2026.09.03)";
+const APP_VERSION = "v5.1.0 (2026.09.08)";
 
 const DEFAULT_SETTINGS = {
   proactiveMsg: true,
@@ -8,7 +8,8 @@ const DEFAULT_SETTINGS = {
   charPrivacy: false,
   disableActions: true,
   aiControl: false,
-  sleepGuard: true
+  sleepGuard: true,
+  scheduleRemind: true
 };
 
 let settings = lsGet('settings', DEFAULT_SETTINGS);
@@ -17,7 +18,17 @@ function loadSettings() {
   var verEl = document.getElementById('appVersionDisplay');
   if (verEl && typeof APP_VERSION !== 'undefined') verEl.textContent = APP_VERSION;
   settings = lsGet('settings', DEFAULT_SETTINGS);
-  const toggles = ['proactiveMsg','autoMoments','notifications','charPrivacy','disableActions','aiControl','sleepGuard'];
+  // 老数据可能缺新增的默认项（如 scheduleRemind）：补上默认值，避免「开关显示关、实际却在生效」的不一致
+  if (!settings || typeof settings !== 'object') {
+    settings = Object.assign({}, DEFAULT_SETTINGS);
+  } else {
+    var _missing = false;
+    for (var _k in DEFAULT_SETTINGS) {
+      if (settings[_k] === undefined) { settings[_k] = DEFAULT_SETTINGS[_k]; _missing = true; }
+    }
+    if (_missing) lsSet('settings', settings);
+  }
+  const toggles = ['proactiveMsg','autoMoments','notifications','charPrivacy','disableActions','aiControl','sleepGuard','scheduleRemind'];
   toggles.forEach(function(key) {
     const el = document.getElementById('setting' + key.charAt(0).toUpperCase() + key.slice(1));
     if (el) {
@@ -49,7 +60,8 @@ function toggleSetting(el, key) {
     charPrivacy: '角色隐私',
     disableActions: '禁止动作描写',
     aiControl: '允许AI操纵手机',
-    sleepGuard: '睡眠陪伴'
+    sleepGuard: '睡眠陪伴',
+    scheduleRemind: '上课提醒'
   };
   addChatSystem((isOn ? '✅ ' : '❌ ') + labels[key] + (isOn ? '已开启' : '已关闭'));
 }

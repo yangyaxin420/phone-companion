@@ -170,6 +170,96 @@ function doSleepNow(bedMs) {
   } catch (e) { console.error('doSleepNow', e); }
 }
 
+/* ---- ☀️ 我醒了：弹日期时间，确认后按真实醒来时刻结算当前这晚 ---- */
+function wakeNow() {
+  try {
+    const now = new Date();
+    const dEl = document.getElementById('wakeDate');
+    const tEl = document.getElementById('wakeTime');
+    const mEl = document.getElementById('wakeModal');
+    if (!dEl || !tEl || !mEl) { doWakeNow(Date.now()); return; }   // 兜底：没弹窗就直接记现在
+    const p = function(n) { return String(n).padStart(2, '0'); };
+    dEl.value = now.getFullYear() + '-' + p(now.getMonth() + 1) + '-' + p(now.getDate());
+    tEl.value = p(now.getHours()) + ':' + p(now.getMinutes());
+    mEl.style.display = 'flex';
+  } catch (e) { console.error('wakeNow', e); doWakeNow(Date.now()); }
+}
+function wakeModalCancel() {
+  const mEl = document.getElementById('wakeModal');
+  if (mEl) mEl.style.display = 'none';
+}
+function wakeModalConfirm() {
+  try {
+    wakeModalCancel();
+    let wakeMs = Date.now();
+    const dEl = document.getElementById('wakeDate');
+    const tEl = document.getElementById('wakeTime');
+    if (dEl && tEl && dEl.value && tEl.value) {
+      const dp = dEl.value.split('-'), tp = tEl.value.split(':');
+      if (dp.length === 3 && tp.length === 2) {
+        const ms = new Date(+dp[0], +dp[1] - 1, +dp[2], +tp[0], +tp[1]).getTime();
+        if (!isNaN(ms)) wakeMs = ms;
+      }
+    }
+    if (wakeMs > Date.now() + 60000) wakeMs = Date.now();   // 未来时间钳制为现在
+    doWakeNow(wakeMs);
+  } catch (e) { console.error('wakeModalConfirm', e); doWakeNow(Date.now()); }
+}
+function doWakeNow(wakeMs) {
+  try {
+    const wakeD = new Date(wakeMs);
+    const key = _sleepKeyLocal(wakeD);      // key=醒来时刻的本地日期（与 sleepFeedExternal 同规则）
+    const prev = sleepData[key] || null;
+    const mark = _sleepTonight();
+
+    /* 1) 找真实睡点：我睡了标记(当夜/昨夜) → 已存记录 → 才估算。seed 会 :51 用完即清标记，故要回退到 prev.bed */
+    let bedMs = null, realBed = false;
+    if (mark && mark.bed) {
+      const bedDay = new Date(mark.bed); bedDay.setHours(0, 0, 0, 0);
+      const wDay = new Date(wakeD); wDay.setHours(0, 0, 0, 0);
+      const diff = Math.round((wDay - bedDay) / 86400000);   // 0=当夜、1=昨夜睡下今早醒
+      if ((diff === 0 || diff === 1) && mark.bed <= wakeMs) { bedMs = mark.bed; realBed = true; }
+    }
+    if (bedMs == null && prev && prev.bed) { bedMs = prev.bed; realBed = !!(prev.seeded === false); }
+    if (bedMs == null) { bedMs = wakeMs - (7 * 3600 + Math.floor(Math.random() * 3600)) * 1000; }  // 估 6.5~7.5h
+
+    if (wakeMs <= bedMs) {
+      if (typeof addChatSystem === 'function') addChatSystem('😅 醒来时间要比睡下时间晚哦，这条没记。');
+      return;
+    }
+
+    /* 2) 结算写入（sleepMin/quality 按真实醒来重算；wakeCount 沿用已有值） */
+    const sleepMin = Math.min(720, Math.max(60, Math.round((wakeMs - bedMs) / 60000)));
+    const wakeCount = (prev && typeof prev.wakeCount === 'number') ? prev.wakeCount : 0;
+    sleepData[key] = {
+      wake: key, bed: bedMs, wakeUp: wakeMs, sleepMin,
+      wakeCount, quality: _sleepQuality(sleepMin, wakeCount), seeded: !realBed
+    };
+    lsSet('sleepTonight', null);
+    sleepSave();
+    if (typeof renderSleep === 'function') renderSleep();
+
+    /* 3) 晨间关心：衔接 scenario 'sleep'，并置防重标记，避免 5 分钟轮询又问一遍 */
+    const guardOn = !!(settings && settings.sleepGuard);
+    const greeted = !!lsGet('sleepGreeted_' + key, false);
+    const char = (typeof getCharById === 'function' && currentCharId) ? getCharById(currentCharId) : null;
+    const hs = Math.floor(sleepMin / 60), ms0 = sleepMin % 60;
+    if (guardOn && char && typeof generateProactiveMessage === 'function' && !greeted) {
+      const story = (char.story || '').toLowerCase();
+      const isT = /傲娇|毒舌|暴躁|刻薄|冷淡/.test(story);
+      const isG = /温柔|温暖|亲切|可爱|软/.test(story);
+      generateProactiveMessage('sleep', char, isT, isG, sleepData[key]);
+      lsSet('sleepGreeted_' + key, true);     // 吃掉标记 → 轮询不再双问
+    } else {
+      if (typeof addChatSystem === 'function') {
+        addChatSystem(guardOn && greeted
+          ? '☀️ 醒了。已把昨晚更新为 ' + _sleepHM(bedMs) + '→' + _sleepHM(wakeMs) + '（晨间那句已经问过啦）'
+          : '☀️ 醒了，早。昨晚 ' + _sleepHM(bedMs) + ' 睡、' + _sleepHM(wakeMs) + ' 醒，约 ' + hs + ' 小时' + (ms0 ? ms0 + ' 分' : '') + ' 已记好。');
+      }
+    }
+  } catch (e) { console.error('doWakeNow', e); }
+}
+
 /* ---- 页面渲染 ---- */
 function renderSleep() {
   try {

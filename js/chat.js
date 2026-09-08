@@ -907,6 +907,11 @@ function buildChatContext() {
     const sc = buildSleepContext();
     if (sc) block += '\n' + sc;
   }
+  // 课表感应（她今天的课/值班，骆云影看得到）
+  if (typeof buildScheduleContext === 'function') {
+    const cs = buildScheduleContext();
+    if (cs) block += '\n' + cs;
+  }
   return block;
 }
 
@@ -1168,6 +1173,11 @@ async function callLLMApi(userText) {
   if (typeof buildSleepContext === 'function') {
     const sc = buildSleepContext();
     if (sc) contextBlock += '\n' + sc;
+  }
+  // 课表感应（她今天的课/值班，骆云影看得到）
+  if (typeof buildScheduleContext === 'function') {
+    const cs = buildScheduleContext();
+    if (cs) contextBlock += '\n' + cs;
   }
   // 每日一问接话钩子（她刚回答时加一句，让他认真回应）
   if (typeof dailyQHint === 'function') {
@@ -1666,6 +1676,33 @@ async function generateProactiveMessage(scenario, char, isTsundere, isGentle, ex
       : isGentle
       ? ['晚安~盖好被子，今晚也梦到我','睡吧睡吧，我守着夜，你只管好好睡','晚安哦，明早我第一句话就跟你说']
       : ['晚安。','早点睡。明早见。'];
+  } else if (scenario === 'class') {
+    var _ci = extra && extra.item;
+    var _cd = _ci && _ci.type === 'duty';
+    var _nm = (_ci && _ci.name) ? String(_ci.name) : '';
+    var _act = _cd ? (_nm && _nm !== '值班' ? _nm : '值班') : (_nm || '课');   // 活动名：值班没具体名就统一叫「值班」
+    var _cs = _ci ? _ci.start : '';
+    var _cl = _ci && _ci.loc ? '@' + _ci.loc : '';
+    var _cm = extra && extra.min != null ? extra.min + '分钟' : '';
+    if (_cd) {
+      // 值班提醒
+      localTemplates = isTsundere
+        ? [_cm ? '你' + _cm + '后要去' + _act + '。记得去，别让人等。' : '到' + _act + '的点了。快去。',
+           '……' + _act + '要开始了，去吧。我可不想你迟到。']
+        : isGentle
+        ? ['快到' + _act + '的时间啦' + (_cm ? '，还有' + _cm : '') + (_cl ? '，在' + _cl : '') + '～慢慢过去也来得及',
+           '要' + _act + '咯' + (_cm ? '，还有' + _cm : '') + '，别迟到呀～']
+        : [(_cm ? '还有' + _cm + '去' + _act : '到' + _act + '的点了') + (_cs ? '，' + _cs : '') + (_cl ? '，' + _cl : '') + '。'];
+    } else {
+      // 上课提醒（课表没有钟点，暂只由其它路径触发）
+      localTemplates = isTsundere
+        ? [_cm ? '你' + _cm + '后上' + _act + '。啧，别迟到。' : '到' + _act + '的点了。快走，迟到我可不管。',
+           '……' + _act + '快开始了，去吧。我可不想你迟到。']
+        : isGentle
+        ? ['要上' + _act + '啦' + (_cm ? '，还有' + _cm : '') + (_cl ? '，在' + _cl : '') + '，别迟到哦',
+           '该去上' + _act + '了' + (_cm ? '，还有' + _cm : '') + '，慢慢过去也来得及']
+        : [(_cm ? '还有' + _cm + '上' + _act : '到' + _act + '的点了') + (_cl ? '，在' + _cl : '') + '，到了就专心。'];
+    }
   } else {
     localTemplates = isTsundere
       ? ['……无聊。你在干嘛。','哼。','啧。']
@@ -1686,6 +1723,7 @@ async function generateProactiveMessage(scenario, char, isTsundere, isGentle, ex
       else if (scenario === 'heart') scenarioDesc = '你"感觉"到用户的心跳' + (extra ? extra.hr : '') + ' bpm，有点快，关心她一下。';
       else if (scenario === 'sleep') scenarioDesc = '你刚"感觉"到她睡醒了，昨晚睡了约 ' + (extra && extra.sleepMin ? Math.floor(extra.sleepMin / 60) + ' 小时' : '一晚') + (extra && extra.quality ? (extra.quality === 'good' ? '，睡得很沉' : extra.quality === 'ok' ? '，睡得还行' : '，没睡够') : '') + '。自然地问她昨晚睡得好不好。';
       else if (scenario === 'goodnight') scenarioDesc = '用户要去睡了，温柔送她入睡，让她安心睡。';
+      else if (scenario === 'class') scenarioDesc = '用户' + (extra && extra.item && extra.item.type === 'duty' ? '快要去值班' : '快要去上课') + (extra && extra.item ? '：' + extra.item.name + '（' + extra.item.start + (extra.item.loc ? ' ' + extra.item.loc : '') + '）' : '') + (extra && extra.min != null ? '，还有约' + extra.min + '分钟' : '') + '。自然地提醒她该走了、别迟到，1-2句话，别啰嗦。';
       else scenarioDesc = '随意地和用户打个招呼。';
 
       var prompt = '你是' + pName + '.' + (story ? '你的性格/背景：' + story : '') + '\n' + scenarioDesc + '\n请发一条简短的消息给用户（1-2句话），符合你的性格特点和当前场景。\n- 不要用*动作描写*、不要加emoji\n- 简短自然，像微信消息';

@@ -4,6 +4,7 @@ const ICONS = [
   { id:'daily',    symbol:'📋', name:'日报',  page:'page-daily' },
   { id:'track',    symbol:'🧭', name:'足迹',  page:'page-track' },
   { id:'tasks',    symbol:'☑', name:'任务',  page:'page-tasks' },
+  { id:'course',   symbol:'📚', name:'课表',  page:'page-course' },
   { id:'companion',symbol:'⟳', name:'专注',  page:'page-companion' },
   { id:'moments',  symbol:'○', name:'朋友圈',page:'page-moments' },
   { id:'secret',   symbol:'◎', name:'Secret',page:'page-secret' },
@@ -75,6 +76,7 @@ function navigateTo(pageId, skipAnim) {
   if (pageId === 'page-moments' && typeof renderMoments === 'function') renderMoments();
   if (pageId === 'page-story' && typeof renderStoryList === 'function') renderStoryList();
   if (pageId === 'page-sleep' && typeof renderSleep === 'function') renderSleep();
+  if (pageId === 'page-course' && typeof renderCourse === 'function') renderCourse();
   const emojiPanel = document.getElementById('emojiPanel');
   if (emojiPanel) emojiPanel.classList.remove('show');
   updateNav();

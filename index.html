@@ -9,10 +9,10 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="theme-color" content="#ecf6f8">
-<meta name="app-version" content="v5.0.0 (2026.09.03)">
+<meta name="app-version" content="v5.1.0 (2026.09.08)">
 <title>我的手机</title>
-<link rel="stylesheet" href="css/style.css?v=39">
-<link rel="stylesheet" href="css/track.css?v=39">
+<link rel="stylesheet" href="css/style.css?v=41">
+<link rel="stylesheet" href="css/track.css?v=41">
 </head>
 <body>
 
@@ -575,7 +575,10 @@
   <div class="page" id="page-sleep">
     <div class="sub-page-header">💤 睡眠</div>
     <div class="sub-page-body" style="padding:14px 16px;overflow-y:auto;">
-      <button id="sleepBtn" onclick="sleepNow()" style="display:block;margin:2px auto 10px;padding:8px 22px;border:none;border-radius:999px;background:linear-gradient(135deg,#5b87a2,#7c5ba6);color:#fff;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 3px 10px rgba(124,91,166,.22);">🌙 我睡了</button>
+      <div style="display:flex;gap:10px;justify-content:center;margin:2px auto 10px;">
+        <button id="sleepBtn" onclick="sleepNow()" style="flex:1;max-width:150px;padding:8px 12px;border:none;border-radius:999px;background:linear-gradient(135deg,#5b87a2,#7c5ba6);color:#fff;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 3px 10px rgba(124,91,166,.22);">🌙 我睡了</button>
+        <button id="wakeBtn" onclick="wakeNow()" style="flex:1;max-width:150px;padding:8px 12px;border:none;border-radius:999px;background:linear-gradient(135deg,#e8a13c,#d97c46);color:#fff;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 3px 10px rgba(217,124,70,.22);">☀️ 我醒了</button>
+      </div>
       <div id="sleepWrap">
         <div class="steps-card" id="sleepLastCard"></div>
         <div style="font-size:12px;color:#4a7ba6;font-weight:600;margin-top:16px;">近 7 天睡得怎样</div>
@@ -597,6 +600,144 @@
             <button onclick="sleepModalCancel()" style="flex:1;padding:10px;border:none;border-radius:12px;background:#eef3f6;color:#6f94ab;font-size:13px;font-weight:600;cursor:pointer;">取消</button>
             <button onclick="sleepModalConfirm()" style="flex:1.4;padding:10px;border:none;border-radius:12px;background:linear-gradient(135deg,#5b87a2,#7c5ba6);color:#fff;font-size:13px;font-weight:600;cursor:pointer;">记下 · 晚安</button>
           </div>
+        </div>
+      </div>
+
+      <!-- 醒来弹窗：选日期和时间 -->
+      <div id="wakeModal" style="position:fixed;inset:0;background:rgba(20,30,45,.45);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;z-index:9999;">
+        <div style="width:min(300px,86vw);background:#fff;border-radius:22px;padding:20px 18px 14px;box-shadow:0 12px 40px rgba(20,25,45,.25);text-align:center;">
+          <div style="font-size:16px;font-weight:700;color:#3a5a6e;">☀️ 几点醒的呀</div>
+          <div style="font-size:11px;color:#9ab;margin:4px 0 14px;">会把昨晚按真实醒来时刻结算，他会安心</div>
+          <div style="display:flex;gap:10px;align-items:center;justify-content:center;">
+            <input type="date" id="wakeDate" style="flex:1.3;min-width:0;font-size:15px;padding:9px 8px;border:1px solid #d0e6ee;border-radius:12px;color:#3a5a6e;background:#f6fbfd;">
+            <input type="time" id="wakeTime" style="flex:1;min-width:0;font-size:15px;padding:9px 6px;border:1px solid #d0e6ee;border-radius:12px;color:#3a5a6e;background:#f6fbfd;">
+          </div>
+          <div style="display:flex;gap:10px;margin-top:16px;">
+            <button onclick="wakeModalCancel()" style="flex:1;padding:10px;border:none;border-radius:12px;background:#eef3f6;color:#6f94ab;font-size:13px;font-weight:600;cursor:pointer;">取消</button>
+            <button onclick="wakeModalConfirm()" style="flex:1.4;padding:10px;border:none;border-radius:12px;background:linear-gradient(135deg,#e8a13c,#d97c46);color:#fff;font-size:13px;font-weight:600;cursor:pointer;">记下 · 早安</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 课表 + 值班 ===== -->
+  <div class="page" id="page-course">
+    <div class="sub-page-header flex-between">
+      <span>📚 课表</span>
+      <span style="font-size:11px;color:#7f9fb4;font-weight:400;" id="courseWeekInfo"></span>
+    </div>
+    <div class="sub-page-body" style="padding:12px 12px 16px;overflow-y:auto;">
+      <!-- 开学第1周周一（唯一保留设置）+ 本周状态 -->
+      <div class="course-bar">
+        <span style="white-space:nowrap;color:#5a7c92;">开学第1周周一</span>
+        <input type="date" id="courseStartDate" onchange="courseSetStart(this.value)">
+        <span class="course-badge" id="courseWeekBadge"></span>
+      </div>
+      <!-- Excel式网格：横=周一~周五 纵=第1~12节 -->
+      <div class="steps-card" style="padding:8px;">
+        <div class="course-scroll" id="courseGrid"></div>
+      </div>
+      <div style="font-size:10px;color:#b5cbd8;line-height:1.7;margin:6px 2px 14px;">点空格加课、点课块可改可删 · 课只在自己周数显示（1-7周的课，第8周自动消失）· 单双周、前几周/后几周都认</div>
+      <!-- 值班：按日期罗列 -->
+      <div class="course-duty-head">
+        <span style="font-size:12px;color:#4a7ba6;font-weight:600;">🗓 值班 · 按日期</span>
+        <button onclick="openDutyAdd()" class="course-addbtn">➕ 值班</button>
+      </div>
+      <div class="steps-card" style="padding:6px 10px;" id="courseDutyList"></div>
+      <div style="font-size:10px;color:#c6d6df;text-align:center;margin-top:10px;line-height:1.6;">值班当天到点前，他会轻声提醒你</div>
+    </div>
+
+    <!-- 添加/编辑课程弹窗 -->
+    <div id="courseModal" style="position:fixed;inset:0;background:rgba(20,30,45,.45);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;z-index:9999;">
+      <div style="width:min(330px,90vw);background:#fff;border-radius:22px;padding:18px 16px 14px;box-shadow:0 12px 40px rgba(20,25,45,.25);">
+        <div id="courseModalTitle" style="font-size:16px;font-weight:700;color:#3a5a6e;text-align:center;">➕ 加课</div>
+        <input type="hidden" id="courseFormId">
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <div style="flex:1.2;">
+            <div style="font-size:11px;color:#9ab;">星期</div>
+            <select id="courseFormDay" class="course-select">
+              <option value="1">周一</option><option value="2">周二</option><option value="3">周三</option>
+              <option value="4">周四</option><option value="5">周五</option>
+            </select>
+          </div>
+          <div style="flex:1;">
+            <div style="font-size:11px;color:#9ab;">第几节</div>
+            <select id="courseFormS" class="course-select">
+              <option value="1">第1节</option><option value="2">第2节</option><option value="3">第3节</option><option value="4">第4节</option><option value="5">第5节</option>
+              <option value="6">第6节</option><option value="7">第7节</option><option value="8">第8节</option><option value="9">第9节</option><option value="10">第10节</option>
+              <option value="11">第11节</option><option value="12">第12节</option>
+            </select>
+          </div>
+          <div style="flex:1;">
+            <div style="font-size:11px;color:#9ab;">到</div>
+            <select id="courseFormE" class="course-select">
+              <option value="1">第1节</option><option value="2">第2节</option><option value="3">第3节</option><option value="4">第4节</option><option value="5">第5节</option>
+              <option value="6">第6节</option><option value="7">第7节</option><option value="8">第8节</option><option value="9">第9节</option><option value="10">第10节</option>
+              <option value="11">第11节</option><option value="12">第12节</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-top:10px;">
+          <div style="font-size:11px;color:#9ab;">课程名</div>
+          <input type="text" id="courseFormName" placeholder="如：心理学" class="course-input">
+        </div>
+        <div style="margin-top:10px;">
+          <div style="font-size:11px;color:#9ab;">教室（可空）</div>
+          <input type="text" id="courseFormRoom" placeholder="L4-312" class="course-input">
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:10px;">
+          <span style="font-size:11px;color:#9ab;">第</span>
+          <input type="number" id="courseFormW1" min="1" max="30" class="course-num">
+          <span style="font-size:11px;color:#9ab;">—</span>
+          <input type="number" id="courseFormW2" min="1" max="30" class="course-num">
+          <span style="font-size:11px;color:#9ab;">周</span>
+          <button type="button" onclick="courseFormTerm()" style="margin-left:auto;font-size:12px;color:#4a7ba6;background:#eef4fb;border:none;border-radius:999px;padding:6px 10px;cursor:pointer;">整学期</button>
+        </div>
+        <div style="display:flex;background:#e7eef4;border-radius:12px;padding:3px;gap:4px;margin-top:10px;">
+          <div id="courseFormParity_all" onclick="setCourseParityForm('all')" style="flex:1;text-align:center;padding:6px 0;border-radius:9px;font-size:12px;cursor:pointer;">每周</div>
+          <div id="courseFormParity_odd" onclick="setCourseParityForm('odd')" style="flex:1;text-align:center;padding:6px 0;border-radius:9px;font-size:12px;cursor:pointer;">单周</div>
+          <div id="courseFormParity_even" onclick="setCourseParityForm('even')" style="flex:1;text-align:center;padding:6px 0;border-radius:9px;font-size:12px;cursor:pointer;">双周</div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:14px;">
+          <button id="courseFormDel" onclick="courseFormDelete()" style="display:none;padding:10px 8px;border:none;border-radius:12px;background:#fdeeee;color:#d96a5a;font-size:13px;font-weight:600;cursor:pointer;">🗑</button>
+          <button onclick="courseFormCancel()" style="flex:1;padding:10px;border:none;border-radius:12px;background:#eef3f6;color:#6f94ab;font-size:13px;font-weight:600;cursor:pointer;">取消</button>
+          <button onclick="courseFormSave()" style="flex:1.4;padding:10px;border:none;border-radius:12px;background:linear-gradient(135deg,#5b87a2,#7c5ba6);color:#fff;font-size:13px;font-weight:600;cursor:pointer;">✓ 保存</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 值班弹窗（具体日期） -->
+    <div id="dutyModal" style="position:fixed;inset:0;background:rgba(20,30,45,.45);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;z-index:9999;">
+      <div style="width:min(300px,86vw);background:#fff;border-radius:22px;padding:18px 16px 14px;box-shadow:0 12px 40px rgba(20,25,45,.25);">
+        <div style="font-size:16px;font-weight:700;color:#3a5a6e;text-align:center;">🗓 值班安排</div>
+        <input type="hidden" id="dutyFormId">
+        <div style="margin-top:12px;">
+          <div style="font-size:11px;color:#9ab;">日期</div>
+          <input type="date" id="dutyFormDate" class="course-input">
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          <div style="flex:1;">
+            <div style="font-size:11px;color:#9ab;">开始</div>
+            <input type="time" id="dutyFormT0" class="course-input">
+          </div>
+          <div style="flex:1;">
+            <div style="font-size:11px;color:#9ab;">结束</div>
+            <input type="time" id="dutyFormT1" class="course-input">
+          </div>
+        </div>
+        <div style="margin-top:10px;">
+          <div style="font-size:11px;color:#9ab;">名称（可空）</div>
+          <input type="text" id="dutyFormName" placeholder="值班 / 开会 / 志愿" class="course-input">
+        </div>
+        <div style="margin-top:10px;">
+          <div style="font-size:11px;color:#9ab;">地点（可空）</div>
+          <input type="text" id="dutyFormLoc" placeholder="学生会办公室" class="course-input">
+        </div>
+        <div style="display:flex;gap:10px;margin-top:14px;">
+          <button id="dutyFormDel" onclick="dutyFormDelete()" style="display:none;padding:10px 8px;border:none;border-radius:12px;background:#fdeeee;color:#d96a5a;font-size:13px;font-weight:600;cursor:pointer;">🗑</button>
+          <button onclick="dutyFormCancel()" style="flex:1;padding:10px;border:none;border-radius:12px;background:#eef3f6;color:#6f94ab;font-size:13px;font-weight:600;cursor:pointer;">取消</button>
+          <button onclick="dutyFormSave()" style="flex:1.4;padding:10px;border:none;border-radius:12px;background:linear-gradient(135deg,#e8a13c,#d97c46);color:#fff;font-size:13px;font-weight:600;cursor:pointer;">✓ 保存</button>
         </div>
       </div>
     </div>
@@ -636,6 +777,19 @@
             <div class="settings-row-desc">他会记你几点睡、早上问一句睡得怎样、睡前说晚安</div>
           </div>
           <div class="ios-toggle" id="settingSleepGuard" onclick="toggleSetting(this,'sleepGuard')">
+            <div class="ios-toggle-slider"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 📚 上课提醒 -->
+      <div class="settings-card">
+        <div class="settings-row">
+          <div class="settings-row-left">
+            <div class="settings-row-title">📚 上课提醒</div>
+            <div class="settings-row-desc">他会看着你的课表，上课/值班前轻声提醒你</div>
+          </div>
+          <div class="ios-toggle" id="settingScheduleRemind" onclick="toggleSetting(this,'scheduleRemind')">
             <div class="ios-toggle-slider"></div>
           </div>
         </div>
@@ -876,29 +1030,30 @@
 </div><!-- phone-frame -->
 
 <!-- script moved to external files -->
-<script src="js/utils.js?v=39"></script>
-    <script src="js/photo.js?v=39"></script>
-<script src="js/app.js?v=39"></script>
-<script src="js/weather.js?v=39"></script>
-<script src="js/tasks.js?v=39"></script>
-<script src="js/expense.js?v=39"></script>
-<script src="js/chat.js?v=39"></script>
-<script src="js/question.js?v=39"></script>
-<script src="js/secret.js?v=39"></script>
-<script src="js/moments.js?v=39"></script>
-<script src="js/persona.js?v=39"></script>
-<script src="js/daily.js?v=39"></script>
-<script src="js/tide.js?v=39"></script>
-<script src="js/companion.js?v=39"></script>
-<script src="js/settings.js?v=39"></script>
-<script src="js/track.js?v=39"></script>
-<script src="js/heart.js?v=39"></script>
-<script src="js/steps.js?v=39"></script>
-<script src="js/report.js?v=39"></script>
-<script src="js/breathe.js?v=39"></script>
-<script src="js/band.js?v=39"></script>
-<script src="js/story.js?v=39"></script>
-<script src="js/sleep.js?v=39"></script>
+<script src="js/utils.js?v=41"></script>
+    <script src="js/photo.js?v=41"></script>
+<script src="js/app.js?v=41"></script>
+<script src="js/weather.js?v=41"></script>
+<script src="js/tasks.js?v=41"></script>
+<script src="js/expense.js?v=41"></script>
+<script src="js/chat.js?v=41"></script>
+<script src="js/question.js?v=41"></script>
+<script src="js/secret.js?v=41"></script>
+<script src="js/moments.js?v=41"></script>
+<script src="js/persona.js?v=41"></script>
+<script src="js/daily.js?v=41"></script>
+<script src="js/tide.js?v=41"></script>
+<script src="js/companion.js?v=41"></script>
+<script src="js/settings.js?v=41"></script>
+<script src="js/track.js?v=41"></script>
+<script src="js/heart.js?v=41"></script>
+<script src="js/steps.js?v=41"></script>
+<script src="js/report.js?v=41"></script>
+<script src="js/breathe.js?v=41"></script>
+<script src="js/band.js?v=41"></script>
+<script src="js/story.js?v=41"></script>
+<script src="js/sleep.js?v=41"></script>
+<script src="js/course.js?v=41"></script>
 <script>
 /* ==================== 初始化 ==================== */
 function init() {
@@ -953,6 +1108,8 @@ function init() {
   if (typeof initSteps === 'function') initSteps();
   // 睡眠（模拟/🌙我睡了）
   if (typeof initSleep === 'function') initSleep();
+  // 课表（课程/值班 · AI解析导入）
+  if (typeof initCourse === 'function') initCourse();
   // ?heart=1 直接进心跳页（调试/快捷入口）
   if (typeof URLSearchParams !== 'undefined' && new URLSearchParams(location.search).get('heart') === '1') {
     navigateTo('page-heart', true);
