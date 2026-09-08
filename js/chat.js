@@ -1682,26 +1682,26 @@ async function generateProactiveMessage(scenario, char, isTsundere, isGentle, ex
     var _nm = (_ci && _ci.name) ? String(_ci.name) : '';
     var _act = _cd ? (_nm && _nm !== '值班' ? _nm : '值班') : (_nm || '课');   // 活动名：值班没具体名就统一叫「值班」
     var _cs = _ci ? _ci.start : '';
-    var _cl = _ci && _ci.loc ? '@' + _ci.loc : '';
+    var _cl = _ci && _ci.loc ? String(_ci.loc) : '';   // 地点直接说（四楼/一楼），不加 @
     var _cm = extra && extra.min != null ? extra.min + '分钟' : '';
     if (_cd) {
       // 值班提醒
       localTemplates = isTsundere
-        ? [_cm ? '你' + _cm + '后要去' + _act + '。记得去，别让人等。' : '到' + _act + '的点了。快去。',
+        ? [_cm ? '你' + _cm + '后要去' + _act + (_cl ? '，在' + _cl : '') + '。记得去，别让人等。' : '到' + _act + '的点了' + (_cl ? '，在' + _cl : '') + '。快去。',
            '……' + _act + '要开始了，去吧。我可不想你迟到。']
         : isGentle
         ? ['快到' + _act + '的时间啦' + (_cm ? '，还有' + _cm : '') + (_cl ? '，在' + _cl : '') + '～慢慢过去也来得及',
-           '要' + _act + '咯' + (_cm ? '，还有' + _cm : '') + '，别迟到呀～']
-        : [(_cm ? '还有' + _cm + '去' + _act : '到' + _act + '的点了') + (_cs ? '，' + _cs : '') + (_cl ? '，' + _cl : '') + '。'];
+           '要' + _act + '咯' + (_cm ? '，还有' + _cm : '') + (_cl && !_cm ? '，在' + _cl : '') + '，别迟到呀～']
+        : [(_cm ? '还有' + _cm + '去' + _act : '到' + _act + '的点了') + (_cl ? '，在' + _cl : '') + '。'];
     } else {
       // 上课提醒（课表没有钟点，暂只由其它路径触发）
       localTemplates = isTsundere
         ? [_cm ? '你' + _cm + '后上' + _act + '。啧，别迟到。' : '到' + _act + '的点了。快走，迟到我可不管。',
            '……' + _act + '快开始了，去吧。我可不想你迟到。']
         : isGentle
-        ? ['要上' + _act + '啦' + (_cm ? '，还有' + _cm : '') + (_cl ? '，在' + _cl : '') + '，别迟到哦',
+        ? ['要上' + _act + '啦' + (_cm ? '，还有' + _cm : '') + (_cs ? '，' + _cs + '开始' : '') + (_cl ? '，在' + _cl : '') + '，别迟到哦',
            '该去上' + _act + '了' + (_cm ? '，还有' + _cm : '') + '，慢慢过去也来得及']
-        : [(_cm ? '还有' + _cm + '上' + _act : '到' + _act + '的点了') + (_cl ? '，在' + _cl : '') + '，到了就专心。'];
+        : [(_cm ? '还有' + _cm + '上' + _act : '到' + _act + '的点了') + (_cs && !_cm ? '，' + _cs + '开始' : '') + (_cl ? '，在' + _cl : '') + '。'];
     }
   } else {
     localTemplates = isTsundere

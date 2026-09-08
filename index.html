@@ -9,10 +9,10 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="theme-color" content="#ecf6f8">
-<meta name="app-version" content="v5.1.0 (2026.09.08)">
+<meta name="app-version" content="v5.2.0 (2026.09.08)">
 <title>我的手机</title>
-<link rel="stylesheet" href="css/style.css?v=41">
-<link rel="stylesheet" href="css/track.css?v=41">
+<link rel="stylesheet" href="css/style.css?v=42">
+<link rel="stylesheet" href="css/track.css?v=42">
 </head>
 <body>
 
@@ -639,13 +639,18 @@
         <div class="course-scroll" id="courseGrid"></div>
       </div>
       <div style="font-size:10px;color:#b5cbd8;line-height:1.7;margin:6px 2px 14px;">点空格加课、点课块可改可删 · 课只在自己周数显示（1-7周的课，第8周自动消失）· 单双周、前几周/后几周都认</div>
-      <!-- 值班：按日期罗列 -->
+      <!-- 值班：每周固定班（主）+ 偶尔单次（换班/临时） -->
       <div class="course-duty-head">
-        <span style="font-size:12px;color:#4a7ba6;font-weight:600;">🗓 值班 · 按日期</span>
-        <button onclick="openDutyAdd()" class="course-addbtn">➕ 值班</button>
+        <span style="font-size:12px;color:#4a7ba6;font-weight:600;">🗓 值班 · 每周固定</span>
+        <button onclick="openDutyAdd()" class="course-addbtn">➕ 加时段</button>
       </div>
       <div class="steps-card" style="padding:6px 10px;" id="courseDutyList"></div>
-      <div style="font-size:10px;color:#c6d6df;text-align:center;margin-top:10px;line-height:1.6;">值班当天到点前，他会轻声提醒你</div>
+      <div style="display:flex;align-items:center;gap:6px;margin:10px 2px 6px;">
+        <span style="font-size:11px;color:#a6c2d2;">偶尔换班 / 单次</span>
+        <button onclick="openOneoffAdd()" style="margin-left:auto;font-size:11px;color:#d97c46;background:#fdf2e7;border:none;border-radius:999px;padding:5px 12px;cursor:pointer;">＋ 临时按日期</button>
+      </div>
+      <div class="steps-card" style="padding:6px 10px;" id="courseOneoffList"></div>
+      <div style="font-size:10px;color:#c6d6df;text-align:center;margin-top:10px;line-height:1.6;">固定班每周循环，到点前他会轻声提醒你</div>
     </div>
 
     <!-- 添加/编辑课程弹窗 -->
@@ -707,14 +712,17 @@
       </div>
     </div>
 
-    <!-- 值班弹窗（具体日期） -->
+    <!-- 值班弹窗：每周固定（星期+起止+地点） -->
     <div id="dutyModal" style="position:fixed;inset:0;background:rgba(20,30,45,.45);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;z-index:9999;">
       <div style="width:min(300px,86vw);background:#fff;border-radius:22px;padding:18px 16px 14px;box-shadow:0 12px 40px rgba(20,25,45,.25);">
-        <div style="font-size:16px;font-weight:700;color:#3a5a6e;text-align:center;">🗓 值班安排</div>
+        <div style="font-size:16px;font-weight:700;color:#3a5a6e;text-align:center;">🗓 每周固定值班</div>
         <input type="hidden" id="dutyFormId">
         <div style="margin-top:12px;">
-          <div style="font-size:11px;color:#9ab;">日期</div>
-          <input type="date" id="dutyFormDate" class="course-input">
+          <div style="font-size:11px;color:#9ab;">星期</div>
+          <select id="dutyFormDay" class="course-select">
+            <option value="1">周一</option><option value="2">周二</option><option value="3">周三</option><option value="4">周四</option><option value="5">周五</option>
+            <option value="6">周六</option><option value="7">周日</option>
+          </select>
         </div>
         <div style="display:flex;gap:8px;margin-top:10px;">
           <div style="flex:1;">
@@ -731,13 +739,48 @@
           <input type="text" id="dutyFormName" placeholder="值班 / 开会 / 志愿" class="course-input">
         </div>
         <div style="margin-top:10px;">
-          <div style="font-size:11px;color:#9ab;">地点（可空）</div>
-          <input type="text" id="dutyFormLoc" placeholder="学生会办公室" class="course-input">
+          <div style="font-size:11px;color:#9ab;">地点</div>
+          <input type="text" id="dutyFormLoc" placeholder="四楼 / 一楼" class="course-input">
         </div>
         <div style="display:flex;gap:10px;margin-top:14px;">
           <button id="dutyFormDel" onclick="dutyFormDelete()" style="display:none;padding:10px 8px;border:none;border-radius:12px;background:#fdeeee;color:#d96a5a;font-size:13px;font-weight:600;cursor:pointer;">🗑</button>
           <button onclick="dutyFormCancel()" style="flex:1;padding:10px;border:none;border-radius:12px;background:#eef3f6;color:#6f94ab;font-size:13px;font-weight:600;cursor:pointer;">取消</button>
           <button onclick="dutyFormSave()" style="flex:1.4;padding:10px;border:none;border-radius:12px;background:linear-gradient(135deg,#e8a13c,#d97c46);color:#fff;font-size:13px;font-weight:600;cursor:pointer;">✓ 保存</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 临时值班弹窗（具体日期，换班用） -->
+    <div id="oneoffModal" style="position:fixed;inset:0;background:rgba(20,30,45,.45);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;z-index:9999;">
+      <div style="width:min(300px,86vw);background:#fff;border-radius:22px;padding:18px 16px 14px;box-shadow:0 12px 40px rgba(20,25,45,.25);">
+        <div style="font-size:16px;font-weight:700;color:#3a5a6e;text-align:center;">🗓 临时值班</div>
+        <input type="hidden" id="oneoffFormId">
+        <div style="margin-top:12px;">
+          <div style="font-size:11px;color:#9ab;">日期</div>
+          <input type="date" id="oneoffFormDate" class="course-input">
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          <div style="flex:1;">
+            <div style="font-size:11px;color:#9ab;">开始</div>
+            <input type="time" id="oneoffFormT0" class="course-input">
+          </div>
+          <div style="flex:1;">
+            <div style="font-size:11px;color:#9ab;">结束</div>
+            <input type="time" id="oneoffFormT1" class="course-input">
+          </div>
+        </div>
+        <div style="margin-top:10px;">
+          <div style="font-size:11px;color:#9ab;">名称（可空）</div>
+          <input type="text" id="oneoffFormName" placeholder="值班 / 开会 / 志愿" class="course-input">
+        </div>
+        <div style="margin-top:10px;">
+          <div style="font-size:11px;color:#9ab;">地点（可空）</div>
+          <input type="text" id="oneoffFormLoc" placeholder="学生会办公室" class="course-input">
+        </div>
+        <div style="display:flex;gap:10px;margin-top:14px;">
+          <button id="oneoffFormDel" onclick="oneoffFormDelete()" style="display:none;padding:10px 8px;border:none;border-radius:12px;background:#fdeeee;color:#d96a5a;font-size:13px;font-weight:600;cursor:pointer;">🗑</button>
+          <button onclick="oneoffFormCancel()" style="flex:1;padding:10px;border:none;border-radius:12px;background:#eef3f6;color:#6f94ab;font-size:13px;font-weight:600;cursor:pointer;">取消</button>
+          <button onclick="oneoffFormSave()" style="flex:1.4;padding:10px;border:none;border-radius:12px;background:linear-gradient(135deg,#e8a13c,#d97c46);color:#fff;font-size:13px;font-weight:600;cursor:pointer;">✓ 保存</button>
         </div>
       </div>
     </div>
@@ -1030,30 +1073,30 @@
 </div><!-- phone-frame -->
 
 <!-- script moved to external files -->
-<script src="js/utils.js?v=41"></script>
-    <script src="js/photo.js?v=41"></script>
-<script src="js/app.js?v=41"></script>
-<script src="js/weather.js?v=41"></script>
-<script src="js/tasks.js?v=41"></script>
-<script src="js/expense.js?v=41"></script>
-<script src="js/chat.js?v=41"></script>
-<script src="js/question.js?v=41"></script>
-<script src="js/secret.js?v=41"></script>
-<script src="js/moments.js?v=41"></script>
-<script src="js/persona.js?v=41"></script>
-<script src="js/daily.js?v=41"></script>
-<script src="js/tide.js?v=41"></script>
-<script src="js/companion.js?v=41"></script>
-<script src="js/settings.js?v=41"></script>
-<script src="js/track.js?v=41"></script>
-<script src="js/heart.js?v=41"></script>
-<script src="js/steps.js?v=41"></script>
-<script src="js/report.js?v=41"></script>
-<script src="js/breathe.js?v=41"></script>
-<script src="js/band.js?v=41"></script>
-<script src="js/story.js?v=41"></script>
-<script src="js/sleep.js?v=41"></script>
-<script src="js/course.js?v=41"></script>
+<script src="js/utils.js?v=42"></script>
+    <script src="js/photo.js?v=42"></script>
+<script src="js/app.js?v=42"></script>
+<script src="js/weather.js?v=42"></script>
+<script src="js/tasks.js?v=42"></script>
+<script src="js/expense.js?v=42"></script>
+<script src="js/chat.js?v=42"></script>
+<script src="js/question.js?v=42"></script>
+<script src="js/secret.js?v=42"></script>
+<script src="js/moments.js?v=42"></script>
+<script src="js/persona.js?v=42"></script>
+<script src="js/daily.js?v=42"></script>
+<script src="js/tide.js?v=42"></script>
+<script src="js/companion.js?v=42"></script>
+<script src="js/settings.js?v=42"></script>
+<script src="js/track.js?v=42"></script>
+<script src="js/heart.js?v=42"></script>
+<script src="js/steps.js?v=42"></script>
+<script src="js/report.js?v=42"></script>
+<script src="js/breathe.js?v=42"></script>
+<script src="js/band.js?v=42"></script>
+<script src="js/story.js?v=42"></script>
+<script src="js/sleep.js?v=42"></script>
+<script src="js/course.js?v=42"></script>
 <script>
 /* ==================== 初始化 ==================== */
 function init() {

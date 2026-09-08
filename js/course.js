@@ -29,6 +29,16 @@ const COURSE_DEFAULT = {
   duties: []
 };
 
+// 默认每周固定值班表（晞晞口述：周四早上四楼 / 周五两段四楼 / 周六两段一楼 / 周日晚四楼）
+const DUTY_WEEKLY_DEFAULT = [
+  { day: 4, t0: '08:00', t1: '09:30', loc: '四楼' },
+  { day: 5, t0: '17:00', t1: '18:30', loc: '四楼' },
+  { day: 5, t0: '20:00', t1: '22:00', loc: '四楼' },
+  { day: 6, t0: '17:00', t1: '18:30', loc: '一楼' },
+  { day: 6, t0: '20:00', t1: '22:00', loc: '一楼' },
+  { day: 7, t0: '17:00', t1: '18:30', loc: '四楼' }
+];
+
 let courseData = lsGet('course', null);
 let _courseFormParity = 'all';   // 弹窗里当前选中的 每周/单/双
 const _coursePalette = [
@@ -85,11 +95,22 @@ function _color(name) {
 /* ==================== 存取 / 初始化默认 ==================== */
 function courseSave() { if (courseData) lsSet('course', courseData); }
 function courseSeedDefault() {
-  courseData = { schema: 'course2', semesterStart: COURSE_DEFAULT.semesterStart, items: [], duties: [] };
+  courseData = { schema: 'course2', semesterStart: COURSE_DEFAULT.semesterStart, items: [], duties: [], dutyWeekly: [] };
   COURSE_DEFAULT.items.forEach(function(it) {
     courseData.items.push(Object.assign({ id: _courseUid() }, it));
   });
+  DUTY_WEEKLY_DEFAULT.forEach(function(w) {
+    courseData.dutyWeekly.push(Object.assign({ id: _courseUid() }, w));
+  });
   courseSave();
+}
+function _dutyWeeklyFix(x) {          // 归一化每周值班条目字段
+  if (!x) return null;
+  x.day = (+x.day >= 1 && +x.day <= 7) ? +x.day : 7;
+  x.t0 = String(x.t0 || '17:00').slice(0, 5);
+  x.t1 = String(x.t1 || '').slice(0, 5);
+  x.loc = String(x.loc || '').trim();
+  return x;
 }
 function courseEnsure() {
   const raw = lsGet('course', null);
@@ -97,6 +118,16 @@ function courseEnsure() {
     courseData = raw;
     if (!Array.isArray(courseData.items)) courseData.items = [];
     if (!Array.isArray(courseData.duties)) courseData.duties = [];
+    let addedWeekly = false;
+    if (!Array.isArray(courseData.dutyWeekly)) {               // 老数据补默认每周值班表
+      courseData.dutyWeekly = [];
+      DUTY_WEEKLY_DEFAULT.forEach(function(w) {
+        courseData.dutyWeekly.push(Object.assign({ id: _courseUid() }, w));
+      });
+      addedWeekly = true;
+    }
+    courseData.dutyWeekly = courseData.dutyWeekly.map(_dutyWeeklyFix).filter(Boolean);
+    if (addedWeekly) courseSave();                             // 默认值班表落盘，避免每次进来重新生成
     if (typeof courseData.semesterStart !== 'string') courseData.semesterStart = COURSE_DEFAULT.semesterStart;
     courseData.items.forEach(function(it) {
       if (!it) return;
@@ -187,31 +218,71 @@ function courseBlockTd(it) {
     '<div class="course-cn">' + _cEsc(it.name) + '</div>' + sub + rm + '</td>';
 }
 
-/* 值班：按日期罗列（今天置顶高亮，过去置灰沉底） */
+/* 值班渲染：每周固定表（周一到周日，今天高亮/值班中/下次）+ 偶尔临时（按日期） */
+function _cHhMm(v) { const p = String(v || '0:0').split(':'); return (+p[0] || 0) * 60 + (+p[1] || 0); }
+function courseDutyStatus(row, now) {   // 返回 { cls, tag } 之一
+  const today = courseDayNum(now);
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const t0 = _cHhMm(row.t0), t1 = row.t1 ? _cHhMm(row.t1) : t0 + 60;
+  if (row.day === today) {
+    if (nowMin >= t0 && nowMin <= t1) return { cls: ' duty-live', tag: '值班中' };
+    if (nowMin < t0) return { cls: ' duty-today', tag: '今天 ' + (row.t0 || '') };
+  }
+  return { cls: '', tag: '' };
+}
+function _nextDutyWeekMin(rows, now) {   // 下一个未开始的班是哪个（跨周也算），返回 row 或 null
+  const nowKey = (courseDayNum(now) - 1) * 1440 + now.getHours() * 60 + now.getMinutes();
+  let best = null, bestKey = Infinity;
+  rows.forEach(function(r) {
+    let k = (r.day - 1) * 1440 + _cHhMm(r.t0);
+    if (k <= nowKey) k += 7 * 1440;
+    if (k < bestKey) { bestKey = k; best = r; }
+  });
+  return best;
+}
 function courseRenderDuty() {
   const el = document.getElementById('courseDutyList');
-  if (!el) return;
-  const arr = (courseData.duties || []).slice();
-  if (!arr.length) {
-    el.innerHTML = '<div style="font-size:12px;color:#c6d6df;text-align:center;padding:16px 0;">还没有值班安排<br><span style="font-size:11px;">点右上「➕」按日期加一条，他到时提醒你</span></div>';
-    return;
+  const oEl = document.getElementById('courseOneoffList');
+  const now = new Date();
+  const wk = (courseData.dutyWeekly || []).slice();
+  if (el) {
+    if (!wk.length) {
+      el.innerHTML = '<div style="font-size:12px;color:#c6d6df;text-align:center;padding:16px 0;">还没有固定值班班次<br><span style="font-size:11px;">点「➕ 加时段」排好每周班，他每周到点前提醒你</span></div>';
+    } else {
+      wk.sort(function(a, b) { return (a.day - b.day) || (_cHhMm(a.t0) - _cHhMm(b.t0)); });
+      const next = _nextDutyWeekMin(wk, now);
+      el.innerHTML = wk.map(function(x) {
+        const st = courseDutyStatus(x, now);
+        const tag = st.tag || (x === next ? '下次' : '');
+        const main = (x.loc ? x.loc : '值班');
+        return '<div class="duty-row' + st.cls + '" onclick="openDutyEdit(\'' + x.id + '\')">' +
+          '<div class="duty-d">' + COURSE_WEEK_CN[x.day - 1] +
+          '<span class="duty-t">' + (x.t0 || '') + (x.t1 ? '–' + x.t1 : '') + '</span></div>' +
+          '<div class="duty-m">' + _cEsc(main) + (tag ? '<span class="duty-tag">' + tag + '</span>' : '') + '</div>' +
+          '<button onclick="event.stopPropagation();deleteWeeklyDuty(\'' + x.id + '\')" class="duty-x">✕</button></div>';
+      }).join('');
+    }
   }
-  arr.sort(function(a, b) { return (a.date < b.date) ? -1 : (a.date > b.date ? 1 : (a.t0 < b.t0 ? -1 : 1)); });
-  const todayKey = courseDateKey(new Date());
-  const html = arr.map(function(x) {
-    const past = x.date < todayKey;
-    const today = x.date === todayKey;
-    const dm = String(x.date).split('-');
-    const dt = dm.length === 3 ? new Date(+dm[0], +dm[1] - 1, +dm[2]) : null;
-    const dow = dt ? COURSE_WEEK_CN[courseDayNum(dt) - 1] : '';
-    const main = (x.name ? x.name : '值班') + (x.loc ? ' · ' + x.loc : '');
-    return '<div class="duty-row' + (today ? ' duty-today' : '') + (past ? ' duty-past' : '') + '">' +
-      '<div class="duty-d">' + (+dm[1]) + '月' + (+dm[2]) + '日 ' + dow +
-      '<span class="duty-t">' + (x.t0 || '') + (x.t1 ? '–' + x.t1 : '') + '</span></div>' +
-      '<div class="duty-m">' + _cEsc(main) + '</div>' +
-      '<button onclick="deleteDuty(\'' + x.id + '\')" style="flex:none;background:none;border:none;color:#d9a6a0;font-size:14px;cursor:pointer;padding:2px;">✕</button></div>';
-  }).join('');
-  el.innerHTML = html;
+  if (oEl) {
+    const od = (courseData.duties || []).slice();
+    od.sort(function(a, b) { return (a.date < b.date) ? -1 : (a.date > b.date ? 1 : (a.t0 < b.t0 ? -1 : 1)); });
+    const tk = courseDateKey(now);
+    oEl.innerHTML = od.length
+      ? od.map(function(x) {
+          const past = x.date < tk;
+          const today = x.date === tk;
+          const dm = String(x.date).split('-');
+          const dt = dm.length === 3 ? new Date(+dm[0], +dm[1] - 1, +dm[2]) : null;
+          const dow = dt ? COURSE_WEEK_CN[courseDayNum(dt) - 1] : '';
+          const main = (x.name ? x.name : '值班') + (x.loc ? ' · ' + x.loc : '');
+          return '<div class="duty-row' + (today ? ' duty-today' : '') + (past ? ' duty-past' : '') + '" onclick="openOneoffEdit(\'' + x.id + '\')">' +
+            '<div class="duty-d">' + (+dm[1]) + '月' + (+dm[2]) + '日 ' + dow +
+            '<span class="duty-t">' + (x.t0 || '') + (x.t1 ? '–' + x.t1 : '') + '</span></div>' +
+            '<div class="duty-m">' + _cEsc(main) + '</div>' +
+            '<button onclick="event.stopPropagation();deleteDuty(\'' + x.id + '\')" class="duty-x">✕</button></div>';
+        }).join('')
+      : '<div style="font-size:11px;color:#c6d6df;text-align:center;padding:8px 0;">没有单次安排</div>';
+  }
 }
 
 /* ==================== 课程增删改（点格弹窗） ==================== */
@@ -310,57 +381,132 @@ function courseSetStart(v) {
   if (v) addChatSystem('📅 开学第1周周一已设为 ' + v);
 }
 
-/* ==================== 值班增删（具体日期） ==================== */
+/* ==================== 每周固定值班增删（周几+钟点+楼层，每周循环） ==================== */
+function dutyFormFill(x) {
+  document.getElementById('dutyFormId').value = x.id || '';
+  document.getElementById('dutyFormDay').value = String(x.day || 7);
+  document.getElementById('dutyFormT0').value = x.t0 || '17:00';
+  document.getElementById('dutyFormT1').value = x.t1 || '';
+  document.getElementById('dutyFormName').value = x.name || '';
+  document.getElementById('dutyFormLoc').value = x.loc || '';
+  const del = document.getElementById('dutyFormDel');
+  if (del) del.style.display = x.id ? 'inline-block' : 'none';
+}
 function openDutyAdd() {
   const m = document.getElementById('dutyModal');
   if (!m) return;
-  document.getElementById('dutyFormId').value = '';
-  document.getElementById('dutyFormDate').value = courseDateKey(new Date());
-  document.getElementById('dutyFormT0').value = '14:00';
-  document.getElementById('dutyFormT1').value = '16:00';
-  document.getElementById('dutyFormName').value = '';
-  document.getElementById('dutyFormLoc').value = '';
-  const del = document.getElementById('dutyFormDel');
-  if (del) del.style.display = 'none';
+  const now = new Date();
+  dutyFormFill({ id: '', day: courseDayNum(now), t0: '17:00', t1: '18:30', name: '', loc: '' });
+  m.style.display = 'flex';
+}
+function openDutyEdit(id) {
+  const x = (courseData.dutyWeekly || []).find(function(r) { return r.id === id; });
+  if (!x) return;
+  const m = document.getElementById('dutyModal');
+  if (!m) return;
+  dutyFormFill(x);
   m.style.display = 'flex';
 }
 function dutyFormCancel() { const m = document.getElementById('dutyModal'); if (m) m.style.display = 'none'; }
 function dutyFormDelete() {
   const id = document.getElementById('dutyFormId').value;
-  if (!id || !confirm('删掉这次值班吗？')) return;
-  courseData.duties = courseData.duties.filter(function(x) { return x.id !== id; });
+  if (!id || !confirm('删掉这班固定值班吗？')) return;
+  courseData.dutyWeekly = courseData.dutyWeekly.filter(function(x) { return x.id !== id; });
   courseSave(); dutyFormCancel(); renderCourse();
 }
-function deleteDuty(id) {
-  if (!confirm('删掉这次值班吗？')) return;
-  courseData.duties = courseData.duties.filter(function(x) { return x.id !== id; });
+function deleteWeeklyDuty(id) {
+  if (!confirm('删掉这班固定值班吗？')) return;
+  courseData.dutyWeekly = courseData.dutyWeekly.filter(function(x) { return x.id !== id; });
   courseSave(); renderCourse();
 }
 function dutyFormSave() {
   try {
     const id = document.getElementById('dutyFormId').value;
-    const date = document.getElementById('dutyFormDate').value;
+    const day = +document.getElementById('dutyFormDay').value || 7;
     const t0 = document.getElementById('dutyFormT0').value;
-    const t1 = document.getElementById('dutyFormT1').value;
+    if (!t0) { alert('填个开始时间吧'); return; }
+    const obj = {
+      day: day, t0: t0, t1: document.getElementById('dutyFormT1').value,
+      name: (document.getElementById('dutyFormName').value || '').trim(),
+      loc: (document.getElementById('dutyFormLoc').value || '').trim()
+    };
+    if (!obj.loc && !obj.name) { alert('填个地点（如：四楼）吧，他才知道去哪提醒'); return; }
+    if (id) {
+      const i = courseData.dutyWeekly.findIndex(function(x) { return x.id === id; });
+      if (i >= 0) courseData.dutyWeekly[i] = Object.assign({}, courseData.dutyWeekly[i], obj);
+    } else { obj.id = _courseUid(); courseData.dutyWeekly.push(obj); }
+    courseSave(); dutyFormCancel(); renderCourse();
+    addChatSystem('🗓 每周' + COURSE_WEEK_CN[day - 1] + (obj.t1 ? ' ' + obj.t0 + '–' + obj.t1 : ' ' + obj.t0) + ' @' + obj.loc + ' 已记，到点前提醒你');
+  } catch (e) { console.error('dutyFormSave', e); }
+}
+
+/* ==================== 偶尔一次性值班（具体日期，临时换班用） ==================== */
+function openOneoffAdd() {
+  const m = document.getElementById('oneoffModal');
+  if (!m) return;
+  document.getElementById('oneoffFormId').value = '';
+  document.getElementById('oneoffFormDate').value = courseDateKey(new Date());
+  document.getElementById('oneoffFormT0').value = '17:00';
+  document.getElementById('oneoffFormT1').value = '18:30';
+  document.getElementById('oneoffFormName').value = '';
+  document.getElementById('oneoffFormLoc').value = '';
+  const del = document.getElementById('oneoffFormDel');
+  if (del) del.style.display = 'none';
+  m.style.display = 'flex';
+}
+function openOneoffEdit(id) {
+  const x = (courseData.duties || []).find(function(r) { return r.id === id; });
+  if (!x) return;
+  const m = document.getElementById('oneoffModal');
+  if (!m) return;
+  document.getElementById('oneoffFormId').value = id;
+  document.getElementById('oneoffFormDate').value = x.date || '';
+  document.getElementById('oneoffFormT0').value = x.t0 || '';
+  document.getElementById('oneoffFormT1').value = x.t1 || '';
+  document.getElementById('oneoffFormName').value = x.name || '';
+  document.getElementById('oneoffFormLoc').value = x.loc || '';
+  const del = document.getElementById('oneoffFormDel');
+  if (del) del.style.display = 'inline-block';
+  m.style.display = 'flex';
+}
+function oneoffFormCancel() { const m = document.getElementById('oneoffModal'); if (m) m.style.display = 'none'; }
+function deleteDuty(id) {
+  if (!confirm('删掉这次值班吗？')) return;
+  courseData.duties = courseData.duties.filter(function(x) { return x.id !== id; });
+  courseSave(); renderCourse();
+}
+function oneoffFormDelete() {
+  const id = document.getElementById('oneoffFormId').value;
+  if (!id || !confirm('删掉这次值班吗？')) return;
+  courseData.duties = courseData.duties.filter(function(x) { return x.id !== id; });
+  courseSave(); oneoffFormCancel(); renderCourse();
+}
+function oneoffFormSave() {
+  try {
+    const id = document.getElementById('oneoffFormId').value;
+    const date = document.getElementById('oneoffFormDate').value;
     if (!date) { alert('选个日期吧'); return; }
     const obj = {
       date: date,
-      t0: t0 || '00:00', t1: t1 || '',
-      name: (document.getElementById('dutyFormName').value || '').trim(),
-      loc: (document.getElementById('dutyFormLoc').value || '').trim()
+      t0: document.getElementById('oneoffFormT0').value || '00:00',
+      t1: document.getElementById('oneoffFormT1').value,
+      name: (document.getElementById('oneoffFormName').value || '').trim(),
+      loc: (document.getElementById('oneoffFormLoc').value || '').trim()
     };
     if (id) {
       const i = courseData.duties.findIndex(function(x) { return x.id === id; });
       if (i >= 0) courseData.duties[i] = Object.assign({}, courseData.duties[i], obj);
     } else { obj.id = _courseUid(); courseData.duties.push(obj); }
-    courseSave(); dutyFormCancel(); renderCourse();
-  } catch (e) { console.error('dutyFormSave', e); }
+    courseSave(); oneoffFormCancel(); renderCourse();
+  } catch (e) { console.error('oneoffFormSave', e); }
 }
 
 /* ==================== AI 感知：骆云影看得到今天的课/值班 ==================== */
 function buildScheduleContext() {
   try {
-    if (!courseData || (!courseData.items.length && !(courseData.duties && courseData.duties.length))) return '';
+    if (!courseData || (!courseData.items.length &&
+        !(courseData.dutyWeekly && courseData.dutyWeekly.length) &&
+        !(courseData.duties && courseData.duties.length))) return '';
     const now = new Date();
     const week = courseWeekNumber(now);
     const day = courseDayNum(now);
@@ -377,41 +523,55 @@ function buildScheduleContext() {
       out += '她今天没课。';
     }
     const tk = courseDateKey(now);
-    const duties = (courseData.duties || []).filter(function(x) { return x.date === tk; });
-    if (duties.length) out += '今天要值班：' + duties.map(function(x) { return (x.t0 || '') + (x.name ? x.name : '值班') + (x.loc ? '@' + x.loc : ''); }).join('；') + '。';
-    out += '\n用法：这是"看见"——她聊到上课/约饭/时间时自然接话；别死板复读，别每句都提课表。';
+    const dutyStrs = [];
+    (courseData.dutyWeekly || []).forEach(function(w) { if (w.day === day) dutyStrs.push((w.name || '值班') + (w.loc ? '@' + w.loc : '') + ' ' + (w.t0 || '') + (w.t1 ? '-' + w.t1 : '')); });
+    (courseData.duties || []).forEach(function(x) { if (x.date === tk) dutyStrs.push((x.name || '值班') + (x.loc ? '@' + x.loc : '') + ' ' + (x.t0 || '') + (x.t1 ? '-' + x.t1 : '')); });
+    if (dutyStrs.length) out += '她今天要值班：' + dutyStrs.join('；') + '。';
+    out += '\n用法：这是"看见"——她聊到上课/值班/约饭/时间时自然接话；别死板复读，别每句都提课表。';
     return out;
   } catch (e) { console.error('buildScheduleContext', e); return ''; }
 }
 
-/* 值班当天准点前提醒（骆云影说一句）；课表无钟点则不做上课提醒 */
+/* 值班准点前提醒（骆云影说一句）；每周固定班(星期匹配) + 偶尔一次性(日期匹配)；课表无钟点则不做上课提醒 */
 function courseCheckReminders() {
   try {
+    if (!courseData) return;
     if (!settings || settings.proactiveMsg === false) return;
     if (settings.scheduleRemind === false) return;
     const now = new Date();
     const tk = courseDateKey(now);
-    const duties = (courseData.duties || []).filter(function(x) { return x.date === tk && x.t0; });
-    if (!duties.length) return;
+    const today = courseDayNum(now);
     const nowMin = now.getHours() * 60 + now.getMinutes();
     const inChat = typeof currentPage !== 'undefined' && currentPage === 'page-chat' &&
       typeof lastUserMsgTime === 'number' && now.getTime() - lastUserMsgTime < 5 * 60000;
-    for (let i = 0; i < duties.length; i++) {
-      const x = duties[i];
-      const pm = String(x.t0).split(':');
-      const startMin = (+pm[0] || 0) * 60 + (+pm[1] || 0);
-      const diff = startMin - nowMin;
-      if (diff <= 0 || diff > 15) continue;
-      const key = 'scheduleNotified_' + x.id + '_' + tk;
-      if (lsGet(key, false)) continue;
-      if (inChat) { lsSet(key, true); continue; }
+
+    const cands = [];
+    (courseData.dutyWeekly || []).forEach(function(x) {
+      if (x.day === today && x.t0) cands.push({ id: x.id, weekly: true, t0: x.t0, t1: x.t1, name: x.name, loc: x.loc });
+    });
+    (courseData.duties || []).forEach(function(x) {
+      if (x.date === tk && x.t0) cands.push({ id: x.id, weekly: false, t0: x.t0, t1: x.t1, name: x.name, loc: x.loc });
+    });
+    if (!cands.length) return;
+    cands.sort(function(a, b) { return _cHhMm(a.t0) - _cHhMm(b.t0); });
+
+    const doRemind = function(x, diff) {
+      const key = (x.weekly ? 'wkNotified_' : 'otNotified_') + x.id + '_' + tk;
+      if (lsGet(key, false)) return;
+      if (inChat) { lsSet(key, true); return; }   // 正在聊不插话，但也不重复
       const char = (typeof getCharById === 'function' && typeof currentCharId !== 'undefined') ? getCharById(currentCharId) : null;
-      if (!char || typeof generateProactiveMessage !== 'function') return;
+      if (!char || typeof generateProactiveMessage !== 'function') { lsSet(key, true); return; }
       const story = (char.story || '').toLowerCase();
       const isT = /傲娇|毒舌|暴躁|刻薄|冷淡/.test(story);
       const isG = /温柔|温暖|亲切|可爱|软/.test(story);
       generateProactiveMessage('class', char, isT, isG, { item: { type: 'duty', name: x.name || '值班', start: x.t0, end: x.t1, loc: x.loc }, min: Math.ceil(diff) });
       lsSet(key, true);
+    };
+
+    for (let i = 0; i < cands.length; i++) {
+      const diff = _cHhMm(cands[i].t0) - nowMin;
+      if (diff <= 0 || diff > 15) continue;
+      doRemind(cands[i], diff);
       return;   // 每次只提醒最近一项
     }
   } catch (e) { console.error('courseCheckReminders', e); }
