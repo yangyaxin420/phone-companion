@@ -842,25 +842,19 @@ async function generateMultiReplies(text, count, length) {
         frequency_penalty: 0.5
       };
 
-      const resp = await fetch(apiConfig.baseUrl.replace(/\/+$/, '') + '/chat/completions', {
+      const content = await llmFetchWithRetry(apiConfig.baseUrl.replace(/\/+$/, '') + '/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiConfig.apiKey },
         body: JSON.stringify(body)
-      });
+      }, { label: '多条回复' });
 
-      if (resp.ok) {
-        const data = await resp.json();
-        const content = data.choices?.[0]?.message?.content?.trim();
-        if (content) {
-          // 用 --- 分隔，过滤空白
-          const splits = content.split(/---+/).map(s => s.trim()).filter(s => s.length > 1);
-          for (let s of splits) {
-            const parsed = parseAiActions(s);
-            replies.push(parsed.display || s);
-            if (parsed.actions) executeAiActions(parsed.actions);
-            if (replies.length >= count) break;
-          }
-        }
+      // 用 --- 分隔，过滤空白
+      const splits = content.split(/---+/).map(s => s.trim()).filter(s => s.length > 1);
+      for (let s of splits) {
+        const parsed = parseAiActions(s);
+        replies.push(parsed.display || s);
+        if (parsed.actions) executeAiActions(parsed.actions);
+        if (replies.length >= count) break;
       }
     } catch(e) {
       console.log('[多条回复] API失败:', e?.message?.substring(0,60));
@@ -1039,17 +1033,20 @@ async function sendChat() {
   } catch(e) {
     typing.classList.remove('show');
     const fallback = generateLocalReply(text);
+    // 永久性错误（Key 无效/余额不足）必须告诉用户；瞬抖类已自动重试过，静默兜底即可，
+    // 不再弹「API 返回空白/错误」打扰。
     let errMsg = '';
-    if (e.message.includes('Failed to fetch') || e.message.includes('NetworkError')) {
-      errMsg = '网络连接失败，请检查 API Key 和网络。如在中国大陆可能需要科学上网。';
-    } else if (e.message.includes('401')) {
-      errMsg = 'API Key 无效，请检查。';
+    if (e.message.includes('401')) {
+      errMsg = 'API Key 无效，请到设置页检查。';
     } else if (e.message.includes('402')) {
       errMsg = 'API 余额不足，请充值。';
-    } else {
+    } else if (e.permanent) {
       errMsg = `API 错误：${e.message.substring(0,60)}`;
+    } else {
+      console.log('[聊天] 重试后仍失败，已静默本地回复：' + (e.message || '').substring(0, 60));
     }
-    chatMessages.push({ role:'ai', text:fallback + `\n\n（⚠️ ${errMsg}，已切换本地回复）`, time: Date.now() });
+    const suffix = errMsg ? `\n\n（⚠️ ${errMsg}）` : '';
+    chatMessages.push({ role:'ai', text: fallback + suffix, time: Date.now() });
     saveChatData();
     renderChat();
   } finally {
@@ -1065,6 +1062,50 @@ let corsProxyIndex = 0;
 
 function buildCorsProxyUrl(targetUrl) {
   return CORS_PROXIES[corsProxyIndex % CORS_PROXIES.length].build(targetUrl);
+}
+
+/* ---- 带超时 + 自动重试的 API 请求 ----
+   网络瞬抖/返回空/限流/5xx 都自己重试，成功就把内容给用户，
+   不再因为第一次抖动就弹「API 错误、已切换本地回复」。
+   只有 Key 无效/余额不足/参数错(400/401/402/403) 属于永久错误，不重试。
+   返回：非空的 message.content（已 trim）；全部失败则抛出最后一次错误。 */
+async function llmFetchWithRetry(url, init, opts) {
+  opts = opts || {};
+  var attempts = opts.attempts || 3;
+  var timeoutMs = opts.timeoutMs || 20000;
+  var label = opts.label || 'API';
+  var lastErr = null;
+  for (var i = 0; i < attempts; i++) {
+    if (i > 0) await new Promise(function(r) { setTimeout(r, 500 * i); });
+    var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    var timer = ctrl ? setTimeout(function() { try { ctrl.abort(); } catch(_) {} }, timeoutMs) : null;
+    try {
+      var reqInit = ctrl ? Object.assign({}, init, { signal: ctrl.signal }) : init;
+      var resp = await fetch(url, reqInit);
+      if (timer) { clearTimeout(timer); timer = null; }
+      if (resp.ok) {
+        var data = await resp.json();
+        var content = data.choices && data.choices[0] && data.choices[0].message
+          ? (data.choices[0].message.content || '') : '';
+        if (content && content.trim()) return content.trim();
+        lastErr = new Error('API 返回内容为空'); // 空回复也当一次失败，重试
+      } else {
+        var errText = await resp.text().catch(function() { return ''; });
+        var pe = new Error('API ' + resp.status + ': ' + errText.substring(0, 100));
+        pe.permanent = (resp.status === 400 || resp.status === 401 || resp.status === 402 || resp.status === 403);
+        if (pe.permanent) { if (timer) clearTimeout(timer); throw pe; }
+        lastErr = pe; // 429 / 5xx 等，重试
+      }
+    } catch (e) {
+      if (timer) { clearTimeout(timer); timer = null; }
+      if (e && e.permanent) throw e;
+      lastErr = e; // 网络失败 / 超时，重试
+    }
+    if (i < attempts - 1) {
+      console.log('[' + label + '] 第' + (i + 1) + '次失败，自动重试：' + (lastErr && lastErr.message ? lastErr.message.substring(0, 60) : ''));
+    }
+  }
+  throw lastErr || new Error('API 请求失败');
 }
 
 /* ---- DeepSeek API ---- */
@@ -1239,29 +1280,14 @@ ${_aiControlPrompt}`;
     temperature: 0.8
   };
 
-  const resp = await fetch(apiUrl, {
+  return await llmFetchWithRetry(apiUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiConfig.apiKey}`
     },
     body: JSON.stringify(body)
-  }).catch(async e => {
-    if (!apiConfig.useCorsProxy) {
-      // 直连失败不自动开启代理
-    }
-    throw e;
-  });
-
-  if (!resp.ok) {
-    const errText = await resp.text().catch(() => '');
-    throw new Error(`API ${resp.status}: ${errText.substring(0,100)}`);
-  }
-
-  const data = await resp.json();
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) throw new Error('API 返回内容为空');
-  return content.trim();
+  }, { label: '聊天' });
 }
 
 /* ---- 轻量 AI 调用（吃醋/私聊/内心日记共用） ---- */
@@ -1712,6 +1738,12 @@ async function generateProactiveMessage(scenario, char, isTsundere, isGentle, ex
   }
 
   var message = '';
+
+  // 用户正在发消息/等回复时，后台主动消息让路，避免同时抢 API 撞车（下次轮询再来）
+  if (_chatSending) {
+    console.log('[主动消息] 用户正在对话，本轮跳过以免抢 API');
+    return;
+  }
 
   // 尝试API生成
   if (apiConfig && apiConfig.apiKey) {
