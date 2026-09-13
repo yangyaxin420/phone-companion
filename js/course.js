@@ -61,6 +61,20 @@ function courseMonday(d) {
   r.setDate(r.getDate() + diff); r.setHours(0, 0, 0, 0);
   return r;
 }
+/* 第 week 周的周一（以开学周一为基准；未设开学日则退回当前周的相对推算） */
+function courseWeekMonday(week) {
+  const sd = courseData && courseData.semesterStart;
+  let base = null;
+  if (sd) {
+    const p = String(sd).split('-');
+    if (p.length === 3) base = courseMonday(new Date(+p[0], +p[1] - 1, +p[2]));
+  }
+  if (!base) base = courseMonday(new Date());
+  const m = new Date(base);
+  m.setDate(base.getDate() + ((week || 1) - 1) * 7);
+  m.setHours(0, 0, 0, 0);
+  return m;
+}
 function courseWeekNumber(day) {   // 开学日起算的第几周；未开学→0（day 可传，测试用）
   const sd = courseData && courseData.semesterStart;
   if (!sd) return 0;
@@ -178,8 +192,10 @@ function courseRenderGrid(week) {
   const el = document.getElementById('courseGrid');
   if (!el) return;
   const now = new Date();
-  const today = courseDayNum(now);
-  const mon = courseMonday(now);
+  const mon = courseWeekMonday(week);          // 正在查看那一周的周一（不是当前周）
+  const curWeek = courseWeekNumber(now);       // 0 = 未开学
+  const isViewingThisWeek = (week === curWeek); // 只有看本周才高亮"今天"
+  const today = isViewingThisWeek ? courseDayNum(now) : 0;
   const byDay = [null, [], [], [], [], []];      // 1..5
   courseData.items.forEach(function(it) { if (it.day >= 1 && it.day <= 5 && courseActiveWeek(it, week)) byDay[it.day].push(it); });
   for (let d = 1; d <= 5; d++) byDay[d].sort(function(a, b) { return a.s - b.s; });
