@@ -527,6 +527,13 @@ function showSecretNotes() {
     h += '</div></div>';
   }
 
+  // === 记住的事（AI 从对话里提炼的一条条事实） ===
+  var memTitle = isTsundere ? '📌 记住的事（省得她赖账）' : isGentle ? '📌 记住的事 ♡' : '📌 记住的事';
+  h += '<div class="secret-note-card">';
+  h += '<div class="sn-time">' + memTitle + '</div>';
+  h += _memoryNotesHtml(secretCharId);
+  h += '</div>';
+
   // === 内心日记（已并入记事本） ===
   var diaryArr = getInnerDiary(secretCharId) || [];
   var diaryTitle = isTsundere ? '📖 内心日记（自己写的，别念出来）' : isGentle ? '📖 我的内心日记 ♡' : '📖 内心日记';
@@ -570,6 +577,11 @@ function showSecretNotes() {
   }
 
   container.innerHTML = h;
+
+  // 攒够新对话就补一条「记住的事」，生成完原地刷新那张卡（不重载整页）
+  if (charMsgs.length >= 4) {
+    setTimeout(function() { ensureMemoryNote(secretCharId); }, 700);
+  }
 
   // 确保今天有内心日记：当天没写才懒生成一次；当天已有不再反复重写
   //（旧版 bug 会留下"今天和昨天一字一样"的重复——只允许首次打开时修一次，
@@ -641,38 +653,62 @@ function _refreshInnerDiaryCard() {
   }
 }
 
+/* ---- 记住的事：卡片内容（记事本初次渲染和懒生成后刷新共用一套，避免两边走样） ---- */
+function _memoryNotesHtml(charId) {
+  var charNotes = [];
+  if (typeof memoryNotes !== 'undefined' && memoryNotes.length > 0) {
+    charNotes = memoryNotes.filter(function(n) { return n.charId === charId; }).slice(-12).reverse();
+  }
+  if (charNotes.length === 0) {
+    return '<div style="font-size:12px;color:#bbb;padding:10px 0;text-align:center;">多聊几天，我会默默记住<br><span style="font-size:11px;">关于她的事，都收着呢</span></div>';
+  }
+  var notesHtml = '';
+  charNotes.forEach(function(n) {
+    var d = new Date(n.createdAt);
+    var timeStr = (d.getMonth() + 1) + '月' + d.getDate() + '日';
+    notesHtml += '<div style="font-size:13px;color:#555;padding:8px 0;border-bottom:1px solid #f5f5f5;line-height:1.7;">' +
+      '<span style="color:#bbb;font-size:10px;">' + timeStr + '</span><br>' +
+      escHtml(n.summary) + '</div>';
+  });
+  return notesHtml;
+}
+
+/* ---- 打开记事本时补一条记忆笔记：有足够新对话才生成，后台跑不跟聊天抢 API ---- */
+async function ensureMemoryNote(charId) {
+  if (window._memNoteBusy) return;
+  if (typeof generateMemoryNote !== 'function') return;
+  var msgs = (chatData[charId] || []).filter(function(m) { return m.role !== 'system'; });
+  if (msgs.length < 4) return;
+
+  var last = null;
+  if (typeof memoryNotes !== 'undefined' && memoryNotes.length > 0) {
+    last = memoryNotes.filter(function(n) { return n.charId === charId; }).pop() || null;
+  }
+  var since = last ? last.createdAt : 0;
+  var fresh = msgs.filter(function(m) { return m.time > since; }).length;
+  if (fresh < 4) return; // 门槛和 generateMemoryNote 保持一致，免得空跑一趟
+
+  window._memNoteBusy = true;
+  try {
+    var note = await generateMemoryNote(charId, false);
+    if (note) _refreshMemoryNotesCard();
+  } catch (e) { /* 生成失败就保持原样，下次开记事本再试 */ }
+  window._memNoteBusy = false;
+}
+
 /* ---- 刷新当前页面的记忆笔记卡片（不重新加载整页） ---- */
 function _refreshMemoryNotesCard() {
   var container = document.getElementById('secretContent');
   if (!container) return;
   var cards = container.querySelectorAll('.secret-note-card');
-  // 找第三个卡片（第一个是今日摘要，第二个是本周记录，第三个是记忆笔记）
-  // 或者查找包含"记忆笔记"或"记住的事"文本的卡片
+  // 查找标题含「记住的事」的卡片
   for (var ci = 0; ci < cards.length; ci++) {
     var snTime = cards[ci].querySelector('.sn-time');
     if (snTime && (snTime.textContent.indexOf('记住的事') !== -1 || snTime.textContent.indexOf('记忆笔记') !== -1 || snTime.textContent.indexOf('关于她') !== -1)) {
-      // 重建这个卡片的内容
-      var charNotes = [];
-      if (typeof memoryNotes !== 'undefined' && memoryNotes.length > 0) {
-        charNotes = memoryNotes.filter(function(n) { return n.charId === secretCharId; }).slice(-10).reverse();
-      }
-      var notesHtml = '';
-      var memTitle = snTime.textContent; // 保留原标题
-      if (charNotes.length > 0) {
-        charNotes.forEach(function(n) {
-          var d = new Date(n.createdAt);
-          var timeStr = d.getMonth()+1 + '月' + d.getDate() + '日';
-          notesHtml += '<div style="font-size:13px;color:#555;padding:8px 0;border-bottom:1px solid #f5f5f5;line-height:1.7;">' +
-            '<span style="color:#bbb;font-size:10px;">' + timeStr + '</span><br>' +
-            escHtml(n.summary) + '</div>';
-        });
-      } else {
-        notesHtml = '<div style="font-size:12px;color:#bbb;padding:10px 0;text-align:center;">多聊几天，我会默默记住<br><span style="font-size:11px;">关于她的事，都收着呢</span></div>';
-      }
+      var notesHtml = _memoryNotesHtml(secretCharId);
       // 替换卡片内容区域（跳过标题行）
       var innerDivs = cards[ci].querySelectorAll('div');
       for (var di = 0; di < innerDivs.length; di++) {
-        // 找到内容区（非sn-time的div）替换
         if (!innerDivs[di].classList.contains('sn-time') && innerDivs[di].parentNode === cards[ci]) {
           innerDivs[di].innerHTML = notesHtml;
           break;

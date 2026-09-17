@@ -9,22 +9,50 @@ function showStory() {
 /* 收集她最近的日常，织进故事里 */
 function buildStoryMaterial() {
   const lines = [];
-  const records = lsGet('day_records', {});
-  const keys = Object.keys(records).sort().reverse().slice(0, 5);
-  keys.forEach(d => { lines.push('【' + d + '】' + records[d].text); });
   const today = new Date().toISOString().split('T')[0];
-  if (typeof moodData !== 'undefined' && moodData && moodData[today]) {
-    lines.push('今天心情：' + moodData[today].emoji + moodData[today].label);
+
+  // 1) 她今天跟他说过的话 —— 最主要的故事素材（原话，越具体越好）
+  try {
+    var cid = (typeof currentCharId !== 'undefined' && currentCharId) ? currentCharId : 'luo';
+    var charMsgs = (typeof chatData !== 'undefined' && chatData[cid]) || [];
+    var saidToday = charMsgs.filter(function(m) {
+      return m.role === 'user' && m.time && new Date(m.time).toISOString().split('T')[0] === today;
+    }).map(function(m) { return m.text; });
+    if (saidToday.length === 0) {
+      // 今天还没聊 → 拿最近几句补，别让素材空着
+      saidToday = charMsgs.filter(function(m) { return m.role === 'user'; }).slice(-4).map(function(m) { return m.text; });
+    }
+    if (saidToday.length > 0) {
+      lines.push('她今天对他说过的话（原话，别改意思，可以挑一件小事写进故事）：\n' +
+        saidToday.slice(-8).join('\n').slice(0, 500));
+    }
+  } catch (e) { /* 素材拿不到就算了，不影响出故事 */ }
+
+  // 2) 她自己写的每日记录
+  const records = lsGet('day_records', {});
+  const keys = Object.keys(records).sort().reverse().slice(0, 4);
+  if (keys.length > 0) {
+    lines.push('她前几天自己写下的记录：\n' + keys.map(d => '【' + d + '】' + String(records[d].text).slice(0, 120)).join('\n'));
   }
-  if (typeof moments !== 'undefined' && moments && moments.length > 0) {
-    lines.push('最近朋友圈：' + moments.slice(0, 2).map(m => m.content.substring(0, 30)).join('；'));
+
+  // 3) 心情 / 睡眠 / 昨天睡的怎么样
+  if (typeof moodData !== 'undefined' && moodData && moodData[today]) {
+    lines.push('她今天的心情：' + moodData[today].emoji + moodData[today].label);
   }
   if (typeof sleepLastNightText === 'function') {
     const sl = sleepLastNightText();
     if (sl) lines.push(sl);
   }
-  return lines.join('\n');
+
+  // 4) 朋友圈（她和他最近发过的）
+  if (typeof moments !== 'undefined' && moments && moments.length > 0) {
+    var ms = moments.slice(0, 3).map(function(m) { return (m.user ? m.user + '：' : '') + String(m.content).substring(0, 40); });
+    lines.push('最近的朋友圈：' + ms.join('；'));
+  }
+
+  return lines.join('\n\n');
 }
+
 
 async function generateNightStory() {
   if (_storySending) return;
@@ -73,58 +101,123 @@ async function generateNightStory() {
 async function callNightStoryAI(material) {
   const pName = (personaData && personaData.name) || '骆云影';
   const charStory = (personaData && personaData.story) || '黑色中长发，灰蓝色眼睛，178cm。ISTP，傲娇暴躁毒舌刻薄，嘴硬心软。';
-  const un = (userPersona && userPersona.name) || '你';
+  const un = (userPersona && userPersona.name) || '她';
   const sp = `你是${pName}。${charStory}
-今晚${un}睡前，你要给她编一个完整的睡前小故事。
-要求：
-- 必须有情节：一个具体人物 + 一件具体的小事（有起因、经过、结尾）
-- 可以有一点小小的转折或情感点，但不要不知所云、不要只有氛围和意象
-- 200-400字，2-3个小段落
-- 温暖、带一点童话感，但别肉麻
-- 可以悄悄把下面她最近的日子织进故事里
-- 结尾用轻的收，收得住
-- 只讲故事本身，不要评论故事，不要动作描写，不要提「我给你编了个故事」这类话
+
+今晚${un}睡前，你要给她讲一个故事。这是你每晚的活儿，讲完她好睡觉。
+
+【故事必须长这样】
+- 要有一个人，有名字（别用「她」当主角，起个名字）
+- 要有一件事，具体的、能看见的：一把伞、一碗面、一双旧鞋、一张车票、一只猫、一盏灯——挑一样，让它从开头留到最后
+- 要有起因、经过、结尾。要发生点什么，哪怕是件很小的事
+- 中间可以有一个小小的转弯，让人心里动一下
+- 500字左右，3-4段
+
+【语气】
+- 你不是在念童话，你是在给她讲故事。可以带一点你自己的腔调——你平时怎么说话，就怎么讲
+- 平实，别堆词。「仿佛」「像是」「氤氲」「缱绻」这种词一个都别用
+- 少用形容词，多用具体的东西。写「他把伞往她那边斜了斜」，别写「他体贴地照顾着她」
+- 温暖但不肉麻，别煽情，别讲道理
+- 结尾用轻的收，收得住，别总结、别升华
+
+【最重要的一条】
+下面有她今天真实说过的话。挑一件小事（她提过的吃的、天气、累、谁惹她生气了都行），把它织进故事里——故事里要能看见这件事的影子。这是她今晚会觉得「他在讲我」的地方。
+
+【格式】
+第一行只写标题，用《》括起来，比如：\`《伞往哪边斜》\`
+空一行，然后直接开始讲故事。
+不要输出 JSON，不要输出任何解释、评论、动作描写，也不要提「我给你编了个故事」这种话。
 
 她最近的日子：
-${material || '（今天没什么特别的）'}
-
-讲完故事后，把标题和正文整理成一个JSON对象返回：
-{"title":"3-8个字的标题","story":"完整故事正文"}
-（可以只输出这个JSON，我会自己解析；故事正文用完整的人话，不要漏字）`;
+${material || '（今天没什么特别的）'}`;
   const apiUrl = (apiConfig.baseUrl || 'https://api.deepseek.com').replace(/\/+$/, '') + '/chat/completions';
-  const resp = await fetch(apiUrl, {
+  const init = {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiConfig.apiKey },
     body: JSON.stringify({
       model: apiConfig.model || 'deepseek-v4-flash',
       messages: [
         { role: 'system', content: sp },
-        { role: 'user', content: '把今晚的故事用JSON返回。' }
+        { role: 'user', content: '讲吧，我听着。' }
       ],
-      temperature: 0.85, max_tokens: 1400
+      temperature: 0.9, max_tokens: 2200
     })
-  });
-  if (!resp.ok) throw new Error('API错误(' + resp.status + ')');
-  const json = await resp.json();
-  const content = json.choices?.[0]?.message?.content || '';
-  // 1) 先试严格 JSON（剥掉可能裹着的代码块）
-  const cleaned = content.replace(/```(json|JSON)?/g, '').trim();
-  const jm = cleaned.match(/\{[\s\S]*\}/);
-  if (jm) {
-    try {
-      const obj = JSON.parse(jm[0]);
-      if (obj && obj.title && obj.story) return { title: String(obj.title), story: String(obj.story) };
-    } catch (e) { /* JSON 解析失败 → 走纯文本兜底 */ }
+  };
+  // 故事长、耗时长，给 45 秒超时；失败自动重试一次（复用聊天那套重试）
+  const content = (typeof llmFetchWithRetry === 'function')
+    ? await llmFetchWithRetry(apiUrl, init, { label: '晚安故事', timeoutMs: 45000, attempts: 2 })
+    : await (async function() {
+        const r = await fetch(apiUrl, init);
+        if (!r.ok) throw new Error('API错误(' + r.status + ')');
+        const j = await r.json();
+        return ((j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '').trim();
+      })();
+  return parseNightStory(content);
+}
+
+/* 把 JSON 字符串字面量里的裸换行/制表符转义掉 —— AI 写长文时经常留下裸换行，
+   导致 JSON.parse 直接抛错（这就是以前故事会掉进旧故事本的原因之一） */
+function _repairJsonCtl(s) {
+  let out = '';
+  let inStr = false;
+  let esc = false;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (esc) { out += ch; esc = false; continue; }
+    if (ch === '\\') { out += ch; esc = true; continue; }
+    if (ch === '"') { inStr = !inStr; out += ch; continue; }
+    if (inStr) {
+      const c = ch.charCodeAt(0);
+      if (c === 10) { out += '\\n'; continue; }
+      if (c === 13) { out += '\\r'; continue; }
+      if (c === 9) { out += '\\t'; continue; }
+      if (c < 32) { out += ' '; continue; }
+    }
+    out += ch;
   }
-  // 2) 兜底：AI 直接把故事讲出来了 → 整段当故事，标题取第一句
-  const text = content.trim();
-  if (text.length > 20) {
-    const firstLine = text.split('\n').map(l => l.trim()).find(l => l.length > 2) || '';
-    let title = firstLine.replace(/^[「『“‘"']+|[」』”"'']+$/g, '').replace(/^[#*\s]+/, '').slice(0, 8);
-    if (title.length > 8) title = title.slice(0, 8);
-    return { title: title || '一个故事', story: text };
+  return out;
+}
+
+/* 把 AI 返回的纯文本拆成 {title, story}（兼容它偶尔还是吐 JSON 的情况） */
+function parseNightStory(content) {
+  const raw = String(content || '').trim();
+  if (!raw) return null;
+  let text = raw.replace(/```(json|JSON)?/g, '').trim();
+
+  // 万一它还是返回了 JSON
+  const jm = text.match(/\{[\s\S]*\}/);
+  if (jm && /"(story|title)"\s*:/.test(jm[0])) {
+    let obj = null;
+    try { obj = JSON.parse(jm[0]); } catch (e) { obj = null; }
+    if (!obj) { try { obj = JSON.parse(_repairJsonCtl(jm[0])); } catch (e) { obj = null; } }
+    if (obj && obj.story) {
+      const s = String(obj.story).trim();
+      if (s.length >= 60) return { title: String(obj.title || '今晚的故事').slice(0, 12), story: s };
+    }
+    // 它想返回 JSON 但坏了 → 别把裸 JSON 当故事显示，交给本地兜底
+    return null;
   }
-  return null; // 没讲出来 → 交给上层用本地故事兜底
+
+  // 主路径：第一行《标题》，其余是正文
+  const lines = text.split('\n');
+  let title = '';
+  let start = 0;
+  for (let i = 0; i < Math.min(lines.length, 4); i++) {
+    const l = lines[i].trim().replace(/^[#*\s]+/, '');
+    const m = l.match(/^[《「【\[]?\s*([^》」】\]]{2,14})\s*[》」】\]]$/);
+    if (m) { title = m[1].trim(); start = i + 1; break; }
+  }
+  let body = lines.slice(start).join('\n').trim();
+  if (!title) {
+    // 没给标题 → 拿第一个像样的短行当标题
+    const first = lines.map(l => l.trim()).find(l => l.length > 2 && l.length <= 16) || '';
+    title = first.replace(/^[《「【\[#"'\s]+|[》」】\]"']+$/g, '').slice(0, 10);
+  }
+  // 剥掉正文里可能残留的标题行重复
+  if (title && body.indexOf(title) === 0) body = body.slice(title.length).replace(/^[》」】\]：:\s]+/, '').trim();
+
+  if (body.length < 60) return null; // 太短，不算故事 → 交给本地兜底
+  return { title: title || '今晚的故事', story: body };
 }
 
 /* 没有 API Key 时的本地小故事兜底（有情节有人物） */
@@ -138,8 +231,11 @@ function localNightStory(material) {
     '十二点的灯': '苏念刚上大学，失眠，每晚翻来覆去到十二点。她发现对面楼有一扇窗，每到十二点准时亮起，像是在陪她。\n有天她半夜起来喝水，听见室友阿橙的手机在响——定时开关的提示音。她这才发现，那扇亮着的灯，是阿橙偷偷给她装的。\n苏念没拆穿。第二天晚上，她钻进阿橙的被窝：今晚我也怕黑。阿橙耳朵红了：怕黑就直说。灯一直亮着。',
     '邮差': '老周在小镇送了二十年信。镇上有个老人，每周都往外地寄一封信给女儿，可老周知道，那封信从来是空的。他从不多问，准时收，准时送。\n冬天，老人照常把信封递给他，说：我女儿今年该回来了。老周接过来，看见信封上难得写了字，一行小字：等我。\n那年除夕，老人家的灯真的亮了。老周后来才听说，空信封是他们父女俩约好的暗号——没字，就是平安。雪停的时候，老周送完了这一年的最后一封信。'
   };
-  const i = Math.floor(Math.random() * titles.length);
-  const title = titles[i];
+  // 优先挑最近没讲过的那几篇，别老翻同一篇
+  const recent = lsGet('night_stories', []).slice(0, 5).map(s => s.title);
+  const unused = titles.filter(t => recent.indexOf(t) === -1);
+  const pool = unused.length > 0 ? unused : titles;
+  const title = pool[Math.floor(Math.random() * pool.length)];
   const body = bodies[title];
   return { title, story: body };
 }
@@ -162,7 +258,7 @@ function renderStoryCard(item, isFallback) {
   const el = document.getElementById('storyResult');
   if (!el) return;
   el.innerHTML = '<div style="background:#fff;border-radius:16px;padding:18px;box-shadow:0 2px 12px rgba(0,0,0,.06);">' +
-    '<div style="font-size:12px;color:#999;margin-bottom:6px;">🌙 骆云影 · ' + item.date + (isFallback ? ' <span style="color:#ccc;">（AI 没接上，先讲旧故事本的）</span>' : '') + '</div>' +
+    '<div style="font-size:12px;color:#999;margin-bottom:6px;">🌙 骆云影 · ' + item.date + (isFallback ? ' <span style="color:#ccc;">（这篇是从故事本里翻出来的）</span>' : '') + '</div>' +
     '<div style="font-size:16px;font-weight:700;color:#334;margin-bottom:10px;">' + escHtml(item.title) + '</div>' +
     '<div style="font-size:14px;line-height:1.8;color:#555;white-space:pre-wrap;">' + escHtml(item.story) + '</div>' +
     '</div>';

@@ -235,7 +235,7 @@ async function generateMemoryNote(charId, force) {
   if (apiConfig && apiConfig.apiKey) {
     try {
       const apiUrl = (apiConfig.baseUrl || 'https://api.deepseek.com').replace(/\/+$/, '') + '/chat/completions';
-      const resp = await fetch(apiUrl, {
+      const reply = await llmFetchWithRetry(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiConfig.apiKey },
         body: JSON.stringify({
@@ -247,27 +247,23 @@ async function generateMemoryNote(charId, force) {
           max_tokens: 64,
           temperature: 0.3
         })
-      });
-      if (resp.ok) {
-        const data = await resp.json();
-        const reply = data.choices?.[0]?.message?.content?.trim();
-        if (reply && reply.length > 10) {
-          // 去重：和最后一条笔记内容相同则不存
-          var lastOne = memoryNotes.filter(function(n) { return n.charId === charId; }).pop();
-          if (lastOne && lastOne.summary === reply.trim()) return null;
-          const note = {
-            id: Date.now(),
-            charId,
-            summary: reply.trim(),
-            createdAt: Date.now(),
-            date: new Date().toISOString().split('T')[0]
-          };
-          memoryNotes.push(note);
-          if (memoryNotes.length > 100) memoryNotes = memoryNotes.slice(-100);
-          lsSet('memoryNotes', memoryNotes);
-          return note;
-        }
-      } // if resp.ok
+      }, { label: '记忆笔记', attempts: 2 });
+      if (reply && reply.length > 6) {
+        // 去重：和最后一条笔记内容相同则不存
+        var lastOne = memoryNotes.filter(function(n) { return n.charId === charId; }).pop();
+        if (lastOne && lastOne.summary === reply.trim()) return null;
+        const note = {
+          id: Date.now(),
+          charId,
+          summary: reply.trim(),
+          createdAt: Date.now(),
+          date: new Date().toISOString().split('T')[0]
+        };
+        memoryNotes.push(note);
+        if (memoryNotes.length > 100) memoryNotes = memoryNotes.slice(-100);
+        lsSet('memoryNotes', memoryNotes);
+        return note;
+      }
     } catch(e) {
       console.log('[记忆笔记] AI生成失败:', e?.message?.substring(0,50));
       // API失败时如果强制生成，走规则总结兜底
@@ -818,7 +814,7 @@ async function generateMultiReplies(text, count, length) {
       : `\n4. 不要动作描写`;
     const _multiAiCtrl = (settings && settings.aiControl)
       ? `\n\n你被授权操纵手机：需要时可使用标记 [TASK:任务]、[SCHEDULE:事项|日期|时间]、[EXPENSE:金额|类别]、[MOMENT:内容]，执行后聊天里会显示提示。只在用户明确需要时用，不要滥用`
-      : `\n\n你没有操纵手机的权限，只能纯聊天，绝对禁止生成任何 [TASK]/[SCHEDULE]/[EXPENSE]/[MOMENT] 标记`;
+      : `\n\n你没有操纵手机的权限，绝对禁止生成 [TASK]/[SCHEDULE]/[MOMENT] 标记，只能纯聊天。（记账例外：她明确说「帮我记一笔」时可用 [EXPENSE:金额|类别]，但不要从数字自己猜）`;
     const sysPrompt = systemPrompt + personaPart + contextBlock +
       `\n\n你现在是${pName}。` +
       `\n用户给你发了一条消息，你需要生成${count}条不同的回复供用户选择。` +
@@ -972,17 +968,7 @@ async function sendChat() {
   renderChat();
   saveMemory(text);
 
-  // 自动记账检测
-  const expenseParsed = parseExpenseFromChat(text);
-  if (expenseParsed) {
-    const expRecords = getExpRecords();
-    expRecords.push({ id: Date.now() + "_" + Math.random().toString(36).slice(2,6), amount: expenseParsed.amount, type: expenseParsed.type, category: expenseParsed.category, note: text.substring(0,20), date: new Date().toISOString().split("T")[0] });
-    saveExpRecords(expRecords);
-    renderExpense();
-    chatMessages.push({ role:"system", text: "💰 已自动记账：" + (expenseParsed.type === "income" ? "+" : "") + expenseParsed.amount.toFixed(2) + "元 (" + expenseParsed.category + ")", time: Date.now() });
-    saveChatData();
-    renderChat();
-  }
+  // v5.5.0：不再从聊天文本里自动抠数字记账（改由 AI 明确判断后才记账）
 
   // 歌曲推荐检测
   if (typeof detectSongFromChat === 'function' && text.length > 2) {
@@ -1247,10 +1233,10 @@ async function callLLMApi(userText) {
     ? `\n\n【你被授权操纵手机 — 在回复中使用这些标记，我会自动执行并在聊天里显示提示】
 - [TASK:任务内容] 添加任务（可每行一个）
 - [SCHEDULE:事项|日期|时间] 添加日程
-- [EXPENSE:金额|类别] 记账，如 [EXPENSE:25.5|餐饮]
+- [EXPENSE:金额|类别] 记账，如 [EXPENSE:25.5|餐饮]。⚠️ 只有她明确说「帮我记一笔」才用；聊天里提到数字（「今天花了 25」「买了双鞋 300」）只是闲聊，你不是记账工具，绝对不要自己替她记
 - [MOMENT:朋友圈内容] 用你的名义发一条朋友圈
-只在用户明确请求或明显需要时使用，不要滥用，正常聊天就行`
-    : `\n\n🔴 【重要规则】你没有操纵手机的权限！绝对不能生成任何 [TASK]、[SCHEDULE]、[EXPENSE]、[MOMENT] 这样的操作标记，只能纯聊天。`;
+只在用户明确请求时使用，不要滥用，正常聊天就行`
+    : `\n\n🔴 【重要规则】你没有操纵手机的权限！绝对不能生成 [TASK]、[SCHEDULE]、[MOMENT] 这样的操作标记，只能纯聊天。\n（唯一例外：记账不受此限 —— 她明确说「帮我记一笔 / 记个账」时，可以用 [EXPENSE:金额|类别] 替她记。但绝不能从聊天里的数字自己猜着记。）`;
   const fullSystemPrompt = systemPrompt + personaPart + worldBookPart + contextBlock + antiRepeatHint + `\n\n你的名字叫${pName}。回复规则：
 1. 回复简短，几句话就行，说清楚你想表达的东西
 2. 绝对不要用动作描写（如*微笑*、*拥抱*、*拍肩*），只说纯文字${_actionsPrompt}
@@ -1321,36 +1307,6 @@ async function callLightLlm(systemContent, userContent, maxTokens, temperature) 
   }
 }
 
-/* ---- 自动记账解析 ---- */
-const EXPENSE_KEYWORDS = [
-  ['餐饮', /吃|饭|食堂|外卖|餐|喝|饮|咖啡|奶茶|早|中|晚|午|夜宵|零食/],
-  ['交通', /车|交通|打车|地铁|公交|加油|骑车|停车/],
-  ['购物', /买|购物|衣服|鞋|包|网购|超市/],
-  ['娱乐', /玩|娱乐|电影|游戏|视频|唱歌|旅游/],
-  ['学习', /学|书|课|文具|资料|打印/],
-  ['日用', /日|用|生活|水电|物业|话费|理发/],
-  ['医疗', /药|医院|看病|体检|牙/],
-];
-
-function parseExpenseFromChat(text) {
-  var numMatch = text.match(/\d+(\.\d+)?/);
-  var amount = numMatch ? parseFloat(numMatch[0]) : null;
-  if (!amount || amount <= 0 || amount > 99999999) return null;
-  var isIncome = /收入|工资|兼职|红包|进账|发钱|生活费/.test(text);
-  var type = isIncome ? "income" : "expense";
-  var category = isIncome ? "其他收入" : "其他";
-  if (!isIncome) {
-    for (var i = 0; i < EXPENSE_KEYWORDS.length; i++) {
-      if (EXPENSE_KEYWORDS[i][1].test(text)) { category = EXPENSE_KEYWORDS[i][0]; break; }
-    }
-  } else {
-    if (/工资|薪水/.test(text)) category = "工资";
-    else if (/兼职|副业/.test(text)) category = "兼职";
-    else if (/红包/.test(text)) category = "红包";
-  }
-  return { amount: amount, type: type, category: category };
-}
-
 /* ---- 解析 AI 操作指令 ---- */
 function parseAiActions(reply) {
   const actions = [];
@@ -1377,9 +1333,14 @@ function parseAiActions(reply) {
 }
 
 function executeAiActions(actions) {
-  if (!(settings && settings.aiControl)) {
-    if (actions.length > 0) addChatSystem('🔒 AI操纵手机权限未开启，已忽略操作请求');
-    return;
+  // 记账不算「操纵手机」——她要求的就是 AI 判断后记账，所以不受 aiControl 开关限制；
+  // 其他动作（任务/日程/朋友圈）仍然要开权限
+  const _canControl = !!(settings && settings.aiControl);
+  const _gated = actions.filter(a => a.type !== 'expense');
+  if (!_canControl) {
+    if (_gated.length > 0) addChatSystem('🔒 AI操纵手机权限未开启，已忽略操作请求');
+    actions = actions.filter(a => a.type === 'expense');
+    if (actions.length === 0) return;
   }
   const pName = personaData.name || '小伴';
   actions.forEach(a => {
@@ -1452,44 +1413,9 @@ function generateLocalReply(text) {
     const undone = tasks.filter(x=>!x.done).length;
     return undone > 0 ? `你有 ${undone} 个未完成的任务哦～要不要去看看？` : `所有任务都完成啦！真棒 🎉`;
   }
-  if (/花了|买了|吃了|喝了|用了|付了|支出|消费/.test(t) && /\d+/.test(t)) {
-    const amountMatch = t.match(/(\d+)(\.\d+)?/);
-    if (amountMatch) {
-      const amount = parseFloat(amountMatch[0]);
-      if (amount > 0 && amount < 999999) {
-        if (!(settings && settings.aiControl)) return `嗯，${amount.toFixed(2)} 元…要先给我「操纵手机」的权限，我才能帮你记账。`;
-        let category = "其他";
-        if (/吃|饭|食堂|外卖|餐|喝|饮|咖啡|奶茶/.test(t)) category = "餐饮";
-        else if (/买|购物|衣服|鞋|包|网购/.test(t)) category = "购物";
-        else if (/车|交通|打车|地铁|公交|加油/.test(t)) category = "交通";
-        else if (/玩|娱乐|电影|游戏/.test(t)) category = "娱乐";
-        else if (/学|书|课|文具|资料/.test(t)) category = "学习";
-        else if (/日|用|生活|水电|物业/.test(t)) category = "日用";
-        const records = getExpRecords();
-        records.push({ id: Date.now() + "_" + Math.random().toString(36).slice(2,6), amount, type: "expense", category, note: t.substring(0,20), date: new Date().toISOString().split("T")[0] });
-        saveExpRecords(records);
-        renderExpense();
-        return "💰 已自动记账：" + category + " " + amount.toFixed(2) + "元";
-      }
-    }
-  }
-  if (/收入|工资|兼职|红包|进账|发钱/.test(t) && /\d+/.test(t)) {
-    const amountMatch = t.match(/(\d+)(\.\d+)?/);
-    if (amountMatch) {
-      const amount = parseFloat(amountMatch[0]);
-      if (amount > 0 && amount < 999999) {
-        if (!(settings && settings.aiControl)) return `这笔 ${amount.toFixed(2)} 元的进账先不记啦，等你给我「操纵手机」的权限～`;
-        let category = "其他收入";
-        if (/工资|薪水/.test(t)) category = "工资";
-        else if (/兼职|副业/.test(t)) category = "兼职";
-        else if (/红包/.test(t)) category = "红包";
-        const records = getExpRecords();
-        records.push({ id: Date.now() + "_" + Math.random().toString(36).slice(2,6), amount, type: "income", category, note: t.substring(0,20), date: new Date().toISOString().split("T")[0] });
-        saveExpRecords(records);
-        renderExpense();
-        return "💰 已自动记账：" + category + " +" + amount.toFixed(2) + "元";
-      }
-    }
+  // 记账：不自动抠数字。要记就明说「帮我记一笔 25 餐饮」，否则只当普通聊天
+  if (/记账|记一笔|记一下账/.test(t)) {
+    return `想记哪一笔？说「帮我记 25 餐饮」这样，我记下来。`;
   }
   if (/闹钟|叫醒|定时/.test(t)) {
     return `闹钟功能停掉了。要是有重要的事，告诉我几点，我帮你记成任务到点提醒你。`;
