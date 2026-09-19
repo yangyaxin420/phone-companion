@@ -217,6 +217,17 @@ function initHeart() {
   }
   renderHeart();
   renderHeartRangePanel();
+  // 头一次打开心跳页，把这个面板直接摊开。
+  // 它是折叠的，晞晞翻了一遍说「我这边没有」——不能指望她自己猜那行字能点。
+  // 看过一次就收起来，之后按她自己点的来。
+  if (!lsGet('heartRangeSeen', false)) {
+    heartRangeOpen = true;
+    const box = document.getElementById('heartRangePanel');
+    const chev = document.getElementById('heartRangeChevron');
+    if (box) box.style.display = 'block';
+    if (chev) chev.style.transform = 'rotate(180deg)';
+    lsSet('heartRangeSeen', true);
+  }
   // 自动采样检查：每分钟看一次是否该采了
   setInterval(function() {
     if (heartState.sampling) {
