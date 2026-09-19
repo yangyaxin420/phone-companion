@@ -640,6 +640,20 @@ ul{list-style:none;}
 .heart-hi-hr{font-size:14px;font-weight:700;color:#be123c;}
 .heart-hi-temp{font-size:12px;color:#f472b6;}
 
+/* ---- 心跳：手动调节区间 ---- */
+.heart-range-box{background:#fff;border-radius:16px;padding:14px 16px;margin-top:6px;box-shadow:0 1px 4px rgba(0,0,0,.04);}
+.heart-range-row{margin-bottom:12px;}
+.heart-range-label{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;color:#64748b;margin-bottom:6px;}
+.heart-range-label b{font-size:13px;color:#be123c;font-weight:700;}
+.heart-range-row input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:2px;background:#f1d7e4;outline:none;}
+.heart-range-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;border-radius:50%;background:#ec4899;border:2px solid #fff;box-shadow:0 1px 4px rgba(236,72,153,.4);cursor:pointer;}
+.heart-range-row input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:#ec4899;border:2px solid #fff;box-shadow:0 1px 4px rgba(236,72,153,.4);cursor:pointer;}
+.heart-range-preview{font-size:11px;color:#94a3b8;line-height:1.6;background:#fdf2f8;border-radius:10px;padding:8px 10px;margin-top:2px;}
+.heart-range-btns{display:flex;gap:8px;margin-top:10px;}
+.heart-range-btn{flex:1;background:#f8fafc;color:#64748b;border:1px solid #e2e8f0;border-radius:12px;padding:9px;font-size:12px;font-weight:600;cursor:pointer;}
+.heart-range-btn.reroll{background:#fdf2f8;color:#be123c;border-color:#fbcfe8;}
+.heart-range-note{font-size:10px;color:#cbd5e1;line-height:1.6;margin-top:8px;}
+
 /* ---- 呼吸练习（4-7-8，骆云影陪你）+ 手环预览 ---- */
 .heart-actions-mini{display:flex;gap:8px;}
 .heart-breathe,.heart-band,.heart-report{flex:1;background:#eef6ff;color:#3b82f6;border:1px solid #dbeafe;border-radius:14px;padding:12px;font-size:13px;font-weight:600;cursor:pointer;}

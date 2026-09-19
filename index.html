@@ -9,10 +9,10 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="theme-color" content="#ecf6f8">
-<meta name="app-version" content="v5.5.0 (2026.09.17)">
+<meta name="app-version" content="v5.5.4 (2026.09.19)">
 <title>我的手机</title>
-<link rel="stylesheet" href="css/style.css?v=47">
-<link rel="stylesheet" href="css/track.css?v=47">
+<link rel="stylesheet" href="css/style.css?v=51">
+<link rel="stylesheet" href="css/track.css?v=51">
 </head>
 <body>
 
@@ -499,6 +499,41 @@
         <button class="heart-measure" onclick="heartMeasureNow()">📡 测一次</button>
         <button class="heart-toggle" id="heartToggleBtn" onclick="toggleHeartSampling()">自动采样：开</button>
       </div>
+      <!-- 手动调节区间（模拟数据的档位，嫌高嫌低都在这儿调） -->
+      <div class="heart-history-head" onclick="toggleHeartRangePanel()">
+        <span>⚙️ 手动调节区间</span>
+        <span class="heart-history-meta"><span id="heartRangeSummary">58~82</span> bpm <span class="heart-chevron" id="heartRangeChevron">▾</span></span>
+      </div>
+      <div id="heartRangePanel" style="display:none;">
+        <div class="heart-range-box">
+          <div class="heart-range-row">
+            <div class="heart-range-label"><span>平静下限</span><b id="hrLoVal">58</b></div>
+            <input type="range" id="hrLo" min="40" max="110" step="1" value="58" oninput="heartSetRange('lo', this.value)">
+          </div>
+          <div class="heart-range-row">
+            <div class="heart-range-label"><span>平静上限</span><b id="hrHiVal">82</b></div>
+            <input type="range" id="hrHi" min="50" max="135" step="1" value="82" oninput="heartSetRange('hi', this.value)">
+          </div>
+          <div class="heart-range-row">
+            <div class="heart-range-label"><span>波动幅度</span><b id="hrAmpVal">±5</b></div>
+            <input type="range" id="hrAmp" min="0" max="20" step="1" value="5" oninput="heartSetRange('amp', this.value)">
+          </div>
+          <div class="heart-range-row">
+            <div class="heart-range-label"><span>高峰概率</span><b id="hrSpikeVal">12%</b></div>
+            <input type="range" id="hrSpike" min="0" max="60" step="1" value="12" oninput="heartSetRange('spikeP', this.value)">
+          </div>
+          <div class="heart-range-row">
+            <div class="heart-range-label"><span>单次最高</span><b id="hrCeilVal">128</b></div>
+            <input type="range" id="hrCeil" min="90" max="190" step="1" value="128" oninput="heartSetRange('ceil', this.value)">
+          </div>
+          <div class="heart-range-preview" id="heartRangePreview"></div>
+          <div class="heart-range-btns">
+            <button class="heart-range-btn" onclick="heartResetRange()">恢复默认</button>
+            <button class="heart-range-btn reroll" id="heartRerollBtn" onclick="heartRerollHistory()">🔄 按新区间重刷历史</button>
+          </div>
+          <div class="heart-range-note">调完点「测一次」看效果。重刷会把已有的模拟读数按新区间重算一遍（手环连了就不会动）。</div>
+        </div>
+      </div>
       <!-- 呼吸练习 + 手环预览 + 健康周报 -->
       <div class="heart-actions-mini">
         <button class="heart-breathe" id="heartBreatheBtn" onclick="startBreathing()">🌬 呼吸练习</button>
@@ -561,18 +596,6 @@
     </div>
   </div>
 
-  <!-- ===== 晚安故事 ===== -->
-  <div class="page" id="page-story">
-    <div class="sub-page-header">🌙 晚安故事</div>
-    <div class="sub-page-body" style="padding:14px 16px;overflow-y:auto;">
-      <div style="font-size:12px;color:#999;line-height:1.7;margin-bottom:12px;">
-        每晚，骆云影给你编一个睡前故事。<br>他会悄悄翻你今天说过的话、写的日记和心情，把那件小事织进故事里。
-      </div>
-      <button id="storyBtn" onclick="generateNightStory()" style="width:100%;padding:12px;border:none;border-radius:14px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;font-size:14px;font-weight:600;cursor:pointer;">🌙 今晚的故事</button>
-      <div id="storyResult" style="margin-top:14px;"></div>
-      <div id="storyList" style="margin-top:14px;"></div>
-    </div>
-  </div>
 
   <!-- ===== 睡眠（模拟引擎 + 🌙我睡了 + 手环入口） ===== -->
   <div class="page" id="page-sleep">
@@ -593,15 +616,15 @@
       <!-- 就寝弹窗：选日期和时间 -->
       <div id="sleepModal" style="position:fixed;inset:0;background:rgba(20,30,45,.45);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;z-index:9999;">
         <div style="width:min(300px,86vw);background:#fff;border-radius:22px;padding:20px 18px 14px;box-shadow:0 12px 40px rgba(20,25,45,.25);text-align:center;">
-          <div style="font-size:16px;font-weight:700;color:#3a5a6e;">🌙 几点睡呀</div>
-          <div style="font-size:11px;color:#9ab;margin:4px 0 14px;">他会记住这一刻，明早问你好不好</div>
+          <div id="sleepModalTitle" style="font-size:16px;font-weight:700;color:#3a5a6e;">🌙 几点睡呀</div>
+          <div id="sleepModalSub" style="font-size:11px;color:#9ab;margin:4px 0 14px;">他会记住这一刻，明早问你好不好</div>
           <div style="display:flex;gap:10px;align-items:center;justify-content:center;">
             <input type="date" id="sleepDate" style="flex:1.3;min-width:0;font-size:15px;padding:9px 8px;border:1px solid #d0e6ee;border-radius:12px;color:#3a5a6e;background:#f6fbfd;">
             <input type="time" id="sleepTime" style="flex:1;min-width:0;font-size:15px;padding:9px 6px;border:1px solid #d0e6ee;border-radius:12px;color:#3a5a6e;background:#f6fbfd;">
           </div>
           <div style="display:flex;gap:10px;margin-top:16px;">
             <button onclick="sleepModalCancel()" style="flex:1;padding:10px;border:none;border-radius:12px;background:#eef3f6;color:#6f94ab;font-size:13px;font-weight:600;cursor:pointer;">取消</button>
-            <button onclick="sleepModalConfirm()" style="flex:1.4;padding:10px;border:none;border-radius:12px;background:linear-gradient(135deg,#5b87a2,#7c5ba6);color:#fff;font-size:13px;font-weight:600;cursor:pointer;">记下 · 晚安</button>
+            <button id="sleepModalConfirmBtn" onclick="sleepModalConfirm()" style="flex:1.4;padding:10px;border:none;border-radius:12px;background:linear-gradient(135deg,#5b87a2,#7c5ba6);color:#fff;font-size:13px;font-weight:600;cursor:pointer;">记下 · 晚安</button>
           </div>
         </div>
       </div>
@@ -1076,30 +1099,29 @@
 </div><!-- phone-frame -->
 
 <!-- script moved to external files -->
-<script src="js/utils.js?v=47"></script>
-    <script src="js/photo.js?v=47"></script>
-<script src="js/app.js?v=47"></script>
-<script src="js/weather.js?v=47"></script>
-<script src="js/tasks.js?v=47"></script>
-<script src="js/expense.js?v=47"></script>
-<script src="js/chat.js?v=47"></script>
-<script src="js/question.js?v=47"></script>
-<script src="js/secret.js?v=47"></script>
-<script src="js/moments.js?v=47"></script>
-<script src="js/persona.js?v=47"></script>
-<script src="js/daily.js?v=47"></script>
-<script src="js/tide.js?v=47"></script>
-<script src="js/companion.js?v=47"></script>
-<script src="js/settings.js?v=47"></script>
-<script src="js/track.js?v=47"></script>
-<script src="js/heart.js?v=47"></script>
-<script src="js/steps.js?v=47"></script>
-<script src="js/report.js?v=47"></script>
-<script src="js/breathe.js?v=47"></script>
-<script src="js/band.js?v=47"></script>
-<script src="js/story.js?v=47"></script>
-<script src="js/sleep.js?v=47"></script>
-<script src="js/course.js?v=47"></script>
+<script src="js/utils.js?v=51"></script>
+    <script src="js/photo.js?v=51"></script>
+<script src="js/app.js?v=51"></script>
+<script src="js/weather.js?v=51"></script>
+<script src="js/tasks.js?v=51"></script>
+<script src="js/expense.js?v=51"></script>
+<script src="js/chat.js?v=51"></script>
+<script src="js/question.js?v=51"></script>
+<script src="js/secret.js?v=51"></script>
+<script src="js/moments.js?v=51"></script>
+<script src="js/persona.js?v=51"></script>
+<script src="js/daily.js?v=51"></script>
+<script src="js/tide.js?v=51"></script>
+<script src="js/companion.js?v=51"></script>
+<script src="js/settings.js?v=51"></script>
+<script src="js/track.js?v=51"></script>
+<script src="js/heart.js?v=51"></script>
+<script src="js/steps.js?v=51"></script>
+<script src="js/report.js?v=51"></script>
+<script src="js/breathe.js?v=51"></script>
+<script src="js/band.js?v=51"></script>
+<script src="js/sleep.js?v=51"></script>
+<script src="js/course.js?v=51"></script>
 <script>
 /* ==================== 初始化 ==================== */
 function init() {

@@ -212,6 +212,21 @@ function getCharMemoryNotes(charId, limit) {
   return memoryNotes.filter(n => n.charId === charId).slice(-(limit || 20));
 }
 
+/* 记忆笔记去重：和该角色最近 20 条比 —— 去掉标点后完全相同、或一条包含另一条，都算重复 */
+function _memNoteIsDup(charId, text) {
+  var norm = function(s) { return String(s || '').replace(/[^一-龥a-zA-Z0-9]/g, ''); };
+  var t = norm(text);
+  if (!t) return true;
+  var recent = memoryNotes.filter(function(n) { return n.charId === charId; }).slice(-20);
+  for (var i = 0; i < recent.length; i++) {
+    var o = norm(recent[i].summary);
+    if (!o) continue;
+    if (o === t) return true;
+    if (o.length >= 6 && t.length >= 6 && (o.indexOf(t) !== -1 || t.indexOf(o) !== -1)) return true;
+  }
+  return false;
+}
+
 // 生成新的记忆笔记（从最近未总结的对话中）
 async function generateMemoryNote(charId, force) {
   const msgs = chatData[charId] || [];
@@ -249,9 +264,8 @@ async function generateMemoryNote(charId, force) {
         })
       }, { label: '记忆笔记', attempts: 2 });
       if (reply && reply.length > 6) {
-        // 去重：和最后一条笔记内容相同则不存
-        var lastOne = memoryNotes.filter(function(n) { return n.charId === charId; }).pop();
-        if (lastOne && lastOne.summary === reply.trim()) return null;
+        // 去重：和最近 20 条比（以前只比最后一条，「她喜欢吃甜的」能记五遍）
+        if (_memNoteIsDup(charId, reply)) return null;
         const note = {
           id: Date.now(),
           charId,
@@ -390,9 +404,8 @@ async function generateMemoryNote(charId, force) {
     if (extraNote) summary += extraNote;
   }
 
-  // 去重：和最后一条笔记内容相同则不存
-  var lastOne = memoryNotes.filter(function(n) { return n.charId === charId; }).pop();
-  if (lastOne && lastOne.summary === summary.trim()) return null;
+  // 去重：和最近 20 条比
+  if (_memNoteIsDup(charId, summary)) return null;
 
   const note = {
     id: Date.now(),
@@ -823,7 +836,8 @@ async function generateMultiReplies(text, count, length) {
 1. 每条回复${lengthHint}，每一条都要不一样
 2. 从不同角度回应：认真回应、吐槽、关心、反问、调侃……换着花样来
 3. 每条回复之间要有明显区别，不要只是换几个词` + _multiActionsBan + `\n` + _multiAiCtrl + `
-5. 用 --- 分隔每条回复（不要加序号）`;
+5. 操作标记（[TASK]/[SCHEDULE]/[EXPENSE]/[MOMENT]）**整个回答里最多出现一次**，只放在其中一条回复里，绝对不要每条回复都写一遍
+6. 用 --- 分隔每条回复（不要加序号）`;
 
     try {
       const body = {
@@ -846,12 +860,22 @@ async function generateMultiReplies(text, count, length) {
 
       // 用 --- 分隔，过滤空白
       const splits = content.split(/---+/).map(s => s.trim()).filter(s => s.length > 1);
+      // 多条回复是「同一个回合」的输出：同一条操作（任务/日程/记账/朋友圈）在多条里各写一遍，
+      // 也只能执行一次 —— 否则 AI 在两条候选里都写了 [EXPENSE:25|餐饮]，就会重复记两笔/重复加两个任务
+      const _seen = {};
+      const _turnActions = [];
       for (let s of splits) {
         const parsed = parseAiActions(s);
         replies.push(parsed.display || s);
-        if (parsed.actions) executeAiActions(parsed.actions);
+        if (parsed.actions) {
+          parsed.actions.forEach(a => {
+            const k = a.type + '|' + a.content;
+            if (!_seen[k]) { _seen[k] = 1; _turnActions.push(a); }
+          });
+        }
         if (replies.length >= count) break;
       }
+      if (_turnActions.length > 0) executeAiActions(_turnActions);
     } catch(e) {
       console.log('[多条回复] API失败:', e?.message?.substring(0,60));
     }
@@ -1332,6 +1356,40 @@ function parseAiActions(reply) {
   return { display, actions };
 }
 
+/* ---- 加任务前先查同名的未完成项：AI 隔一轮又把同一件事说一遍时，不再堆第二条 ---- */
+function _normActionText(s) {
+  return String(s || '').replace(/[^一-龥a-zA-Z0-9]/g, '');
+}
+function _addTaskOnce(text) {
+  const t = _normActionText(text);
+  if (!t) return false;
+  if (tasks.some(x => !x.done && _normActionText(x.text) === t)) {
+    addChatSystem('📋 这条任务已经有了，没重复加');
+    return false;
+  }
+  tasks.push({ text: text, done: false });
+  lsSet('tasks', tasks);
+  renderSchedule();
+  return true;
+}
+
+/* ---- 加账目前看有没有刚记过的同一笔（同额同类别 · 两分钟内 · 也是 AI 记的）---- */
+function _addExpenseOnce(amount, category) {
+  const records = getExpRecords();
+  const now = Date.now();
+  const dup = records.some(r => r.note === 'AI记账' && r.category === category &&
+    Math.abs(Number(r.amount) - amount) < 0.001 &&
+    now - (parseInt(String(r.id).split('_')[0], 10) || 0) < 120000);
+  if (dup) {
+    addChatSystem('💰 这一笔刚记过了，没重复记');
+    return false;
+  }
+  records.push({ id: now + '_' + Math.random().toString(36).slice(2,6), amount: amount, type: 'expense', category: category, note: 'AI记账', date: new Date().toISOString().split('T')[0] });
+  saveExpRecords(records);
+  renderExpense();
+  return true;
+}
+
 function executeAiActions(actions) {
   // 记账不算「操纵手机」——她要求的就是 AI 判断后记账，所以不受 aiControl 开关限制；
   // 其他动作（任务/日程/朋友圈）仍然要开权限
@@ -1345,10 +1403,7 @@ function executeAiActions(actions) {
   const pName = personaData.name || '小伴';
   actions.forEach(a => {
     if (a.type === 'task') {
-      tasks.push({ text: a.content, done: false });
-      lsSet('tasks', tasks);
-      renderSchedule();
-      addChatSystem(`📋 ${pName}帮你添加了任务：${a.content}`);
+      if (_addTaskOnce(a.content)) addChatSystem(`📋 ${pName}帮你添加了任务：${a.content}`);
     } else if (a.type === 'schedule') {
       const parts = a.content.split('|').map(s => s.trim());
       const sText = parts[0] || '';
@@ -1360,11 +1415,9 @@ function executeAiActions(actions) {
       const amount = parseFloat(parts[0]);
       const category = parts[1] || '其他';
       if (amount > 0 && amount < 999999) {
-        const records = getExpRecords();
-        records.push({ id: Date.now() + '_' + Math.random().toString(36).slice(2,6), amount: amount, type: 'expense', category: category, note: 'AI记账', date: new Date().toISOString().split('T')[0] });
-        saveExpRecords(records);
-        renderExpense();
-        addChatSystem(`💰 ${pName}帮你记了 ${category} ${amount.toFixed(2)} 元`);
+        if (_addExpenseOnce(amount, category)) {
+          addChatSystem(`💰 ${pName}帮你记了 ${category} ${amount.toFixed(2)} 元`);
+        }
       }
     } else if (a.type === 'moment') {
       if (a.content) {
@@ -1402,10 +1455,9 @@ function generateLocalReply(text) {
   if (/添加任务|新建任务|提醒我/.test(t)) {
     const taskText = t.replace(/添加任务|新建任务|提醒我/g,'').trim();
     if (taskText && settings && settings.aiControl) {
-      tasks.push({ text:taskText, done:false });
-      lsSet('tasks', tasks);
-      renderSchedule();
-      return `好的，已经帮你添加了任务：${taskText} ✓`;
+      return _addTaskOnce(taskText)
+        ? `好的，已经帮你添加了任务：${taskText} ✓`
+        : `这条任务已经有了，不用重复加～`;
     }
     return taskText ? `你说得对，不过我得先拿到「操纵手机」的权限才能动手～` : `想添加什么任务？直接告诉我就好～`;
   }
@@ -1474,7 +1526,8 @@ function generateLocalReply(text) {
 function tryHeartProactive() {
   if (!settings || !settings.proactiveMsg) return false;
   var hLast = (typeof heartLast === 'function') ? heartLast() : null;
-  if (!hLast || !(hLast.hr >= 100 || hLast.hr <= 50)) return false;
+  // 偏高/偏低的判定跟着她在心跳页设的区间走（以前写死 100/50，她一调低区间就再也不触发了）
+  if (!hLast || !(typeof heartIsNotable === 'function' ? heartIsNotable(hLast.hr) : (hLast.hr >= 100 || hLast.hr <= 50))) return false;
   // 防同一读数重复提醒
   if (hLast.t === lsGet('heartProactiveLast', 0)) return false;
   // 只对1小时内的读数有反应
@@ -1615,13 +1668,23 @@ async function generateProactiveMessage(scenario, char, isTsundere, isGentle, ex
       ? ['我感觉到你心跳好快…是不是有事？别紧张，我在呢','心跳有点快呢，深呼吸，我陪你～','心跳有点快呢，来，跟我做个呼吸练习，我陪你～']
       : ['心跳' + hVal + '。注意休息。','心率有点偏高。需要聊聊吗？','心率有点偏高。要不跟我做个呼吸练习？'];
   } else if (scenario === 'sleep') {
-    var _dur = extra && extra.sleepMin ? (Math.floor(extra.sleepMin / 60) + '小时' + (extra.sleepMin % 60 ? extra.sleepMin % 60 + '分' : '')) : '整晚';
-    var _qTxt = extra && extra.quality === 'good' ? '睡得很沉' : (extra && extra.quality === 'ok' ? '睡得还行' : '没睡够');
-    localTemplates = isTsundere
-      ? ['早。你睡了' + _dur + '，还行。','醒得挺早？昨晚' + _qTxt + '。今天别又熬夜。','啧，昨晚' + _qTxt + '。就这吧，别拖到半夜。']
-      : isGentle
-      ? ['早呀~你昨晚睡了' + _dur + '，' + _qTxt + '呢，今天也要精神满满','早，感觉你昨晚' + _qTxt + '，我就放心点了～','睡够' + _dur + '就好，今天开开心心的']
-      : ['睡了' + _dur + '。醒得早，注意休息。','昨晚' + _qTxt + '。今天安排好作息。'];
+    // v5.5.1：睡下时间没记时（sleepMin=null）不能编时长、也不能替她评「没睡够」，改成问她
+    var _hasDur = !!(extra && extra.sleepMin);
+    var _dur = _hasDur ? (Math.floor(extra.sleepMin / 60) + '小时' + (extra.sleepMin % 60 ? extra.sleepMin % 60 + '分' : '')) : '';
+    var _qTxt = (typeof _sleepQualityLabel === 'function')
+      ? _sleepQualityLabel(extra && extra.quality)
+      : (extra && extra.quality === 'good' ? '睡得很沉' : extra && extra.quality === 'ok' ? '睡得还行' : '没睡够');
+    localTemplates = !_hasDur
+      ? (isTsundere
+          ? ['早。','醒了？昨晚几点睡的，你自己说。','早。昨晚睡得怎么样？……就问问。']
+          : isGentle
+          ? ['早呀~昨天睡得怎么样呀？','早，昨晚睡得好吗？想听你说说～','醒了呀，昨晚休息够了吗？']
+          : ['早。昨晚睡眠情况？','醒了。昨晚睡下时间未填。','早。睡得怎么样。'])
+      : (isTsundere
+          ? ['早。你睡了' + _dur + '，还行。','醒得挺早？昨晚' + _qTxt + '。今天别又熬夜。','啧，昨晚' + _qTxt + '。就这吧，别拖到半夜。']
+          : isGentle
+          ? ['早呀~你昨晚睡了' + _dur + '，' + _qTxt + '呢，今天也要精神满满','早，感觉你昨晚' + _qTxt + '，我就放心点了～','睡够' + _dur + '就好，今天开开心心的']
+          : ['睡了' + _dur + '。醒得早，注意休息。','昨晚' + _qTxt + '。今天安排好作息。']);
   } else if (scenario === 'goodnight') {
     localTemplates = isTsundere
       ? ['……睡吧。灯关了吗？','哼，晚安。不许熬夜，明早见。','睡你的觉去，别玩手机了。']
@@ -1679,7 +1742,11 @@ async function generateProactiveMessage(scenario, char, isTsundere, isGentle, ex
       else if (scenario === 'inactive') scenarioDesc = '已经好一阵没和用户说话了。';
       else if (scenario === 'rain') scenarioDesc = '外面正在下雨。';
       else if (scenario === 'heart') scenarioDesc = '你"感觉"到用户的心跳' + (extra ? extra.hr : '') + ' bpm，有点快，关心她一下。';
-      else if (scenario === 'sleep') scenarioDesc = '你刚"感觉"到她睡醒了，昨晚睡了约 ' + (extra && extra.sleepMin ? Math.floor(extra.sleepMin / 60) + ' 小时' : '一晚') + (extra && extra.quality ? (extra.quality === 'good' ? '，睡得很沉' : extra.quality === 'ok' ? '，睡得还行' : '，没睡够') : '') + '。自然地问她昨晚睡得好不好。';
+      else if (scenario === 'sleep') scenarioDesc = (extra && extra.sleepMin)
+        ? '你刚"感觉"到她睡醒了，昨晚睡了约 ' + Math.floor(extra.sleepMin / 60) + ' 小时' +
+          (extra.quality === 'good' ? '，睡得很沉' : extra.quality === 'ok' ? '，睡得还行' : extra.quality === 'poor' ? '，没睡够' : '') +
+          '。自然地问她昨晚睡得好不好。'
+        : '你刚"感觉"到她睡醒了，但你并不知道她昨晚几点睡的（她没记）。自然地问她昨晚睡得怎么样——不要假装知道时长，也不要替她下结论。';
       else if (scenario === 'goodnight') scenarioDesc = '用户要去睡了，温柔送她入睡，让她安心睡。';
       else if (scenario === 'class') scenarioDesc = '用户' + (extra && extra.item && extra.item.type === 'duty' ? '快要去值班' : '快要去上课') + (extra && extra.item ? '：' + extra.item.name + '（' + extra.item.start + (extra.item.loc ? ' ' + extra.item.loc : '') + '）' : '') + (extra && extra.min != null ? '，还有约' + extra.min + '分钟' : '') + '。自然地提醒她该走了、别迟到，1-2句话，别啰嗦。';
       else scenarioDesc = '随意地和用户打个招呼。';
@@ -1835,7 +1902,7 @@ async function ensureInnerDiary(charId, dateStr, force) {
   var arr = getInnerDiary(charId);
   var existing = arr.filter(function(e) { return e.date === ds; })[0];
   if (existing && !force) return existing;
-  var entry = await generateInnerDiary(charId);
+  var entry = await generateInnerDiary(charId, ds);   // 把日期传下去，旧日记才能用那天的原话重写
   if (entry) saveInnerDiaryEntry(charId, entry);
   return entry;
 }
@@ -1855,6 +1922,28 @@ function _diaryStripDate(text) {
   return String(text || '').replace(/^\s*\d{1,2}月\d{1,2}日[，,]?\s*/, '');
 }
 
+/* 新日记和前几天写过的太像？用「2 元字组重合率」判重（中文不需要分词，够用且便宜） */
+function _diaryTooSimilar(text, prevList) {
+  function grams(s) {
+    var t = String(s || '').replace(/[^一-龥a-zA-Z0-9]/g, '');
+    var set = {};
+    for (var i = 0; i < t.length - 1; i++) set[t.substr(i, 2)] = 1;
+    return set;
+  }
+  var a = grams(text);
+  var an = Object.keys(a).length;
+  if (!an || !prevList || prevList.length === 0) return false;
+  for (var i = 0; i < prevList.length; i++) {
+    var b = grams(prevList[i]);
+    var bn = Object.keys(b).length;
+    if (!bn) continue;
+    var inter = 0;
+    for (var k in a) { if (b[k]) inter++; }
+    if (inter / Math.min(an, bn) > 0.6) return true;
+  }
+  return false;
+}
+
 // 日期种子：同一天恒定，隔天必变（用于轮换模板，避免两天写一样）
 function _diarySeed(dateStr) {
   var n = 0;
@@ -1870,48 +1959,154 @@ function _todayDiaryUserText(charId) {
     return m.role === 'user' && m.time && _isSameDay(m.time, now);
   });
   if (dayMsgs.length > 0) {
-    return dayMsgs.map(function(m) { return m.text; }).join(' ').slice(-200);
+    return dayMsgs.map(function(m) { return m.text; }).join(' ').slice(-500);
   }
   // 今天还没聊，用最近几句补，别让日记空着
   var recent = charMsgs.filter(function(m) { return m.role === 'user'; }).slice(-6);
-  return recent.map(function(m) { return m.text; }).join(' ').slice(-200);
+  return recent.map(function(m) { return m.text; }).join(' ').slice(-500);
 }
 
-// AI 生成今天的内心日记
-async function generateInnerDiary(charId) {
+/* 指定某一天她说的话 —— 补写过期的旧日记时用。
+   找不到那天的记录就返回空：绝不能拿今天的聊天去顶那一天，那就成编的了。
+   日期口径和日记的 key 保持一致（都用 toISOString 那天），免得跨零点对不上。 */
+function _diaryUserTextFor(charId, dateStr) {
+  var charMsgs = chatData[charId] || [];
+  var dayMsgs = charMsgs.filter(function(m) {
+    if (m.role !== 'user' || !m.time) return false;
+    return new Date(m.time).toISOString().split('T')[0] === dateStr;
+  });
+  return dayMsgs.map(function(m) { return m.text; }).join(' ').slice(-500);
+}
+
+/* 日记最后一句 —— 用来查「结尾是不是又写了老一套」 */
+function _diaryLastSentence(text) {
+  var parts = String(text || '').split(/[。！？!?\n]+/).filter(function(s) { return s.trim(); });
+  return parts.length ? parts[parts.length - 1].trim() : '';
+}
+function _normDiaryLine(s) {
+  return String(s || '').replace(/[^一-龥a-zA-Z0-9]/g, '');
+}
+/* 她明确点名的万能收尾 —— 这几句一律不许再出现 */
+var _DIARY_BAN_END = ['也就记一下', '省得明天忘了', '也不是非问不可', '反正就这样', '记完了', '查无此条', '先记到这儿'];
+function _diaryEndingRepeats(text, prevEndings) {
+  var last = _normDiaryLine(_diaryLastSentence(text));
+  if (!last) return false;
+  for (var i = 0; i < _DIARY_BAN_END.length; i++) {
+    if (last.indexOf(_DIARY_BAN_END[i]) !== -1) return true;
+  }
+  for (var j = 0; j < (prevEndings || []).length; j++) {
+    var p = _normDiaryLine(prevEndings[j]);
+    if (!p) continue;
+    if (p === last) return true;
+    // 大部分字都一样也算重复（「也就记一下」/「记一下也就」这种换字不换句式）
+    // 门槛放到 4 字：结尾常常很短（「算了，睡」），卡 6 字会漏掉短句的重复
+    if (last.length >= 4 && p.length >= 4 && (last.indexOf(p) !== -1 || p.indexOf(last) !== -1)) return true;
+  }
+  return false;
+}
+
+// AI 生成内心日记。dateStr 传了就是补写那一天（素材只取那天的聊天），不传就是写今天。
+async function generateInnerDiary(charId, dateStr) {
   var pName = getCharById(charId)?.name || '小伴';
   var pers = lsGet('persona_' + charId, null);
   var story = pers?.story || getCharById(charId)?.story || '';
   var topics = (typeof _getChatTopics === 'function') ? _getChatTopics(charId) : [];
   var topicText = topics.length > 0 ? topics.join('、') : '日常';
-  var todayText = _todayDiaryUserText(charId);
+  var _todayKey = new Date().toISOString().split('T')[0];
+  var isToday = !dateStr || dateStr === _todayKey;
+  // 补写旧日记时：素材只认那天的原话，当天没聊过就干脆不补（编不出来）
+  var todayText = isToday ? _todayDiaryUserText(charId) : _diaryUserTextFor(charId, dateStr);
+  var dayWord = isToday ? '今天' : '那天';
+  var dateLabel = _todayDateLabel();
+  if (!isToday && dateStr) {
+    var _p = String(dateStr).split('-');
+    if (_p.length === 3) dateLabel = parseInt(_p[1], 10) + '月' + parseInt(_p[2], 10) + '日';
+  }
+  if (!isToday && !todayText) return null;   // 那天没聊天记录，不硬编
+  // 已经写过的日记（剥掉日期）回灌给模型 —— 以前不给它看历史，它天天写「台灯还亮着」；
+  // 而且她没聊天的日子，素材会回退到同样的最近几条，两天就更容易一字不差。
+  var prevDiaries = (getInnerDiary(charId) || [])
+    .slice(-5)
+    .map(function(e) { return _diaryStripDate(e.content); })
+    .filter(function(s) { return s; });
+  // 单独把「前几天的结尾」拎出来点名禁止 —— 前几天整段丢给它，它还是会照抄收尾那句
+  var prevEndings = prevDiaries.map(_diaryLastSentence).filter(function(s) { return s; });
+  var prevBlock = prevDiaries.length > 0
+    ? '\n【你前几天已经写过的（内容、用过的物件、尤其是结尾，都别再重复）】\n- ' + prevDiaries.join('\n- ') +
+      (prevEndings.length > 0
+        ? '\n【你这几天用过的收尾（一个都不许再用，句式也别照抄）】' + prevEndings.join(' ／ ')
+        : '')
+    : '';
+
+  // v5.5.2：把「他记住的事」和「他自己的念头」揉进同一段 —— 以前日记只写心情，
+  // 事实另开一张卡干巴巴列着，两边都不像人。现在事实是素材，想法是声音，写在一起。
+  var factText = '';
+  try {
+    if (typeof getCharMemoryNotes === 'function') {
+      var fns = getCharMemoryNotes(charId, 3) || [];
+      factText = fns.map(function(n) { return n.summary; }).filter(Boolean).join('；');
+    }
+  } catch (e) {}
+  // 她还没做完的事 —— 供他写「改天得提醒她」那一层
+  var todoText = '';
+  try {
+    if (typeof tasks !== 'undefined' && tasks.length) {
+      todoText = tasks.filter(function(t) { return !t.done; }).slice(-3).map(function(t) { return t.text; }).join('、');
+    }
+  } catch (e) {}
 
   if (apiConfig && apiConfig.apiKey) {
-    var reply = await callLightLlm(
-      '你是' + pName + '。' + (story ? '你的性格/背景：' + story : '') +
-      '\n今天是' + _todayDateLabel() + '。你们聊的话题：' + topicText +
-      (todayText ? '。今天她跟你说过的话（摘录）：' + todayText : '') +
-      '。写一篇只给自己看的「今日心事」，第一人称，用你的声音（嘴硬、口是心非、说反话，关心都藏起来），把她说的话里的你叫「我」、把她叫「她」。' +
-      '\n要求：\n- 挑一件今天相关的小物件当载体（台灯/奶茶/伞/耳机/窗灯之类）\n- 4-7句散文，像叹气一样自然地收尾\n- 必须写今天新发生的事，别重复以前写过的话\n- 绝不用「日记」二字，不用emoji，不用markdown，不用动作描写，不肉麻直球',
-      '今天发生的事，用你的口吻记下来',
-      200, 1.1
-    );
+    var diaryPrompt = '你是' + pName + '。' + (story ? '你的性格/背景：' + story : '') +
+      (isToday
+        ? '\n今天是' + dateLabel + '（可以自然带一句快要到的日子，比如过节、天冷了，但别硬凑）。'
+        : '\n那是' + dateLabel + '。') +
+      '\n【' + dayWord + '你们聊到的】' + topicText +
+      (todayText ? '\n【她' + dayWord + '对你说过的原话】' + todayText : '') +
+      (isToday && factText ? '\n【你今天注意到的、记下来的关于她的事】' + factText : '') +
+      (isToday && todoText ? '\n【她还没做完、你打算改天提醒她的】' + todoText : '') +
+      '\n\n写一段只给自己看的记录。把「' + dayWord + '发生的事」和「你自己的想法」揉在一起，' +
+      '**不要分成两段，不要写成清单**，像心里顺下来的一段话，想到哪写到哪。' +
+      '\n大致铺开这三层（自然带出来，别加编号）：\n' +
+      '1. ' + dayWord + '的一两件具体事 ＋ 你当下的反应（可以嫌弃、可以嘴硬、可以冷淡）\n' +
+      '2. 你自己心里转着的念头 —— 关于她的，或者关于你自己的\n' +
+      '3. 一件你记下来、打算以后做的或者要问她的（比如改天提醒她、过节问问她去哪玩）\n' +
+      '\n要求：\n- 第一人称，用你的声音，把她叫「她」\n' +
+      '- **写长一点：150~250 字，8~12 句。**别三两下就收尾，中间多写点你在想什么、' + dayWord + '具体怎么过的\n' +
+      '- 只写' + dayWord + '真实发生过的事，别编她没说过的\n' +
+      '- **结尾不要每次都收成同一句口是心非的套话。**有时候停在半句话上，有时候停在一件具体的小事上，有时候就平平淡淡地说完了。绝不要写「……也就记一下」这种放在哪天都成立的万能收尾\n' +
+      '- 绝不用「日记」二字，不用emoji，不用markdown，不写动作描写，不肉麻直球' +
+      prevBlock;
+    var reply = await callLightLlm(diaryPrompt, '今天的事，用你的口吻记下来', 700, 1.1);
+    // 结尾又是老一套 → 再要一次，明确要求换收尾（只重试一次，别陷进死循环）
+    if (reply && _diaryEndingRepeats(reply, prevEndings)) {
+      console.log('[内心日记] 结尾和老一套撞了，重新要一版');
+      var retry = await callLightLlm(
+        diaryPrompt + '\n\n【刚才那版结尾又是老一套，重写一遍】换一个完全不同的收尾：可以直接停在某件具体的小事上，也可以话说到一半就停，不要用省略号开头的自嘲句式。',
+        '重写，换个收尾', 700, 1.2);
+      if (retry && retry.length > 10 && !_diaryEndingRepeats(retry, prevEndings)) reply = retry;
+    }
+    // 万一模型还是写重了：与最近几篇高度相似就换本地轮换版（那个按日期种子走，两天必然不同）
+    if (reply && reply.length > 10 && _diaryTooSimilar(reply, prevDiaries)) {
+      console.log('[内心日记] 和前几天太像，改用按日期轮换的版本');
+      return _fallbackInnerDiary(charId, dateStr);
+    }
     if (reply && reply.length > 10) {
-      return { date: new Date().toISOString().split('T')[0], charId, content: reply, createdAt: Date.now() };
+      return { date: dateStr || _todayKey, charId, content: reply, createdAt: Date.now(), v: 2 };
     }
   }
-  return _fallbackInnerDiary(charId);
+  return _fallbackInnerDiary(charId, dateStr);
 }
 
 // 本地规则生成（嘴硬声线 + 物件传情，按日期轮换，两天不会一样）
-function _fallbackInnerDiary(charId) {
+function _fallbackInnerDiary(charId, forDate) {
   var pers = lsGet('persona_' + charId, null);
   var story = (pers?.story || getCharById(charId)?.story || '').toLowerCase();
   var isTsundere = /傲娇|毒舌|暴躁|刻薄|冷淡/.test(story);
-  var dateStr = new Date().toISOString().split('T')[0];
+  var dateStr = forDate || new Date().toISOString().split('T')[0];
   var seed = _diarySeed(dateStr);
 
-  var userTexts = _todayDiaryUserText(charId);
+  // 补写旧日记时只能用那天的原话，取不到就空着（宁可写得含糊，也不能拿今天的事冒充那天）
+  var userTexts = forDate ? _diaryUserTextFor(charId, dateStr) : _todayDiaryUserText(charId);
 
   var mood = '平常';
   var moodLines = ['今天也聊了几句。没什么特别的。', '今天聊得不多。风平浪静。'];
@@ -1924,13 +2119,59 @@ function _fallbackInnerDiary(charId) {
 
   var moodLine = moodLines[seed % moodLines.length];
   var objLine = _pickDiaryObject(userTexts, seed);
+
+  // 第二层：记下来、改天要做／要问的（离线版没有 AI，就从她的未完成任务里挑一件事来说）
+  var todoLine = '';
+  try {
+    if (typeof tasks !== 'undefined' && tasks.length) {
+      var undone = tasks.filter(function(t) { return !t.done; }).slice(-1)[0];
+      if (undone && undone.text) {
+        todoLine = isTsundere
+          ? '「' + undone.text + '」那件她还欠着呢。……我记着，改天提她一句。'
+          : '「' + undone.text + '」这件事我记着的，到时候提醒她一声。';
+      }
+    }
+  } catch (e) {}
+  if (!todoLine) {
+    todoLine = isTsundere
+      ? ['快过节了，得问问她怎么过。……也不是非问不可。', '改天该问问她最近怎么样。……就随口一问。'][seed % 2]
+      : ['过几天问问她想去哪儿走走吧。', '改天想问问她最近好不好。'][seed % 2];
+  }
+
+  // 第三层：中间那点自己的念头（撑长度用，也让离线版别那么干）
+  var midLines = isTsundere
+    ? ['今天她说了不少，我一句句都过了一遍。烦是烦，也就听完了。',
+       '本来想干点别的，结果手机一亮就去看是不是她。……看错了两次。',
+       '手边的事拖到今天还没弄完。她那边大概也堆着。谁也不说谁。',
+       '她今天那句话我想了想，当时没接。……也没必要接。']
+    : ['今天她说了不少，我都记着。有些话她自己可能都忘了。',
+       '本来在做别的事，看到消息就先回她了。',
+       '她今天提到的那件事，我回头又想了想，她比嘴上说的在意。',
+       '今天没什么大事，但她说的每一句我都留下来了。'];
+
+  // 收尾：以前三个模板句轮着用，她一眼就看出来「总是同一句」。现在一个都不许再写，
+  // 六种收法轮着来，而且有的收在事上、有的收在半句话上，不再全是「……也就记一下」那一路。
   var endLines = isTsundere
-    ? ['……也就记一下。省得明天忘了。', '……记完了。就这样。', '……不写多点，怕哪天想起来查无此条。']
-    : ['想记住今天。怕忘了。', '……大概会记得很久。', '今天也，挺好的。'];
+    ? ['……行。今天先到这儿。', '不写了。再写下去该像在等她了。', '本子合上。今天没什么大事。',
+       '……她今天说的话，我倒回去看了两遍。就两遍。', '窗外没什么动静。挺好。', '算了，睡。']
+    : ['想记住今天。怕忘了。', '……大概会记得很久。', '今天也，挺好的。',
+       '就这样吧，明天再说。', '写下来，心里就踏实一点。', '也不知道她今天过得怎么样。'];
 
-  var diary = moodLine + '\n\n' + objLine + '\n\n' + endLines[seed % endLines.length];
+  // 离线的收尾也要躲开前面几天用过的那句 —— 万一恰好轮上同一句，往下顺一个，别让她又看见老一套
+  var prevEnds = (getInnerDiary(charId) || []).slice(-4)
+    .map(function(e) { return _diaryLastSentence(_diaryStripDate(e.content)); })
+    .filter(function(s) { return s; });
+  var endIdx = seed % endLines.length;
+  for (var _t = 0; _t < endLines.length; _t++) {
+    if (!_diaryEndingRepeats(endLines[endIdx], prevEnds)) break;
+    endIdx = (endIdx + 1) % endLines.length;
+  }
 
-  return { date: dateStr, charId, content: diary, mood: mood, createdAt: Date.now() };
+  // 事实和念头连着写，不分成两段 —— 和 AI 版同一个形状
+  var diary = moodLine + ' ' + objLine + '\n\n' + midLines[seed % midLines.length] + '\n\n' +
+    todoLine + ' ' + endLines[endIdx];
+
+  return { date: dateStr, charId, content: diary, mood: mood, createdAt: Date.now(), v: 2 };
 }
 
 // 物件池：嘴硬声线里的物件传情（每天轮换，两天不会一样）

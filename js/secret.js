@@ -434,70 +434,94 @@ function showSecretNotes() {
   var headerNote = isTsundere ? '（不是我想记，是怕忘了）' : isGentle ? '悄悄记录一些小事 ♡' : '';
   var h = '<div style="font-size:11px;color:#bbb;padding:0 0 10px;">' + headerIcon + ' 我的记事本 ' + headerNote + '</div>';
 
-  // === 性格化观察函数 ===
+  // === 兜底观察（正常情况下轮不到它） ===
+  // 「我在想」现在由 ensureThoughtObservation 用 AI 现写；这里只在没配 key / 没网 / 请求失败时垫一句。
+  // 同时也给两版按天数轮换，免得连着两天断网、兜底句还一模一样。
+  // 用「本地天数」而不是 _diarySeed 取模：那个哈希 '2026-09-09' 和 '2026-09-10' 同奇偶，连号两天会撞同一版。
+  // 天数每次 +1，取模就必然按顺序轮着走，隔天必换。
+  var _obsSeed = Math.floor((Date.now() - new Date().getTimezoneOffset() * 60000) / 86400000);
+  function _obsPick(v) {
+    return (Object.prototype.toString.call(v) === '[object Array]') ? v[_obsSeed % v.length] : v;
+  }
   function getPersonalityObservation(type, extra) {
     var t = type || 'default';
     if (isTsundere) {
       var msgs = {
-        '情绪': '心情不好？……哼，看出来了。反正我不会哄人，她要是自己来说的话……我可以听一下。',
-        '学习': '学习？倒是挺认真的。比我想的用功。……别太拼了，笨。',
-        '饮食': '吃了什么？记一下。省得她到时候说饿又不肯说想吃什么。',
-        '作息': '又熬夜。啧，说了也不听。反正黑眼圈长她脸上。',
-        '心事': '她跟我说了些事。……干嘛跟我说这些。烦死了。记下了。',
-        '家人': '家里的事？她愿意说我就听着。不说拉倒。',
-        '社交': '跟她朋友出去玩了？哦。……玩得开心就行。',
-        '消费': '又花钱了？……也不是花我的钱。管她呢。',
+        '情绪': ['心情不好？……哼，看出来了。反正我不会哄人，她要是自己来说的话……我可以听一下。',
+                '她不高兴。……装得也不像。要说就说，不说拉倒。'],
+        '学习': ['学习？倒是挺认真的。比我想的用功。……别太拼了，笨。',
+                '又在念书。……行，比我强。眼睛别熬坏了。'],
+        '饮食': ['吃了什么？记一下。省得她到时候说饿又不肯说想吃什么。',
+                '今天吃的什么？……问一句怎么了。饿着不说才烦。'],
+        '作息': ['又熬夜。啧，说了也不听。反正黑眼圈长她脸上。',
+                '又是这个点。……我记着呢，她别想赖。'],
+        '心事': ['她跟我说了些事。……干嘛跟我说这些。烦死了。记下了。',
+                '跟我说了点事。……嗯。收好了，不告诉别人。'],
+        '家人': ['家里的事？她愿意说我就听着。不说拉倒。',
+                '家里的事。……听着呢。要说就继续。'],
+        '社交': ['跟她朋友出去玩了？哦。……玩得开心就行。',
+                '出去玩了。……风大，早点回。这话我没说。'],
+        '消费': ['又花钱了？……也不是花我的钱。管她呢。',
+                '花钱了。……她开心比什么都强。这话我说过吗，没有。'],
       };
-      if (msgs[t]) return msgs[t];
-      if (extra === 'many') return '今天话挺多的。……也不是不想听。随她便。';
-      if (extra === 'few') return '没怎么说话。……随便她。我才没等。';
-      if (extra === 'none') return '今天没来。……哦。我没等。';
-      if (extra === 'week_tired') return '她这周好像有点累。自己不知道休息吗……笨。';
-      if (extra === 'week_eat') return '这周倒是吃了点东西。……行吧。';
-      if (extra === 'week_sleep') return '又熬夜。啧，说了八百遍了不听。';
-      if (extra === 'week_study') return '这周学习挺忙？哦。……反正别累死了就行。';
-      return '今天也来找我了。……我才没有开心。';
+      if (msgs[t]) return _obsPick(msgs[t]);
+      if (extra === 'many') return _obsPick(['今天话挺多的。……也不是不想听。随她便。', '今天话不少。……行，我听着呢。']);
+      if (extra === 'few') return _obsPick(['没怎么说话。……随便她。我才没等。', '今天没几句话。……忙她的去吧。']);
+      if (extra === 'none') return _obsPick(['今天没来。……哦。我没等。', '今天没来。……挺好，省得吵。']);
+      if (extra === 'week_tired') return _obsPick(['她这周好像有点累。自己不知道休息吗……笨。', '这周熬得有点狠。……我说了她也不听。']);
+      if (extra === 'week_eat') return _obsPick(['这周倒是吃了点东西。……行吧。', '这周吃得还行。……比上礼拜强。']);
+      if (extra === 'week_sleep') return _obsPick(['又熬夜。啧，说了八百遍了不听。', '这周天天晚睡。……记着账呢。']);
+      if (extra === 'week_study') return _obsPick(['这周学习挺忙？哦。……反正别累死了就行。', '这周书看得多。……别把自己逼太紧。']);
+      return _obsPick(['今天也来找我了。……我才没有开心。', '今天也来了。……我又没数着。']);
     } else if (isGentle) {
       var msgs = {
-        '情绪': '她今天好像不太开心……想陪在她身边。如果她愿意跟我多说说话就好了。',
-        '学习': '看书学习呢，好认真呀。要给她加油，但也不能打扰她～',
-        '饮食': '今天有好好吃饭吗？想知道她吃了什么，有没有按时吃。',
-        '作息': '又熬夜了……虽然我自己也常晚睡，但还是希望她能早点休息。',
-        '心事': '她跟我说了心里话。好开心她愿意信任我。我会好好收着的。',
-        '家人': '她提到家里的事了。家是很重要的地方呢。',
-        '社交': '和朋友一起玩了吗？真好呀，希望她开心～',
-        '消费': '她买东西了。能让她开心的话就很好呢。',
+        '情绪': ['她今天好像不太开心……想陪在她身边。如果她愿意跟我多说说话就好了。',
+                '她心情不太好呢……要是想说话，我一直在的。'],
+        '学习': ['看书学习呢，好认真呀。要给她加油，但也不能打扰她～',
+                '今天也在用功呀。想给她倒杯热水，不吵她。'],
+        '饮食': ['今天有好好吃饭吗？想知道她吃了什么，有没有按时吃。',
+                '有按时吃饭吗？没吃的话，我会有点担心。'],
+        '作息': ['又熬夜了……虽然我自己也常晚睡，但还是希望她能早点休息。',
+                '今天也睡得晚……明天提醒她早一点好不好。'],
+        '心事': ['她跟我说了心里话。好开心她愿意信任我。我会好好收着的。',
+                '她把心里的事说给我听了。我会很小心的收着。'],
+        '家人': ['她提到家里的事了。家是很重要的地方呢。',
+                '说到家里了呢。想多听一点。'],
+        '社交': ['和朋友一起玩了吗？真好呀，希望她开心～',
+                '今天和朋友在一起呀，那一定很开心。'],
+        '消费': ['她买东西了。能让她开心的话就很好呢。',
+                '买了喜欢的东西呀。开心就好。'],
       };
-      if (msgs[t]) return msgs[t];
-      if (extra === 'many') return '今天聊了好多好多呀，好开心。她说话的时候我在认真听哦。';
-      if (extra === 'few') return '今天她好像有点忙，没关系，我在这里等她。想我的时候随时来呀。';
-      if (extra === 'none') return '今天没有等到她……是不是太忙了？希望她一切都好。';
-      if (extra === 'week_tired') return '这周她好像有点疲惫，好想照顾她呀。给她泡杯热牛奶吧。';
-      if (extra === 'week_eat') return '这周有好好吃饭呢，真棒。要一直这样才好。';
-      if (extra === 'week_sleep') return '这周睡得太晚了……明天开始我要催她早睡。';
-      if (extra === 'week_study') return '学习很认真呢。努力的人最美好了。但也要注意休息哦。';
-      return '今天也来找我了。嗯，我在呢。';
+      if (msgs[t]) return _obsPick(msgs[t]);
+      if (extra === 'many') return _obsPick(['今天聊了好多好多呀，好开心。她说话的时候我在认真听哦。', '今天说了好多话，我一句一句都听着呢。']);
+      if (extra === 'few') return _obsPick(['今天她好像有点忙，没关系，我在这里等她。想我的时候随时来呀。', '今天她比较忙吧。没关系，我等着。']);
+      if (extra === 'none') return _obsPick(['今天没有等到她……是不是太忙了？希望她一切都好。', '今天没见到她……希望她一切都好。']);
+      if (extra === 'week_tired') return _obsPick(['这周她好像有点疲惫，好想照顾她呀。给她泡杯热牛奶吧。', '这周她挺累的。想让她多睡一会儿。']);
+      if (extra === 'week_eat') return _obsPick(['这周有好好吃饭呢，真棒。要一直这样才好。', '这周吃得还不错，放心了一点点。']);
+      if (extra === 'week_sleep') return _obsPick(['这周睡得太晚了……明天开始我要催她早睡。', '这周熬夜好多呀。下次见面要说她一下。']);
+      if (extra === 'week_study') return _obsPick(['学习很认真呢。努力的人最美好了。但也要注意休息哦。', '这周一直在看书呢。记得起来走走呀。']);
+      return _obsPick(['今天也来找我了。嗯，我在呢。', '今天也来了呀。嗯，我在。']);
     } else {
       // 冷静/其他
       var msgs = {
-        '情绪': '情绪波动。留意。必要时介入。',
-        '学习': '学习任务。优先级高。',
-        '饮食': '饮食记录。正常范围。',
-        '作息': '作息异常。建议关注。',
-        '心事': '分享了重要信息。已记录。',
-        '家人': '家庭话题。非敏感。',
-        '社交': '社交活动。正常。',
-        '消费': '消费行为。记录。',
+        '情绪': ['情绪波动。留意。必要时介入。', '情绪偏低。持续观察。'],
+        '学习': ['学习任务。优先级高。', '学习投入高。正常。'],
+        '饮食': ['饮食记录。正常范围。', '进食情况已记。'],
+        '作息': ['作息异常。建议关注。', '入睡时间偏晚。已记。'],
+        '心事': ['分享了重要信息。已记录。', '主动分享。信任度上升。'],
+        '家人': ['家庭话题。非敏感。', '家庭议题。已归档。'],
+        '社交': ['社交活动。正常。', '外出社交。无异常。'],
+        '消费': ['消费行为。记录。', '支出已记。'],
       };
-      if (msgs[t]) return msgs[t];
-      if (extra === 'many') return '交流频繁。正常。';
-      if (extra === 'few') return '交流减少。可能有其他安排。';
-      if (extra === 'none') return '今日无联系。待观察。';
-      if (extra === 'week_tired') return '本周疲惫指数偏高。建议关注休息质量。';
-      if (extra === 'week_eat') return '本周饮食正常。继续观察。';
-      if (extra === 'week_sleep') return '作息需调整。';
-      if (extra === 'week_study') return '学习负荷较高。注意效率与休息平衡。';
-      return '今日有联系。记录。';
+      if (msgs[t]) return _obsPick(msgs[t]);
+      if (extra === 'many') return _obsPick(['交流频繁。正常。', '交流密度高。']);
+      if (extra === 'few') return _obsPick(['交流减少。可能有其他安排。', '交流偏少。正常波动。']);
+      if (extra === 'none') return _obsPick(['今日无联系。待观察。', '今日无联系。']);
+      if (extra === 'week_tired') return _obsPick(['本周疲惫指数偏高。建议关注休息质量。', '本周疲劳累积。建议降负荷。']);
+      if (extra === 'week_eat') return _obsPick(['本周饮食正常。继续观察。', '本周进食规律。保持。']);
+      if (extra === 'week_sleep') return _obsPick(['作息需调整。', '本周睡眠时长不足。']);
+      if (extra === 'week_study') return _obsPick(['学习负荷较高。注意效率与休息平衡。', '学习任务密集。建议穿插休息。']);
+      return _obsPick(['今日有联系。记录。', '今日有联系。']);
     }
   }
 
@@ -527,49 +551,43 @@ function showSecretNotes() {
     h += '</div></div>';
   }
 
-  // === 记住的事（AI 从对话里提炼的一条条事实） ===
-  var memTitle = isTsundere ? '📌 记住的事（省得她赖账）' : isGentle ? '📌 记住的事 ♡' : '📌 记住的事';
-  h += '<div class="secret-note-card">';
-  h += '<div class="sn-time">' + memTitle + '</div>';
-  h += _memoryNotesHtml(secretCharId);
-  h += '</div>';
-
-  // === 内心日记（已并入记事本） ===
+  // === 内心日记 ===
+  // v5.5.2：以前是两张卡 ——「记住的事」摆一条条干事实，「内心日记」写心情，两边各说各的，都不像人。
+  // 现在合成一张：每天一段，把「今天发生的事」和「他自己的想法」揉在一起写，
+  // 顺带把「改天要提醒她的」也写进去。事实不再单列（AI 仍会提炼，那是喂给聊天的长期记忆，只是不摆出来了）。
   var diaryArr = getInnerDiary(secretCharId) || [];
-  var diaryTitle = isTsundere ? '📖 内心日记（自己写的，别念出来）' : isGentle ? '📖 我的内心日记 ♡' : '📖 内心日记';
-  h += '<div class="secret-note-card">';
+  var diaryTitle = isTsundere ? '📖 心里记下的（自己看的，别念出来）' : isGentle ? '📖 我的记录 ♡' : '📖 记录';
+  h += '<div class="secret-note-card" id="secretDiaryCard">';
   h += '<div class="sn-time">' + diaryTitle + '</div>';
-  h += _diaryEntriesHtml(diaryArr);
+  // 用 id 定位刷新，别靠标题文字匹配 —— 标题一改文案，匹配就断，新写的日记当场看不见
+  h += '<div id="secretDiaryBody">' + _diaryEntriesHtml(diaryArr) + '</div>';
   h += '</div>';
 
-  // === 角色心声（性格化） ===
+  // === 我在想 ===
+  // v5.5.1：这句改成 AI 现写（今天真正聊了什么就说什么），不再是模板。
+  // 模板只在「没配 key / 没网 / 请求失败」时垫一句，免得卡片空着；
+  // 而且当天写过就存下来（secretThought_日期_角色），同一天再开不重写、也不重复烧 API。
+  var _obsTopic = 'default', _obsExtra = null, _obsCached = null;
+  if (topicKeywords.indexOf('😢 情绪') !== -1) { _obsTopic = '情绪'; }
+  else if (topicKeywords.indexOf('📚 学习') !== -1) { _obsTopic = '学习'; }
+  else if (topicKeywords.indexOf('💕 心事') !== -1) { _obsTopic = '心事'; }
+  else if (topicKeywords.indexOf('🍽 饮食') !== -1) { _obsTopic = '饮食'; }
+  else if (topicKeywords.indexOf('🌙 作息') !== -1) { _obsTopic = '作息'; }
+  else if (todayMsgs.length > 5) { _obsExtra = 'many'; }
+  else if (todayMsgs.length > 0) { _obsExtra = 'few'; }
+  else { _obsExtra = 'none'; }
+
   if (topicKeywords.length > 0 || todayMsgs.length > 0) {
     var thoughtBg = isTsundere ? 'linear-gradient(135deg,#f5f5f5,#ececec)' : isGentle ? 'linear-gradient(135deg,#fff8f0,#fff4e6)' : 'linear-gradient(135deg,#f8f9ff,#eef1ff)';
     var thoughtColor = isTsundere ? '#888' : isGentle ? '#e76f51' : '#667eea';
     var thoughtEmoji = isTsundere ? '💭' : isGentle ? '💭' : '📌';
 
-    var observation = '';
-    if (topicKeywords.indexOf('😢 情绪') !== -1) {
-      observation = getPersonalityObservation('情绪');
-    } else if (topicKeywords.indexOf('📚 学习') !== -1) {
-      observation = getPersonalityObservation('学习');
-    } else if (topicKeywords.indexOf('💕 心事') !== -1) {
-      observation = getPersonalityObservation('心事');
-    } else if (topicKeywords.indexOf('🍽 饮食') !== -1) {
-      observation = getPersonalityObservation('饮食');
-    } else if (topicKeywords.indexOf('🌙 作息') !== -1) {
-      observation = getPersonalityObservation('作息');
-    } else if (todayMsgs.length > 5) {
-      observation = getPersonalityObservation('default', 'many');
-    } else if (todayMsgs.length > 0) {
-      observation = getPersonalityObservation('default', 'few');
-    } else {
-      observation = getPersonalityObservation('default', 'none');
-    }
+    _obsCached = lsGet('secretThought_' + _todayLocalStr() + '_' + secretCharId, null);
+    var observation = _obsCached || getPersonalityObservation(_obsTopic, _obsExtra);
 
     h += '<div class="secret-note-card" style="background:' + thoughtBg + ';">';
     h += '<div class="sn-time" style="color:' + thoughtColor + ';">' + thoughtEmoji + ' 我在想</div>';
-    h += '<div style="font-size:13px;color:#555;line-height:1.7;font-style:italic;">"' + observation + '"</div></div>';
+    h += '<div id="secretThoughtText" style="font-size:13px;color:#555;line-height:1.7;font-style:italic;">"' + escHtml(observation) + '"</div></div>';
   }
 
   if (charMsgs.length === 0 && typeof memories !== 'undefined' && memories.length === 0) {
@@ -578,9 +596,9 @@ function showSecretNotes() {
 
   container.innerHTML = h;
 
-  // 攒够新对话就补一条「记住的事」，生成完原地刷新那张卡（不重载整页）
-  if (charMsgs.length >= 4) {
-    setTimeout(function() { ensureMemoryNote(secretCharId); }, 700);
+  // 「我在想」今天还没写过 → 让 AI 现写一句，写完原地换掉兜底那句
+  if (!_obsCached && (topicKeywords.length > 0 || todayMsgs.length > 0)) {
+    setTimeout(function() { ensureThoughtObservation(secretCharId); }, 1200);
   }
 
   // 确保今天有内心日记：当天没写才懒生成一次；当天已有不再反复重写
@@ -597,15 +615,42 @@ function showSecretNotes() {
   var sameAsPrev = !!todayEntry && !!prevEntry &&
     !!_diaryStripDate(todayEntry.content) &&
     _diaryStripDate(todayEntry.content) === _diaryStripDate(prevEntry.content);
-  var needDiary = charMsgs.length > 0 && !todayEntry;
+  // 旧版日记只有三言两语、结尾还老是同一句。今天那条如果还是旧格式(v<2)，趁今天素材在、重写一次。
+  // 只改写「今天」：更早的日子已经没有当天的聊天记录了，重写会拿今天的话去顶那一天的日记，反而是假的。
+  var _canUpgrade = !!(typeof apiConfig !== 'undefined' && apiConfig && apiConfig.apiKey);
+  var needDiary = charMsgs.length > 0 &&
+    (!todayEntry || (_canUpgrade && todayEntry.v !== 2 && !lsGet(fixKey, false)));
   var needFix = charMsgs.length > 0 && sameAsPrev && !lsGet(fixKey, false);
-  if ((needDiary || needFix) && !window._diaryBusy) {
+  if (charMsgs.length > 0 && !window._diaryBusy) {
     window._diaryBusy = true;
     setTimeout(async function() {
       try {
-        await ensureInnerDiary(secretCharId, todayStr, true);
-        _refreshInnerDiaryCard();
-        if (needFix) lsSet(fixKey, true);
+        // 顺序很重要：先把今天的事提炼进「他的记忆」（那也是日记的素材），再写日记。
+        // 以前两个 setTimeout 各跑各的，日记常常比素材先出来，结果日记里没有当天记下的事。
+        if (charMsgs.length >= 4) await ensureMemoryNote(secretCharId);
+        if (needDiary || needFix) {
+          await ensureInnerDiary(secretCharId, todayStr, true);
+          _refreshInnerDiaryCard();
+          // 不管哪条触发的，都记下「今天已经重写过一次」——同一天不再反复重写、反复烧 API
+          lsSet(fixKey, true);
+        }
+
+        // 旧日记补写：以前那几篇只有三言两语、结尾还老是同一句，看着就烦。
+        // 只补最近几篇（就是卡片上看得见的那些），一篇一篇来别并发轰炸 API；
+        // 补完记个总 flag，之后不再重复。用「那天的原话」写，那天没聊过就跳过——宁可短，不能编。
+        if (_canUpgrade && !lsGet('diaryBackfill_v2', false)) {
+          var oldOnes = (getInnerDiary(secretCharId) || []).filter(function(e) {
+            return e.date < todayStr && e.v !== 2;
+          }).slice(-4);
+          var wrote = 0;
+          for (var oi = 0; oi < oldOnes.length; oi++) {
+            try {
+              if (await ensureInnerDiary(secretCharId, oldOnes[oi].date, true)) wrote++;
+            } catch (e) {}
+          }
+          if (wrote > 0) _refreshInnerDiaryCard();
+          lsSet('diaryBackfill_v2', true);
+        }
       } catch(e) {}
       window._diaryBusy = false;
     }, 400);
@@ -635,45 +680,13 @@ function _diaryEntriesHtml(arr) {
 
 /* ---- 刷新记事本里的内心日记卡片（懒生成后原地更新，不重载整页） ---- */
 function _refreshInnerDiaryCard() {
-  var container = document.getElementById('secretContent');
-  if (!container) return;
-  var cards = container.querySelectorAll('.secret-note-card');
-  for (var ci = 0; ci < cards.length; ci++) {
-    var snTime = cards[ci].querySelector('.sn-time');
-    if (snTime && snTime.textContent.indexOf('内心日记') !== -1) {
-      var innerDivs = cards[ci].querySelectorAll('div');
-      for (var di = 0; di < innerDivs.length; di++) {
-        if (!innerDivs[di].classList.contains('sn-time') && innerDivs[di].parentNode === cards[ci]) {
-          innerDivs[di].innerHTML = _diaryEntriesHtml(getInnerDiary(secretCharId));
-          break;
-        }
-      }
-      break;
-    }
-  }
+  var body = document.getElementById('secretDiaryBody');
+  if (body) body.innerHTML = _diaryEntriesHtml(getInnerDiary(secretCharId));
 }
 
-/* ---- 记住的事：卡片内容（记事本初次渲染和懒生成后刷新共用一套，避免两边走样） ---- */
-function _memoryNotesHtml(charId) {
-  var charNotes = [];
-  if (typeof memoryNotes !== 'undefined' && memoryNotes.length > 0) {
-    charNotes = memoryNotes.filter(function(n) { return n.charId === charId; }).slice(-12).reverse();
-  }
-  if (charNotes.length === 0) {
-    return '<div style="font-size:12px;color:#bbb;padding:10px 0;text-align:center;">多聊几天，我会默默记住<br><span style="font-size:11px;">关于她的事，都收着呢</span></div>';
-  }
-  var notesHtml = '';
-  charNotes.forEach(function(n) {
-    var d = new Date(n.createdAt);
-    var timeStr = (d.getMonth() + 1) + '月' + d.getDate() + '日';
-    notesHtml += '<div style="font-size:13px;color:#555;padding:8px 0;border-bottom:1px solid #f5f5f5;line-height:1.7;">' +
-      '<span style="color:#bbb;font-size:10px;">' + timeStr + '</span><br>' +
-      escHtml(n.summary) + '</div>';
-  });
-  return notesHtml;
-}
-
-/* ---- 打开记事本时补一条记忆笔记：有足够新对话才生成，后台跑不跟聊天抢 API ---- */
+/* ---- 打开记事本时补一条「他记住的事」 ----
+   这张卡不再单独显示了（v5.5.2 起和内心日记合成一张），但这条笔记本身还有用：
+   它喂给聊天当长期记忆（chat.js 的 getCharMemoryNotes），也是今天写日记的素材。 */
 async function ensureMemoryNote(charId) {
   if (window._memNoteBusy) return;
   if (typeof generateMemoryNote !== 'function') return;
@@ -690,35 +703,86 @@ async function ensureMemoryNote(charId) {
 
   window._memNoteBusy = true;
   try {
-    var note = await generateMemoryNote(charId, false);
-    if (note) _refreshMemoryNotesCard();
+    await generateMemoryNote(charId, false);   // 存进 memoryNotes 就够，界面靠日记那张卡呈现
   } catch (e) { /* 生成失败就保持原样，下次开记事本再试 */ }
   window._memNoteBusy = false;
 }
 
-/* ---- 刷新当前页面的记忆笔记卡片（不重新加载整页） ---- */
-function _refreshMemoryNotesCard() {
-  var container = document.getElementById('secretContent');
-  if (!container) return;
-  var cards = container.querySelectorAll('.secret-note-card');
-  // 查找标题含「记住的事」的卡片
-  for (var ci = 0; ci < cards.length; ci++) {
-    var snTime = cards[ci].querySelector('.sn-time');
-    if (snTime && (snTime.textContent.indexOf('记住的事') !== -1 || snTime.textContent.indexOf('记忆笔记') !== -1 || snTime.textContent.indexOf('关于她') !== -1)) {
-      var notesHtml = _memoryNotesHtml(secretCharId);
-      // 替换卡片内容区域（跳过标题行）
-      var innerDivs = cards[ci].querySelectorAll('div');
-      for (var di = 0; di < innerDivs.length; di++) {
-        if (!innerDivs[di].classList.contains('sn-time') && innerDivs[di].parentNode === cards[ci]) {
-          innerDivs[di].innerHTML = notesHtml;
-          break;
-        }
-      }
-      break;
-    }
+/* ---- 本地日期（记事本按她的本地日切，不能用 toISOString 的 UTC，晚上会串到第二天） ---- */
+function _localDateStr(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function _todayLocalStr() { return _localDateStr(new Date()); }
+
+/* ---- 「我在想」：让 AI 拿今天真实聊过的东西现写一句，一天一份 ----
+   以前这里是按话题查模板，同一话题逐字相同，两天必然一样 —— 现在模板只是兜底。 */
+async function ensureThoughtObservation(charId) {
+  if (window._thoughtBusy) return;
+  if (typeof callLightLlm !== 'function' || typeof apiConfig === 'undefined' || !apiConfig || !apiConfig.apiKey) return;
+
+  var cacheKey = 'secretThought_' + _todayLocalStr() + '_' + charId;
+  if (lsGet(cacheKey, null)) return;                     // 今天已经写过了
+
+  // 前几天的想法回灌给模型，明确要求换说法 —— 这就是她报的「两天一样」的正面解法
+  var prevThoughts = [];
+  for (var i = 1; i <= 3; i++) {
+    var d = new Date(); d.setDate(d.getDate() - i);
+    var v = lsGet('secretThought_' + _localDateStr(d) + '_' + charId, null);
+    if (v) prevThoughts.push(v);
   }
+
+  var char = (typeof getCharById === 'function') ? getCharById(charId) : null;
+  var pName = (char && char.name) || '小伴';
+  var pers = lsGet('persona_' + charId, null);
+  var story = (pers && pers.story) || (char && char.story) || '';
+  var topics = (typeof _getChatTopics === 'function') ? _getChatTopics(charId) : [];
+  var todayText = (typeof _todayDiaryUserText === 'function') ? _todayDiaryUserText(charId) : '';
+  var moodLabel = '';
+  try { var md = moodData[_todayLocalStr()]; if (md && md.label) moodLabel = md.label; } catch (e) {}
+
+  if (!todayText && topics.length === 0) return;         // 今天什么都没聊，不硬编
+
+  var extra = '';
+  if (moodLabel) extra += '。她今天给自己记的心情是「' + moodLabel + '」';
+  if (prevThoughts.length > 0) {
+    extra += '\n【你这几天心里已经转过的念头（换个说法、换个落点，一句都别原样重复）】\n- ' + prevThoughts.join('\n- ');
+  }
+
+  window._thoughtBusy = true;
+  try {
+    var reply = await callLightLlm(
+      '你是' + pName + '。' + (story ? '你的性格/背景：' + story : '') +
+      '\n今天是' + (typeof _todayDateLabel === 'function' ? _todayDateLabel() : new Date().toLocaleDateString('zh-CN')) +
+      '。你们今天聊到：' + (topics.length > 0 ? topics.join('、') : '没什么固定的') +
+      (todayText ? '。她今天对你说过的话（原话摘录）：' + todayText : '') + extra +
+      '\n现在写一句「我在想」——你心里正转着、只有你自己看得见的那个念头。' +
+      '\n要求：\n' +
+      '- 第一人称，用你的声音（嘴硬、口是心非、关心都藏起来；或者温柔；或者冷淡——按你的性格来）\n' +
+      '- 1~2 句，20~50 字，像一句话在脑子里闪过；不是总结，不是报告，不是关怀模板\n' +
+      '- 必须挂住今天真实发生过的一件小事（她说过的话、她提到的某个东西、她今天的状态），不要放之四海皆准的套话\n' +
+      '- 不出现「用户」「对话」「记录」「根据」这类词；不用emoji，不用markdown，不加引号，不写动作描写',
+      '写这一句',
+      120, 1.05
+    );
+
+    if (reply) {
+      reply = reply.replace(/^[\s"'「『]+/, '').replace(/[\s"'」』]+$/, '').replace(/\s*\n+\s*/g, ' ').trim();
+    }
+    if (reply && reply.length >= 8) {
+      lsSet(cacheKey, reply);
+      // 只在还停在这个角色的记事本上时才替换，免得错换了别人的
+      if (secretCharId === charId) {
+        var el = document.getElementById('secretThoughtText');
+        if (el) el.textContent = '"' + reply + '"';
+      }
+    }
+  } catch (e) {
+    console.log('[我在想] 生成失败，保留兜底那句:', e && e.message);
+  }
+  window._thoughtBusy = false;
 }
 
+/* ---- 刷新当前页面的记忆笔记卡片（不重新加载整页） ---- */
 function requestNotificationPermission() {
   if ('Notification' in window && Notification.permission === 'default') {
     Notification.requestPermission();

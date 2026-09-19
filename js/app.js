@@ -11,7 +11,6 @@ const ICONS = [
   { id:'expense',  symbol:'￥', name:'记账',  page:'page-expense' },
   { id:'tide',     symbol:'☽', name:'潮汐',  page:'page-tide' },
   { id:'heart',    symbol:'💓', name:'心跳',  page:'page-heart' },
-  { id:'story',    symbol:'🌙', name:'晚安',  page:'page-story' },
   { id:'sleep',    symbol:'💤', name:'睡眠',  page:'page-sleep' },
   { id:'persona',  symbol:'≡', name:'人设',  page:'page-persona' },
   { id:'settings', symbol:'⚙', name:'设置',  page:'page-settings' }
@@ -74,7 +73,6 @@ function navigateTo(pageId, skipAnim) {
   if (pageId === 'page-persona') loadUserPersona();
   if (pageId === 'page-settings') loadSettings();
   if (pageId === 'page-moments' && typeof renderMoments === 'function') renderMoments();
-  if (pageId === 'page-story' && typeof renderStoryList === 'function') renderStoryList();
   if (pageId === 'page-sleep' && typeof renderSleep === 'function') renderSleep();
   if (pageId === 'page-course' && typeof renderCourse === 'function') renderCourse();
   if (pageId === 'page-main' && typeof renderTodaySchedule === 'function') renderTodaySchedule();

@@ -5,8 +5,45 @@ const HEART_READING_LIMIT = 200;
 const HEART_SAMPLE_INTERVAL = 60 * 60 * 1000; // 自动采样：1小时一轮（避免频繁打扰，手动测随时可点）
 
 let heartState = lsGet('heart', { sampling: true, connected: false, readings: [] });
+
+/* ---- 手动区间（模拟数据用） ----
+   以前是硬编码：base 70、±5 游走、25% 概率 +25~55。问题是「游走」只绕着上一次的读数转，
+   而高峰只加不减，量就一路往上顶，越测越高、最后贴着上限值不下来。
+   现在把区间交给她自己调：平静区间、波动幅度、高峰概率、单次最高。 */
+const HEART_RANGE_DEFAULTS = { lo: 58, hi: 82, amp: 5, spikeP: 12, ceil: 128 };
+const HEART_RANGE_KEYS = ['lo', 'hi', 'amp', 'spikeP', 'ceil'];
+
+function heartRange() {
+  const r = (heartState && heartState.range) || {};
+  const out = {};
+  HEART_RANGE_KEYS.forEach(function(k) {
+    const v = Number(r[k]);
+    out[k] = isFinite(v) ? v : HEART_RANGE_DEFAULTS[k];
+  });
+  // 兜住不合理的组合：上限不能比平静上限还低，也别调出负区间
+  out.lo = Math.max(40, Math.min(110, out.lo));
+  out.hi = Math.max(out.lo + 4, Math.min(135, out.hi));
+  out.amp = Math.max(0, Math.min(20, out.amp));
+  out.spikeP = Math.max(0, Math.min(60, out.spikeP));
+  out.ceil = Math.max(out.hi, Math.min(190, out.ceil));
+  return out;
+}
+
+// 一天里的高低节律：凌晨最低、起床后最高，白天居中
+function _heartTimeFactor(hour) {
+  if (hour >= 0 && hour < 6) return 0.10;
+  if (hour >= 6 && hour < 9) return 0.85;
+  if (hour >= 9 && hour < 21) return 0.45;
+  return 0.60;
+}
+
 function saveHeart() {
-  lsSet('heart', { sampling: heartState.sampling, connected: !!heartState.connected, readings: heartState.readings.slice(-HEART_READING_LIMIT) });
+  lsSet('heart', {
+    sampling: heartState.sampling,
+    connected: !!heartState.connected,
+    range: heartState.range || null,
+    readings: heartState.readings.slice(-HEART_READING_LIMIT)
+  });
 }
 
 // 最新一次读数
@@ -21,19 +58,32 @@ function heartTodayReadings() {
 }
 
 /* ---- 模拟引擎（手环未连接时用） ---- */
-function simHeartHr() {
-  const h = new Date().getHours();
-  // 基础心率随时间波动：凌晨最低、起床后略高、白天正常
-  let base = 70;
-  if (h >= 0 && h < 6) base = 60;
-  else if (h >= 6 && h < 9) base = 76;
-  else if (h >= 21 && h < 24) base = 73;
-  const last = heartLast();
-  // 从上一次读数随机游走
-  let hr = last ? last.hr + (Math.random() * 10 - 5) : base + (Math.random() * 8 - 4);
-  // 偶发紧张/激动高峰：25% 概率 +25~55（演示期调高一点更好触发，真实手环接入后数据就是真的）
-  if (Math.random() < 0.25) hr += 25 + Math.random() * 30;
-  return Math.round(Math.max(48, Math.min(150, hr)));
+// atTs 传时间戳就按那个时刻的节律算（重刷历史用）；prevReading 传了就接着它走
+function simHeartHr(atTs, prevReading) {
+  const R = heartRange();
+  const hour = atTs ? new Date(atTs).getHours() : new Date().getHours();
+  const base = R.lo + (R.hi - R.lo) * _heartTimeFactor(hour);
+  const last = (prevReading === undefined) ? heartLast() : prevReading;
+  let hr;
+  if (last) {
+    // 每次先把上一次的读数往「平静区间」拉回一部分，再叠一点随机抖动。
+    // 只抖动不回拉的话，数会慢慢飘走，一天下来越测越高。
+    hr = last.hr + (base - last.hr) * 0.35 + (Math.random() * 2 - 1) * R.amp;
+  } else {
+    hr = base + (Math.random() * 2 - 1) * R.amp;
+  }
+  // 偶发紧张/激动的高峰：冲多高取决于「单次最高」设到哪，不是以前固定的 +25~55
+  if (Math.random() * 100 < R.spikeP) {
+    hr += (R.ceil - hr) * (0.35 + Math.random() * 0.65);
+  }
+  return Math.round(Math.max(40, Math.min(R.ceil, hr)));
+}
+
+/* 这个读数算不算「值得他关心一下」——偏高或偏低。
+   以前 chat.js 里写死 100/50，她一调低区间，关心就再也不触发了；现在跟着她设的区间走。 */
+function heartIsNotable(hr) {
+  const R = heartRange();
+  return hr >= R.hi + 12 || hr <= R.lo - 8;
 }
 
 function simHeartTemp() {
@@ -77,6 +127,86 @@ function toggleHeartSampling() {
   addChatSystem(heartState.sampling ? '✅ 自动采样已开启（每1小时一轮，手动测随时可点）' : '❌ 自动采样已关闭');
 }
 
+/* ---- 手动调节区间 ---- */
+let heartRangeOpen = false;
+
+function toggleHeartRangePanel() {
+  heartRangeOpen = !heartRangeOpen;
+  const box = document.getElementById('heartRangePanel');
+  const chev = document.getElementById('heartRangeChevron');
+  if (box) box.style.display = heartRangeOpen ? 'block' : 'none';
+  if (chev) chev.style.transform = heartRangeOpen ? 'rotate(180deg)' : '';
+  if (heartRangeOpen) renderHeartRangePanel();
+}
+
+// 拖动滑块 —— 立即生效，并顺手把区间规整后的值写回滑块（比如下限拖过头，上限会自动抬）
+function heartSetRange(key, val) {
+  const R = heartRange();
+  R[key] = Number(val);
+  heartState.range = R;
+  saveHeart();
+  renderHeartRangePanel();
+  renderHeart();
+}
+
+function heartResetRange() {
+  heartState.range = Object.assign({}, HEART_RANGE_DEFAULTS);
+  saveHeart();
+  renderHeartRangePanel();
+  renderHeart();
+  if (typeof addChatSystem === 'function') {
+    addChatSystem('⚙️ 心跳区间已恢复默认（' + HEART_RANGE_DEFAULTS.lo + '~' + HEART_RANGE_DEFAULTS.hi + ' bpm，最高不超过 ' + HEART_RANGE_DEFAULTS.ceil + '）');
+  }
+}
+
+function renderHeartRangePanel() {
+  const R = heartRange();
+  const setVal = function(id, v) {
+    const el = document.getElementById(id);
+    if (el && String(el.value) !== String(v)) el.value = v;
+  };
+  setVal('hrLo', R.lo);   setVal('hrHi', R.hi);
+  setVal('hrAmp', R.amp); setVal('hrSpike', R.spikeP); setVal('hrCeil', R.ceil);
+  const setTxt = function(id, v) { const el = document.getElementById(id); if (el) el.textContent = v; };
+  setTxt('hrLoVal', R.lo); setTxt('hrHiVal', R.hi);
+  setTxt('hrAmpVal', '±' + R.amp); setTxt('hrSpikeVal', R.spikeP + '%'); setTxt('hrCeilVal', R.ceil);
+  setTxt('heartRangeSummary', R.lo + '~' + R.hi);
+  const pv = document.getElementById('heartRangePreview');
+  if (pv) {
+    const spk = R.spikeP > 0
+      ? '，大约 ' + R.spikeP + '% 的次数会冲到 ' + Math.round(R.hi + (R.ceil - R.hi) * 0.7) + '~' + R.ceil + '（他这时候会来问你怎么了）'
+      : '，不会有突然的高峰（他也就不会因为心跳来关心你）';
+    pv.textContent = '平时大约 ' + Math.round(R.lo - R.amp) + '~' + Math.round(R.hi + R.amp) + ' bpm' + spk + '。';
+  }
+  const reroll = document.getElementById('heartRerollBtn');
+  if (reroll) reroll.style.display = heartState.connected ? 'none' : 'block';
+}
+
+/* 手环没连的时候，历史读的全是模拟数。换了区间以后把旧读数按新区间重算一遍，
+   否则趋势图、平均值还挂着一堆老的高值，看着像没生效。
+   手环已连接就是真实数据了，绝不重算。 */
+function heartRerollHistory() {
+  if (heartState.connected) {
+    if (typeof addChatSystem === 'function') addChatSystem('⌚ 手环已连接，用的是真实读数，不能重刷。');
+    return;
+  }
+  const n = heartState.readings.length;
+  if (n === 0) {
+    if (typeof addChatSystem === 'function') addChatSystem('还没有读数，先点「测一次」吧');
+    return;
+  }
+  let prev = null;
+  heartState.readings.forEach(function(r) {
+    r.hr = simHeartHr(r.t, prev);
+    r.temp = Math.round(Math.max(35.8, Math.min(37.5, 36.4 + (Math.random() * 0.2 - 0.1))) * 10) / 10;
+    prev = r;
+  });
+  saveHeart();
+  renderHeart();
+  renderHeartRangePanel();
+  if (typeof addChatSystem === 'function') addChatSystem('🔄 已按新区间重刷 ' + n + ' 条模拟读数');
+}
+
 /* ---- 页面初始化 ---- */
 function initHeart() {
   const last = heartLast();
@@ -86,6 +216,7 @@ function initHeart() {
     heartSample(); // 距上次超过一轮：补一条
   }
   renderHeart();
+  renderHeartRangePanel();
   // 自动采样检查：每分钟看一次是否该采了
   setInterval(function() {
     if (heartState.sampling) {
@@ -120,7 +251,7 @@ function renderHeart() {
   // 呼吸练习按钮：心跳偏快时高亮提醒
   const breatheBtn = document.getElementById('heartBreatheBtn');
   if (breatheBtn) {
-    if (last && last.hr >= 100) {
+    if (last && heartIsNotable(last.hr)) {
       breatheBtn.textContent = '🌬 心跳偏快 · 做个呼吸练习';
       breatheBtn.classList.add('high');
     } else {
@@ -134,11 +265,13 @@ function renderHeart() {
   if (typeof renderHealthReportArea === 'function') renderHealthReportArea();
 }
 
+// 判定跟着她自己设的区间走 —— 不然她把区间调低了，界面还按老数字说她「平静」
 function heartStateDesc(last) {
   if (!last) return '';
-  if (last.hr >= 100) return '有点快，是不是紧张或刚动了？';
-  if (last.hr >= 85) return '略快，可能有点兴奋';
-  if (last.hr <= 55) return '很平静，可能在休息';
+  const R = heartRange();
+  if (last.hr >= R.hi + 12) return '有点快，是不是紧张或刚动了？';
+  if (last.hr > R.hi) return '略快，可能有点兴奋';
+  if (last.hr < R.lo - 6) return '很平静，可能在休息';
   return '平静 · 正常';
 }
 
@@ -228,10 +361,11 @@ function buildHeartContext() {
   const last = heartLast();
   if (!last) return '';
   const mins = Math.max(1, Math.round((Date.now() - last.t) / 60000));
+  const R = heartRange();
   let desc = '';
-  if (last.hr >= 100) desc = '偏快，她可能紧张、激动或在运动';
-  else if (last.hr >= 85) desc = '略快，她可能有点兴奋或刚活动过';
-  else if (last.hr <= 55) desc = '偏慢，她可能很放松或在休息';
+  if (last.hr >= R.hi + 12) desc = '偏快，她可能紧张、激动或在运动';
+  else if (last.hr > R.hi) desc = '略快，她可能有点兴奋或刚活动过';
+  else if (last.hr < R.lo - 6) desc = '偏慢，她可能很放松或在休息';
   else desc = '正常，比较平静';
   const tempNote = last.temp >= 37.0 ? '，体温偏高一点' : '';
   const stepNote = (typeof todaySteps === 'function' && todaySteps() > 0) ? '，今天走了 ' + todaySteps() + ' 步' : '';
