@@ -2,3 +2,11 @@
 
 # PRD文档
 PRD-*.md
+
+# ===== 别提交到公开仓库 =====
+# 这个仓库是 PUBLIC，而且 GitHub Pages 会把整个目录当静态站发出去，
+# 等于谁拿到网址都能直接下载。下面这些是私人数据/草稿，一律不进 git。
+expense_backup/
+colab_dataset/
+colab_training.ipynb
+.claude/
